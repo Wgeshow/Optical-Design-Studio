@@ -42,6 +42,10 @@ class ComsolExportTests(unittest.TestCase):
         self.assertIn('-115.13-11.259*i', script)
         self.assertIn('"quickz", "0[um]"', script)
         self.assertIn('"quickz", "0.25[um]"', script)
+        # COMSOL cumulative geometry selections do not support show(true) in
+        # all supported versions. Extrude must explicitly select its work plane.
+        self.assertNotIn('.show(true)', script)
+        self.assertIn('feature("ext_1_1").selection("input").set(new String[]{"wp_1_1"})', script)
 
     def test_file_export_adds_java_extension_and_validates_lattice(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -51,6 +55,9 @@ class ComsolExportTests(unittest.TestCase):
             self.assertIn('public class OpticalDevice', result.read_text(encoding='utf8'))
             self.assertIn('Compiled Model File for Java', result.with_suffix('.README.txt').read_text(encoding='utf8'))
             self.assertIn('& $compiler "$modelName.java"', result.with_suffix('.build.ps1').read_text(encoding='utf8'))
+            linux_helper = result.with_suffix('.build.sh').read_text(encoding='utf8')
+            self.assertIn('"$comsol_command" compile -verbose "$model.java"', linux_helper)
+            self.assertIn("'--build-mph'", linux_helper)
             self.assertNotIn('model.save(', result.read_text(encoding='utf8'))
         with self.assertRaisesRegex(ValueError, 'Lattice periods'):
             comsol_java(self.materials, self.layers, self.patterns, {'ax_um': 0, 'ay_um': 1})

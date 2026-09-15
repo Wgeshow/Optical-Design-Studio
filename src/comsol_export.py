@@ -58,6 +58,38 @@ try {
 } finally { Pop-Location }
 '''
 
+LINUX_BUILD_HELPER = r'''#!/usr/bin/env bash
+# Usage: bash @@NAME@@.build.sh /path/to/Multiphysics/bin/comsol [--build-mph]
+set -euo pipefail
+model='@@NAME@@'
+source_dir="$(cd "$(dirname "$0")" && pwd)"
+source_file="$source_dir/$model.java"
+comsol_command="${1:-comsol}"
+build_mph="${2:-}"
+
+if [[ "$comsol_command" == */* ]]; then
+  comsol_command="$(cd "$(dirname "$comsol_command")" && pwd)/$(basename "$comsol_command")"
+else
+  comsol_command="$(command -v "$comsol_command" || true)"
+fi
+[[ -n "$comsol_command" && -x "$comsol_command" ]] || { echo 'COMSOL executable not found. Pass its path as the first argument.' >&2; exit 1; }
+[[ -f "$source_file" ]] || { echo "Missing Java source: $source_file" >&2; exit 1; }
+
+build="$source_dir/${model}_compiled_$(date +%Y%m%d_%H%M%S)"
+mkdir "$build"
+cp "$source_file" "$build/"
+cd "$build"
+"$comsol_command" compile -verbose "$model.java" 2>&1 | tee compile.log
+[[ -f "$model.class" ]] || { echo "Compilation failed; read $build/compile.log" >&2; exit 1; }
+echo "Compiled successfully: $build/$model.class"
+
+if [[ "$build_mph" == '--build-mph' ]]; then
+  "$comsol_command" batch -inputfile "$model.class" -outputfile "$model.mph" -batchlog model-build.log
+  [[ -f "$model.mph" ]] || { echo "MPH build failed; read $build/model-build.log" >&2; exit 1; }
+  echo "Created: $build/$model.mph"
+fi
+'''
+
 
 def export_instructions(name):
     return f'''COMSOL export: {name}
@@ -77,6 +109,9 @@ Manual PowerShell command:
 
 Linux/macOS (from a terminal with COMSOL on PATH):
   comsol compile {name}.java
+
+Linux helper with an explicit COMSOL executable path:
+  bash {name}.build.sh ./Multiphysics/bin/comsol --build-mph
 
 Then File > Open > Compiled Model File for Java (*.class), select {name}.class,
 wait for the geometry/model to build, and Save As an .mph model.
@@ -156,7 +191,7 @@ def comsol_java(materials, layers, patterns, settings, class_name="S4UnitCell", 
         raise ValueError('Export exceeds 100,000 patterned copies. Reduce the repeat counts.')
     lines = [
         '// Java SOURCE: compile with COMSOL before opening the resulting .class.',
-        '// See the adjacent .README.txt and .build.ps1 files.',
+        '// See the adjacent .README.txt, .build.ps1, and .build.sh files.',
         "import com.comsol.model.*;",
         "import com.comsol.model.util.*;",
         "",
@@ -185,7 +220,6 @@ def comsol_java(materials, layers, patterns, settings, class_name="S4UnitCell", 
         lines += [
             f'    g.selection().create("sel_{tag}", "CumulativeSelection");',
             f'    g.selection("sel_{tag}").label({_q(name + " domains")});',
-            f'    g.selection("sel_{tag}").show(true);',
         ]
 
     # Add finite stand-ins for the two S4 half-spaces, then the physical stack.
@@ -247,7 +281,7 @@ def comsol_java(materials, layers, patterns, settings, class_name="S4UnitCell", 
                     f'    g.feature("{wp}").geom().feature("{shape}").set("pos", new String[]{{{_expr(center[0])}, {_expr(center[1])}}});',
                     f'    g.feature("{wp}").geom().feature("{shape}").set("rot", {_q(_num(region["Angle_deg"]))});',
                     f'    g.create("{ext}", "Extrude");',
-                    f'    g.feature("{ext}").set("workplane", "{wp}");',
+                    f'    g.feature("{ext}").selection("input").set(new String[]{{"{wp}"}});',
                     f'    g.feature("{ext}").set("distance", {height_expr});',
                     f'    g.create("{clip}", "Block");',
                     f'    g.feature("{clip}").set("base", "corner");',
@@ -317,6 +351,7 @@ def export_comsol_java(path, materials, layers, patterns, settings, options=None
         raise ValueError('Choose a Java filename starting with a letter and containing only letters, digits, and underscores.')
     text = comsol_java(materials, layers, patterns, settings, destination.stem, options)
     destination.with_suffix('.build.ps1').write_text(BUILD_HELPER.replace('@@NAME@@', destination.stem), encoding='utf-8')
+    destination.with_suffix('.build.sh').write_text(LINUX_BUILD_HELPER.replace('@@NAME@@', destination.stem), encoding='utf-8', newline='\n')
     destination.with_suffix('.README.txt').write_text(export_instructions(destination.stem), encoding='utf-8')
     destination.write_text(text, encoding="utf-8", newline="\n")
     return destination
