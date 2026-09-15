@@ -1,0 +1,6 @@
+# Optional CPU-only dependencies. Install into ./ml_dependencies with --no-deps
+# to preserve the existing NumPy 1.26.4 and MKL required by S4.
+scikit-learn==1.7.2
+scipy==1.16.3
+joblib==1.5.3
+threadpoolctl==3.6.0
