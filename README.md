@@ -1,4 +1,4 @@
-# Optical Design Studio 1.2.0
+# Optical Design Studio
 
 Optical Design Studio provides optical simulation, structure editing, material
 management, optimization, and CAD/COMSOL export.
