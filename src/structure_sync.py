@@ -2,7 +2,7 @@
 import html
 import math
 
-import gradio as gr
+from gradio_compat import gr
 import pandas as pd
 
 from model import LAYER_COLS, MAT_COLS, PAT_COLS

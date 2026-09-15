@@ -3,7 +3,7 @@ import html
 import json
 from pathlib import Path
 import uuid
-import gradio as gr
+from gradio_compat import gr
 import pandas as pd
 import matplotlib.pyplot as plt
 from model import prepare, performance

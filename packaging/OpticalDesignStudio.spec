@@ -12,18 +12,19 @@ env_bin = Path(sys.prefix)/'Library'/'bin'
 
 data = [(str(inputs/'seed_library.zip'), '.'), (str(inputs/'S4_Studio.ico'), '.'),
         (str(source/'pcs_s4_runtime'/'s4_runtime.py'), 'pcs_s4_runtime'),
-        (str(source/'pcs_s4_runtime'/'s4_parallel.py'), 'pcs_s4_runtime')]
+        (str(source/'pcs_s4_runtime'/'s4_parallel.py'), 'pcs_s4_runtime'),
+        (str(root/'assets'/'vtk-runtime-directory.txt'), 'cad_runtime/vtk.libs')]
 # Keep the CAD stack isolated: its own NumPy/SciPy must not override the solver.
-# The exporter uses OpenCascade directly.  VTK is a CadQuery visualization
-# dependency and is not used by either STEP or COMSOL export, so do not ship
-# its 300+ MB runtime in the native desktop package.
+# OCP's IVtk bridge loads parts of vtk.libs dynamically, so PE-import closure
+# alone cannot safely trim that directory. Keep its DLLs for reliable startup
+# and CAD/COMSOL export, while excluding the unused VTK Python modules.
 cad_runtime = source/'cad_runtime'
 for path in cad_runtime.rglob('*'):
     if not path.is_file():
         continue
     relative = path.relative_to(cad_runtime)
     top = relative.parts[0].casefold()
-    if top in {'vtk.libs', 'vtkmodules'} or top == 'vtk.py' or top.startswith('vtk-'):
+    if top == 'vtkmodules' or top == 'vtk.py' or top.startswith('vtk-'):
         continue
     if top == 'ocp' and len(relative.parts) > 1 and relative.parts[1].casefold().startswith('ivtk'):
         continue

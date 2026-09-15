@@ -64,6 +64,46 @@ class NativeAugmentationTests(unittest.TestCase):
             self.assertEqual(report['unresolved'][0]['rejected_candidates'][0]['machine'], '0x14c')
             self.assertEqual(report['optional_unresolved'][0]['dependency'], 'pgf90.dll')
 
+    def test_vtk_wheel_dlls_are_copied_to_ocp_search_directory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            payload, environment = root/'payload', root/'environment'
+            internal = payload/'_internal'
+            vtk = root/'vtk.libs'
+            internal.mkdir(parents=True)
+            (environment/'Library'/'bin').mkdir(parents=True)
+            vtk.mkdir()
+            (payload/'Optical Design Studio.exe').write_text('exe')
+            (vtk/'vtkCommonCore.dll').write_text('vtk')
+
+            def imports(path):
+                return (native.AMD64, ['vtkCommonCore.dll']) if path.name.endswith('.exe') else (native.AMD64, [])
+
+            with patch.object(native, 'pe_imports', side_effect=imports):
+                report = native.augment(payload, environment, extra=[vtk])
+            self.assertTrue(report['passed'])
+            self.assertTrue((internal/'cad_runtime'/'vtk.libs'/'vtkCommonCore.dll').is_file())
+
+    def test_ocp_wheel_dlls_are_copied_to_ocp_search_directory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            payload, environment = root/'payload', root/'environment'
+            internal = payload/'_internal'
+            ocp = root/'cadquery_ocp.libs'
+            internal.mkdir(parents=True)
+            (environment/'Library'/'bin').mkdir(parents=True)
+            ocp.mkdir()
+            (payload/'Optical Design Studio.exe').write_text('exe')
+            (ocp/'TKernel-hash.dll').write_text('ocp')
+
+            def imports(path):
+                return (native.AMD64, ['TKernel-hash.dll']) if path.name.endswith('.exe') else (native.AMD64, [])
+
+            with patch.object(native, 'pe_imports', side_effect=imports):
+                report = native.augment(payload, environment, extra=[ocp])
+            self.assertTrue(report['passed'])
+            self.assertTrue((internal/'cad_runtime'/'cadquery_ocp.libs'/'TKernel-hash.dll').is_file())
+
 
 if __name__ == '__main__':
     unittest.main()

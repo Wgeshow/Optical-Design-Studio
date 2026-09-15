@@ -4,7 +4,7 @@ import html
 import json
 import math
 from pathlib import Path
-import gradio as gr
+from gradio_compat import gr
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd

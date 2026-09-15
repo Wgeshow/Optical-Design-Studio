@@ -102,11 +102,9 @@ def main():
         elif item.is_dir() and item.name in SOURCE_FOLDERS:
             patterns = ['__pycache__', '*.pyc', '.git']
             if item.name == 'cad_runtime':
-                # STEP export calls OCP directly; VTK is only CadQuery's
-                # optional visualization layer and is not shipped.
-                # Keep native vtk.libs only as an audit source: the OCP binary
-                # links its small IVtk bridge even when visualization is unused.
-                # The post-build audit copies only that bridge's transitive DLLs.
+                # OCP dynamically loads native VTK libraries through IVtk even
+                # when its Python visualization modules are unused. Preserve
+                # vtk.libs as build input, but omit the Python VTK surface.
                 patterns += ['vtk.py', 'vtkmodules', 'vtk-*.dist-info', 'IVtk*']
             shutil.copytree(item, source/item.name, dirs_exist_ok=True,
                             ignore=shutil.ignore_patterns(*patterns))

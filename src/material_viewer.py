@@ -2,7 +2,7 @@
 import cmath
 import html
 from pathlib import Path
-import gradio as gr
+from gradio_compat import gr
 import matplotlib.pyplot as plt
 import pandas as pd
 from model import MAT_COLS, numeric_rows, number

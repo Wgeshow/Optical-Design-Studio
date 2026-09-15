@@ -17,7 +17,7 @@ import threading
 import time
 import uuid
 
-import gradio as gr
+from gradio_compat import gr
 import matplotlib.pyplot as plt
 import pandas as pd
 

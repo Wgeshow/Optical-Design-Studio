@@ -1,5 +1,5 @@
 """Live geometry preview of the committed project; no simulation is required."""
-import gradio as gr
+from gradio_compat import gr
 
 from structure_preview import build_structure_figure
 

@@ -6,7 +6,7 @@ import struct
 
 from desktop_runtime import application_root
 
-APP_VERSION = '1.1.3'
+APP_VERSION = '1.1.4'
 BUILD_DATE = '2026-09-14'
 
 

@@ -1,7 +1,7 @@
 """Automatic CSV-to-material import and manual dispersive material entry."""
 import html
 from pathlib import Path
-import gradio as gr
+from gradio_compat import gr
 import pandas as pd
 
 from model import MAT_COLS, number

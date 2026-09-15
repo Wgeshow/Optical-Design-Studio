@@ -1,6 +1,6 @@
 """Guided desktop-scale interface, sharing the existing validated project model."""
 import html
-import gradio as gr
+from gradio_compat import gr
 import pandas as pd
 
 from model import MAT_COLS, LAYER_COLS, PAT_COLS, MODES, prepare

@@ -140,7 +140,17 @@ def augment(payload, environment, *, extra=(), audit_only=False):
             if source is None:
                 report['unresolved'].append(dict(owner=str(owner), dependency=name, rejected_candidates=rejected))
                 continue
-            destination = internal / source.name
+            # OCP's delvewheel bootstrap explicitly adds these two wheel
+            # directories to the Windows DLL search path. Preserve both
+            # locations instead of flattening their DLLs into _internal.
+            wheel_runtime_directories = {
+                'vtk.libs': 'vtk.libs',
+                'cadquery_ocp.libs': 'cadquery_ocp.libs',
+            }
+            runtime_directory = wheel_runtime_directories.get(source.parent.name.casefold())
+            destination = (internal/'cad_runtime'/runtime_directory/source.name
+                           if runtime_directory else internal/source.name)
+            destination.parent.mkdir(parents=True, exist_ok=True)
             # Never replace a PyInstaller-selected binary or another build's DLL.
             # All copies here are missing basenames, validated as AMD64 first.
             if destination.exists():

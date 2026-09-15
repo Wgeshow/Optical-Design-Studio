@@ -35,6 +35,7 @@ For a complete release verification, run the packaged application check and an i
 
 ```powershell
 python verify_frozen.py 'dist/Optical Design Studio/Optical Design Studio.exe' 'v103_test' --gpu --expect-empty-library
+
 python verify_local_installation.py 'release/OpticalDesignStudio-Setup-1.0.3-Windows-x64.exe' --previous-installer 'release/OpticalDesignStudio-Setup-1.0.2-Windows-x64.exe'
 python finalize_release.py --fresh-runtime-report 'v103_test/report.json'
 ```

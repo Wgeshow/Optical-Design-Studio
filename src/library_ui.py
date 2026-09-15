@@ -4,7 +4,7 @@ from datetime import datetime
 import html
 import json
 from pathlib import Path
-import gradio as gr
+from gradio_compat import gr
 import matplotlib.pyplot as plt
 import pandas as pd
 

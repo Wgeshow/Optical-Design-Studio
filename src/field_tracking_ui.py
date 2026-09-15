@@ -8,7 +8,7 @@ import re
 import shutil
 import uuid
 
-import gradio as gr
+from gradio_compat import gr
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 import numpy as np
