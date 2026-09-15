@@ -1,6 +1,6 @@
 # Optical Design Studio
 
-Application source code and public Windows releases for Optical Design Studio, maintained by Wgeshow.
+Application source code and public Windows releases for Optical Design Studio.
 
 ## Download
 
@@ -9,8 +9,6 @@ Application source code and public Windows releases for Optical Design Studio, m
 ## Updating the application
 
 Versions 1.0.5 and earlier require one manual upgrade to 1.1.0. Preserve **User Data** and **portable_settings.json**. If using a new application folder, select your existing data folder under **Settings → Data storage** and restart.
-
-Version 1.1.0 supports user-confirmed download, checksum verification, in-place replacement and restart for subsequent compatible updates through **About → Download and install**. The application folder must be writable, with free space for staging and a backup. No GitHub account or token is required.
 
 Packages appear under [Releases](https://github.com/Wgeshow/Optical-Design-Studio/releases). Windows package names follow `OpticalDesignStudio-Portable-VERSION-Windows-x64.zip`, with a matching `.sha256` file.
 
