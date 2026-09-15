@@ -13,7 +13,7 @@ from PyQt6.QtCore import Qt, QSignalBlocker, QUrl
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox,
     QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QProgressBar, QPushButton,
-    QScrollArea, QSplitter, QTabWidget, QVBoxLayout, QWidget)
+    QScrollArea, QSplitter, QTabWidget, QVBoxLayout, QWidget, QListWidget, QListWidgetItem)
 
 from model import MODES
 from peak_optimizer import SEARCH_KEYS, SEARCH_DEFAULTS
@@ -105,7 +105,7 @@ def _scroll(widget):
 class _ResponsiveSplitter(QSplitter):
     def resizeEvent(self,event):
         super().resizeEvent(event)
-        if self.count()!=2:
+        if self.count() not in (2, 3):
             return
         orientation=Qt.Orientation.Horizontal if self.width()>=980 else Qt.Orientation.Vertical
         if orientation!=self.orientation():
@@ -113,12 +113,13 @@ class _ResponsiveSplitter(QSplitter):
             vertical=orientation==Qt.Orientation.Vertical
             self.widget(0).setMinimumHeight(240 if vertical else 0)
             self.widget(1).setMinimumHeight(330 if vertical else 0)
-            self.setSizes([350,430] if vertical else [420,750])
+            self.setSizes(([350,430] if vertical else [300,750]) if self.count() == 2 else
+                          ([300,430,220] if vertical else [280,660,220]))
 
 
 def _split(left, right, actions=None):
     splitter = _ResponsiveSplitter(Qt.Orientation.Horizontal)
-    left.setMinimumWidth(320)
+    left.setMinimumWidth(260)
     if actions is None:
         splitter.addWidget(_scroll(left))
     else:
@@ -131,7 +132,7 @@ def _split(left, right, actions=None):
     splitter.addWidget(right)
     splitter.setStretchFactor(0, 0)
     splitter.setStretchFactor(1, 1)
-    splitter.setSizes([400, 750])
+    splitter.setSizes([300, 750])
     splitter.setChildrenCollapsible(False)
     return splitter
 
@@ -153,7 +154,18 @@ def _read_csv(path):
         return pd.DataFrame()
 
 
-def spectrum_figure(frame, *, threshold=None, title='Optical response'):
+def highest_sample_index(frame, key):
+    """Return the first finite maximum's row position, independent of index labels."""
+    if frame.empty or key not in frame:
+        return None
+    values = pd.to_numeric(frame[key], errors='coerce').to_numpy(dtype=float)
+    valid = np.isfinite(values)
+    if not valid.any():
+        return None
+    return int(np.argmax(np.where(valid, values, -np.inf)))
+
+
+def spectrum_figure(frame, *, threshold=None, title='Optical response', peak_key='A'):
     figure = Figure(figsize=(8, 5), layout='constrained')
     axis = figure.add_subplot(111)
     if frame.empty:
@@ -167,9 +179,10 @@ def spectrum_figure(frame, *, threshold=None, title='Optical response'):
     for key, name, color in [('A', 'Absorption', '#00b99f'), ('R', 'Reflection', '#5487ec'), ('T', 'Transmission', '#e3a650')]:
         if key in frame:
             axis.plot(frame[variable], frame[key], label=name, color=color, linewidth=1.8)
-    if 'A' in frame and frame.A.notna().any():
-        position = frame.A.idxmax()
-        axis.scatter([frame.loc[position, variable]], [frame.loc[position, 'A']], color='#e8748b', s=35, zorder=5, label='Highest sampled value')
+    position = highest_sample_index(frame, peak_key)
+    if position is not None:
+        best = frame.iloc[position]
+        axis.scatter([best[variable]], [best[peak_key]], color='#e8748b', s=45, zorder=5, label=f'Highest sampled {peak_key}')
     if threshold is not None:
         axis.axhline(threshold, color='#929cab', linestyle='--', linewidth=1, label=f'Acceptance > {100 * threshold:g}%')
     axis.set(xlabel='Incidence angle (degrees)' if variable == 'angle_deg' else 'Wavelength (nm)',
@@ -377,6 +390,25 @@ class SimulationPage(_RunPage):
         controls.addWidget(_label('The Fourier basis and CPU/GPU settings are shared through Settings. All completed samples are saved in the data library.', True))
         run_actions = self.actions('Run simulation', self.run)
         controls.addStretch()
+        overview = QGroupBox('Results overview')
+        overview_layout = QHBoxLayout(overview)
+        self.power_values = {}
+        for key, label in [('R', 'Reflectance'), ('T', 'Transmittance'), ('A', 'Absorptance')]:
+            card, card_layout = _group(label)
+            value = _label('—')
+            value.setObjectName('pageTitle')
+            card_layout.addRow(value)
+            overview_layout.addWidget(card, 1)
+            self.power_values[key] = value
+        output.addWidget(overview)
+        self.result_frame = pd.DataFrame()
+        self.peak_quantity = _combo([('Reflection', 'R'), ('Transmission', 'T'), ('Absorption', 'A')], 'A')
+        self.peak_summary = _label('Run a simulation or load a recent run to inspect its highest sample.')
+        peak_box, peak_form = _group('Highest sampled point', [('Find maximum of', self.peak_quantity)])
+        peak_form.addRow(self.peak_summary)
+        peak_form.addRow(_label('Uses the displayed simulation data. Change this selection at any time. Ties use the first sample.', True))
+        output.addWidget(peak_box)
+        self.peak_quantity.currentIndexChanged.connect(self.update_peak)
         self.plot = PlotWidget()
         self.plot.setMinimumHeight(380)
         self.results = table([])
@@ -384,10 +416,22 @@ class SimulationPage(_RunPage):
         tabs.addTab(self.plot, 'Spectrum')
         tabs.addTab(self.results, 'All samples')
         output.addWidget(tabs, 1)
-        self.metrics = _label('Run a simulation to see the highest sampled absorption and GPU activity.')
+        self.metrics = _label('Run a simulation to see sample counts and GPU activity.')
         output.addWidget(self.metrics)
         output.addWidget(_button('Open saved result files', self.open_results))
-        self.layout_.addWidget(_split(left, right, run_actions), 1)
+        panels = _split(left, right, run_actions)
+        recent = QGroupBox('Recent runs')
+        recent_layout = QVBoxLayout(recent)
+        self.recent_runs = QListWidget()
+        self.recent_runs.setMinimumWidth(150)
+        recent_layout.addWidget(self.recent_runs)
+        recent_layout.addWidget(_button('Load selected run', self.load_recent))
+        recent_layout.addWidget(_button('View saved files', self.open_recent))
+        panels.addWidget(recent)
+        panels.setSizes([280, 650, 190])
+        self.layout_.addWidget(panels, 1)
+        store.library_changed.connect(self.refresh_recent)
+        self.refresh_recent()
         self.footer()
         for widget in self.controls.values():
             _on_edit(widget, self.save_settings)
@@ -419,15 +463,82 @@ class SimulationPage(_RunPage):
         if self.save_settings():
             self._start('simulation', {})
 
+    def refresh_recent(self):
+        self.recent_runs.clear()
+        for record in self.store.library.entries():
+            if record.get('kind') != 'simulation':
+                continue
+            item = QListWidgetItem(str(record.get('title', 'Simulation')) + '\n' +
+                str(record.get('created', ''))[:16] + ' · ' + str(record.get('status', 'saved')))
+            item.setData(Qt.ItemDataRole.UserRole, record['id'])
+            self.recent_runs.addItem(item)
+            if self.recent_runs.count() >= 12:
+                break
+        if not self.recent_runs.count():
+            item = QListWidgetItem('No saved simulations yet')
+            item.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.recent_runs.addItem(item)
+
+    def open_recent(self):
+        item = self.recent_runs.currentItem()
+        if item is None or not item.data(Qt.ItemDataRole.UserRole):
+            return
+        try:
+            directory = self.store.library.directory(item.data(Qt.ItemDataRole.UserRole))
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(directory)))
+        except (OSError, ValueError) as exc:
+            self.status.setText(str(exc))
+
+    def load_recent(self):
+        item = self.recent_runs.currentItem()
+        if item is None or not item.data(Qt.ItemDataRole.UserRole):
+            return
+        try:
+            directory = self.store.library.directory(item.data(Qt.ItemDataRole.UserRole))
+            frame = _read_csv(Path(directory) / 'results.csv')
+            self.directory = Path(directory)
+            self.result_frame = frame
+            fill_table(self.results, frame)
+            self.update_peak()
+            self.metrics.setText(f'{len(frame):,} saved samples loaded.')
+            self.status.setText(f'Loaded saved simulation: {directory}')
+        except (OSError, ValueError) as exc:
+            self.status.setText(f'Could not load saved simulation: {exc}')
+
+    def update_peak(self, *_):
+        frame = self.result_frame
+        key = self.peak_quantity.currentData()
+        name = self.peak_quantity.currentText().lower()
+        self.plot.draw_figure(spectrum_figure(frame, peak_key=key))
+        self.results.clearSelection()
+        for value in self.power_values.values():
+            value.setText('—')
+            value.setToolTip('')
+        position = highest_sample_index(frame, key)
+        if position is None:
+            self.peak_summary.setText(f'No finite {name} samples are available in the displayed data.')
+            return
+        best = frame.iloc[position]
+        coordinates = []
+        for column, unit in [('wavelength_nm', 'nm'), ('angle_deg', '°')]:
+            value = pd.to_numeric(best.get(column), errors='coerce')
+            if pd.notna(value) and np.isfinite(value):
+                coordinates.append(f'{value:.8g} {unit}')
+        location = ' at ' + ', '.join(coordinates) if coordinates else ''
+        self.peak_summary.setText(f'Highest sampled {name}: {100 * float(best[key]):.7g}%{location} (sample {position + 1}).')
+        for quantity, label in self.power_values.items():
+            value = pd.to_numeric(best.get(quantity), errors='coerce')
+            label.setText(f'{value:.4f}' if pd.notna(value) and np.isfinite(value) else '—')
+            label.setToolTip(f'Value at the highest sampled {name} point.')
+        self.results.selectRow(position)
+
     def show_result(self, event):
         frame = _read_csv(Path(event.get('output') or self.directory / 'results.csv'))
+        self.result_frame = frame
         fill_table(self.results, frame)
-        self.plot.draw_figure(spectrum_figure(frame))
+        self.update_peak()
         self.plot.figure.savefig(self.directory / 'spectrum.png', dpi=160)
         parts = [f'{len(frame):,} samples saved.']
-        if 'A' in frame and frame.A.notna().any():
-            best = frame.loc[frame.A.idxmax()]
-            parts.append(f"Highest sampled absorption: {100 * best.A:.7g}% at {best.wavelength_nm:.8g} nm, {best.angle_deg:g}°.")
         from gpu_status import acceleration_summary
         info = event.get('info', {})
         parts.append(acceleration_summary(info))
@@ -808,6 +919,8 @@ class FieldsPage(_RunPage):
         self.tabs = QTabWidget()
         current = QWidget()
         body = QVBoxLayout(current)
+        left, center, right = QWidget(), QWidget(), QWidget()
+        settings_layout, plot_layout, export_layout = QVBoxLayout(left), QVBoxLayout(center), QVBoxLayout(right)
         inputs, form = _group('Calculate current Structure')
         self.wavelength = number(1550, .000001)
         self.layer = QComboBox()
@@ -816,20 +929,32 @@ class FieldsPage(_RunPage):
         form.addRow('Layer for top view', self.layer)
         form.addRow('Map samples per axis', self.grid)
         form.addRow(self.actions('Calculate field maps', self.run))
-        body.addWidget(inputs)
-        plot_controls = QHBoxLayout()
+        settings_layout.addWidget(inputs)
         self.component = _combo([('Total intensity |E|²', 'E2'), ('X component |Ex|²', 'Ex'), ('Y component |Ey|²', 'Ey'), ('Z component |Ez|²', 'Ez')])
         self.arrows = _check('Show Re(E) arrows')
         self.logarithmic = _check('Log intensity scale', False)
-        plot_controls.addWidget(self.component, 1)
-        plot_controls.addWidget(self.arrows)
-        plot_controls.addWidget(self.logarithmic)
-        body.addLayout(plot_controls)
+        display, display_form = _group('Display')
+        display_form.addRow('Field component', self.component)
+        display_form.addRow(self.arrows)
+        display_form.addRow(self.logarithmic)
+        settings_layout.addWidget(display)
+        settings_layout.addStretch()
         self.plot = PlotWidget()
-        body.addWidget(self.plot, 1)
+        plot_layout.addWidget(self.plot, 1)
         self.plot.setMinimumHeight(420)
-        body.addWidget(_label('XY is the selected layer midplane; XZ crosses the stack at y = 0. Colors show intensity relative to the incident field. Arrows show the real electric field at one phase.', True))
-        body.addWidget(_button('Open fields, complex samples and structure', self.open_results))
+        plot_layout.addWidget(_label('XY: selected layer midplane · XZ: y = 0. Colors show intensity relative to the incident field.', True))
+        exports, export_form = _group('Export')
+        export_form.addRow(_button('Save image…', self.export_image))
+        export_form.addRow(_button('Export data…', self.export_data))
+        export_form.addRow(_button('Copy plot', self.copy_plot))
+        export_form.addRow(_button('Open saved files', self.open_results))
+        export_layout.addWidget(exports)
+        export_layout.addWidget(_label('Saved data includes complex field samples and the Structure used for the calculation.', True))
+        export_layout.addStretch()
+        panels = _split(left, center)
+        panels.addWidget(right)
+        panels.setSizes([280, 650, 180])
+        body.addWidget(panels, 1)
         self.tabs.addTab(current, 'Current Structure')
         from qt_field_compare import FieldComparisonWidget
         self.comparison = FieldComparisonWidget(store)
@@ -866,6 +991,39 @@ class FieldsPage(_RunPage):
 
     def run(self):
         self._start('fields', self.options())
+
+    def export_image(self):
+        if self.field_directory is None:
+            self.status.setText('Calculate or open a field result before exporting an image.')
+            return
+        path, _ = QFileDialog.getSaveFileName(self, 'Save field image', 'electric-field.png', 'PNG image (*.png)')
+        if path:
+            try:
+                self.plot.figure.savefig(path, dpi=180)
+                self.status.setText('Field image saved.')
+            except Exception as exc:
+                self.status.setText('Could not save image: ' + str(exc))
+
+    def export_data(self):
+        if self.field_directory is None:
+            self.status.setText('Calculate a field result before exporting data.')
+            return
+        path, _ = QFileDialog.getSaveFileName(self, 'Export field samples', 'electric-fields.csv', 'CSV data (*.csv)')
+        if path:
+            try:
+                import shutil
+                shutil.copyfile(self.field_directory / 'electric_fields.csv', path)
+                self.status.setText('Complex field samples exported.')
+            except Exception as exc:
+                self.status.setText('Could not export samples: ' + str(exc))
+
+    def copy_plot(self):
+        if self.field_directory is None:
+            self.status.setText('Calculate a field result before copying the plot.')
+            return
+        from PyQt6.QtWidgets import QApplication
+        QApplication.clipboard().setPixmap(self.plot.canvas.grab())
+        self.status.setText('Field plot copied to clipboard.')
 
     def render_fields(self, *_):
         if self.field_directory is None:
@@ -936,6 +1094,12 @@ class SettingsPage(_RunPage):
         QVBoxLayout(storage_page).addWidget(storage)
         self.settings_tabs.addTab(storage_page, 'Data storage')
         self.settings_tabs.addTab(_split(left,right), 'Performance')
+        from qt_addons import AddonsPage
+        self.addons_panel = AddonsPage(store=store)
+        self.settings_tabs.addTab(_scroll(self.addons_panel), 'Add-ons')
+        from qt_common import theme_manager
+        self.refresh_tab_icons()
+        theme_manager().changed.connect(self.refresh_tab_icons)
         self.layout_.addWidget(self.settings_tabs,1)
         self.footer()
         self.basis.editingFinished.connect(self.save_settings)
@@ -943,6 +1107,12 @@ class SettingsPage(_RunPage):
             _on_edit(widget, self.save_settings)
         store.changed.connect(self.refresh)
         self.refresh()
+
+    def refresh_tab_icons(self, *_):
+        from qt_icons import navigation_icon
+        from qt_common import COLORS, theme_manager
+        for index, name in enumerate(('appearance', 'storage', 'performance', 'addons')):
+            self.settings_tabs.setTabIcon(index, navigation_icon(name, COLORS[theme_manager().mode]['accent']))
 
     def browse_data_directory(self):
         directory = QFileDialog.getExistingDirectory(self, 'Choose data output folder', self.data_directory.text())

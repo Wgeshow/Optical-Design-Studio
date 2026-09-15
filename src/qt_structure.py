@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import colorsys
 import hashlib
+import math
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QSignalBlocker, QSize, QRect
@@ -11,12 +12,13 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QComboBox, QDoubleSpinBox, QFormLayout, QGridLayout,
     QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
     QPushButton, QScrollArea, QSpinBox, QSplitter, QTabWidget, QFileDialog,
-    QVBoxLayout, QWidget, QStyledItemDelegate, QStyleOptionViewItem, QStyle,
+    QVBoxLayout, QWidget, QStyledItemDelegate, QStyleOptionViewItem, QStyle, QMenu, QCheckBox,
 )
 from matplotlib.artist import Artist
 from matplotlib.collections import PatchCollection
 from matplotlib.figure import Figure
 from matplotlib.patches import Polygon, Rectangle
+from matplotlib.ticker import FuncFormatter
 
 from model import LAYER_COLS, PAT_COLS
 from structure_builder import material_catalog, mutate_region, mutate_structure, rows
@@ -220,6 +222,27 @@ def geometry_figure(layers, patterns, selected, lattice_x, lattice_y, cells=1, c
     return fig
 
 
+def apply_geometry_units(figure, unit):
+    """Convert display formatting only; selection geometry stays in micrometres."""
+    factor = 1000 if unit == 'nm' else 1
+    text = lambda value: f'{value * factor:g}'
+    for axis in figure.axes:
+        axis.set_xlabel(f'x ({unit})')
+        axis.set_ylabel(f'y ({unit})' if hasattr(axis, 'zaxis') or axis is figure.axes[0] else f'Depth z ({unit})')
+        axis.xaxis.set_major_formatter(FuncFormatter(lambda value, position: text(value)))
+        axis.yaxis.set_major_formatter(FuncFormatter(lambda value, position: text(value)))
+        axis.format_xdata = text
+        axis.format_ydata = text
+        if hasattr(axis, 'zaxis'):
+            axis.set_zlabel(f'Depth z ({unit})')
+            axis.zaxis.set_major_formatter(FuncFormatter(lambda value, position: text(value)))
+            axis.format_zdata = text
+    metadata = getattr(figure, '_s4_geometry', {})
+    metadata['display_unit'] = unit
+    if metadata.get('section') is not None:
+        metadata['section'].set_title(f"Section · y = {text(metadata['cut_y_um'])} {unit}")
+
+
 class StructurePage(QWidget):
     """Synchronous selection and atomic edits eliminate stale browser callbacks."""
     def heightForWidth(self, width):
@@ -231,6 +254,16 @@ class StructurePage(QWidget):
             return super().heightForWidth(width)
         return max(self.minimumSizeHint().height(), layout.minimumHeightForWidth(width))
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if not hasattr(self, 'workspace_splitter'):
+            return
+        wide = self.width() >= 1120
+        orientation = Qt.Orientation.Horizontal if wide else Qt.Orientation.Vertical
+        if self.workspace_splitter.orientation() != orientation:
+            self.workspace_splitter.setOrientation(orientation)
+            self.workspace_splitter.setSizes([650, 335] if wide else [430, 285])
+
     def __init__(self, store, parent=None):
         super().__init__(parent)
         self.setObjectName('structurePage')
@@ -240,6 +273,7 @@ class StructurePage(QWidget):
         self._unit = 'nm'
         self._refreshing = False
         self._snapshot = None
+        self._lattice_snapshot = None
         self._mutating = False
         self._actions = []
         self._build()
@@ -267,7 +301,16 @@ class StructurePage(QWidget):
         root.setSpacing(12)
         title = QLabel('Structure')
         title.setObjectName('pageTitle')
-        root.addWidget(title)
+        heading = QHBoxLayout()
+        heading.addWidget(title)
+        heading.addStretch()
+        self.export_button = self._button('Export ▾', lambda: None, 'structureExport')
+        export_menu = QMenu(self.export_button)
+        export_menu.addAction('COMSOL model…', self.export_comsol).setObjectName('exportComsol')
+        export_menu.addAction('CAD / STEP…', self.export_cad).setObjectName('exportCad')
+        self.export_button.setMenu(export_menu)
+        heading.addWidget(self.export_button)
+        root.addLayout(heading)
         subtitle = QLabel('Build your multilayer device once. Simulations, optimization and field maps use this structure.')
         subtitle.setObjectName('muted')
         subtitle.setWordWrap(True)
@@ -278,23 +321,37 @@ class StructurePage(QWidget):
         self.lattice_x.setObjectName('latticeX')
         self.lattice_y = _number(.77, 1e-9)
         self.lattice_y.setObjectName('latticeY')
-        self.lattice_x.setSuffix(' µm')
-        self.lattice_y.setSuffix(' µm')
-        layout.addWidget(QLabel('Period X'))
+        self.lattice_x.setSuffix(' ' + self._unit)
+        self.lattice_y.setSuffix(' ' + self._unit)
+        self.lattice_x_label = QLabel('Period')
+        self.lattice_y_label = QLabel('Period Y')
+        self.square_lattice = QCheckBox('Square lattice')
+        self.square_lattice.setObjectName('squareLattice')
+        self.square_lattice.setToolTip('Link both side lengths. Uncheck to enter separate X and Y periods.')
+        self.square_lattice.setChecked(True)
+        self.square_lattice.toggled.connect(self._lattice_mode_changed)
+        self.lattice_x.valueChanged.connect(self._link_lattice_period)
+        layout.addWidget(self.square_lattice)
+        layout.addWidget(self.lattice_x_label)
         layout.addWidget(self.lattice_x)
-        layout.addWidget(QLabel('Period Y'))
+        layout.addWidget(self.lattice_y_label)
         layout.addWidget(self.lattice_y)
+        self._lattice_mode_changed(True)
         layout.addWidget(self._button('Apply lattice', self.apply_lattice, 'applyLattice'))
-        layout.addWidget(self._button('Export COMSOL…', self.export_comsol, 'exportComsol'))
-        layout.addWidget(self._button('Export CAD…', self.export_cad, 'exportCad'))
         layout.addStretch()
-        layout.addWidget(QLabel('Editor units'))
+        unit_card = QGroupBox('Editor units')
+        unit_layout = QHBoxLayout(unit_card)
+        unit_layout.addWidget(QLabel('Dimensions'))
         self.units = QComboBox()
         self.units.setObjectName('structureUnits')
         self.units.addItems(['nm', 'µm'])
         self.units.currentTextChanged.connect(self._change_units)
-        layout.addWidget(self.units)
-        root.addWidget(lattice)
+        unit_layout.addWidget(self.units)
+        self.units.setToolTip('Display units for every length in this Structure workspace, including lattice, layers, regions and previews.')
+        settings_row = QHBoxLayout()
+        settings_row.addWidget(lattice, 1)
+        settings_row.addWidget(unit_card)
+        root.addLayout(settings_row)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setChildrenCollapsible(False)
@@ -332,23 +389,35 @@ class StructurePage(QWidget):
         splitter.addWidget(sidebar)
 
         right = QSplitter(Qt.Orientation.Vertical)
+        self.workspace_splitter = right
+        right.setObjectName('structureWorkspaceSplitter')
         right.setChildrenCollapsible(False)
         self.preview_card = QGroupBox('Structure preview')
         preview = QVBoxLayout(self.preview_card)
-        controls = QHBoxLayout()
+        controls = QGridLayout()
+        self.view_mode = QComboBox()
+        self.view_mode.setObjectName('structureViewMode')
+        self.view_mode.addItems(['2D · Plan & section', '3D · Structure'])
+        self.view_mode.currentIndexChanged.connect(self.draw_preview)
+        controls.addWidget(self.view_mode, 0, 0, 1, 2)
         self.cells = QComboBox()
         self.cells.setObjectName('previewCells')
         self.cells.addItems(['1 × 1 cell', '3 × 3 cells', '5 × 5 cells', '7 × 7 cells'])
         self.cells.currentIndexChanged.connect(self.draw_preview)
         self.cut_y = _number(0)
-        self.cut_y.setSuffix(' µm')
+        self.cut_y.setSuffix(' ' + self._unit)
         self.cut_y.setObjectName('previewCutY')
         self.cut_y.valueChanged.connect(self.draw_preview)
-        controls.addWidget(QLabel('Periodic cells'))
-        controls.addWidget(self.cells)
-        controls.addStretch()
-        controls.addWidget(QLabel('Section Y'))
-        controls.addWidget(self.cut_y)
+        controls.addWidget(QLabel('Periodic cells'), 1, 0)
+        controls.addWidget(self.cells, 1, 1)
+        self.cut_label = QLabel('Section Y')
+        controls.addWidget(self.cut_label, 1, 2)
+        controls.addWidget(self.cut_y, 1, 3)
+        self.reset_view = QPushButton('Reset view')
+        self.reset_view.setObjectName('resetStructureView')
+        self.reset_view.clicked.connect(lambda: self.draw_preview(reset=True))
+        controls.addWidget(self.reset_view, 0, 3)
+        controls.setColumnStretch(2, 1)
         preview.addLayout(controls)
         self.plot = PlotWidget()
         self.plot.setObjectName('structurePlot')
@@ -362,6 +431,9 @@ class StructurePage(QWidget):
 
         self.tabs = QTabWidget()
         self.tabs.setObjectName('structureEditorTabs')
+        self.tabs.setMinimumWidth(285)
+        self.tabs.setUsesScrollButtons(True)
+        self.tabs.setElideMode(Qt.TextElideMode.ElideRight)
         self.layer_editor = QWidget()
         layer_layout = QVBoxLayout(self.layer_editor)
         form = QFormLayout()
@@ -384,7 +456,7 @@ class StructurePage(QWidget):
         layer_layout.addWidget(self.layer_hint)
         layer_layout.addWidget(self._button('Apply layer', lambda: self.layer_action('apply'), 'applyLayer', True))
         layer_layout.addStretch()
-        self.tabs.addTab(self._scroll(self.layer_editor), 'Layer properties')
+        self.tabs.addTab(self._scroll(self.layer_editor), 'Layer')
 
         self.region_editor = QWidget()
         region_layout = QVBoxLayout(self.region_editor)
@@ -395,7 +467,8 @@ class StructurePage(QWidget):
         region_select.addWidget(QLabel('Region'))
         region_select.addWidget(self.region_choice, 1)
         region_layout.addLayout(region_select)
-        grid = QGridLayout()
+        grid = QFormLayout()
+        grid.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         self.shape = QComboBox()
         self.shape.setObjectName('regionShape')
         for label, value in [('Circle', 'circle'), ('Ellipse', 'ellipse'), ('Rectangle', 'rectangle')]:
@@ -414,31 +487,23 @@ class StructurePage(QWidget):
                               (self.region_angle, 'regionAngle')):
             widget.setObjectName(name)
         self.sx_label, self.sy_label = QLabel('Radius'), QLabel('Y radius')
-        for row, (left_label, left, right_label, right_widget) in enumerate([
-            (QLabel('Shape'), self.shape, QLabel('Material'), self.region_material),
-            (QLabel('Centre X'), self.region_x, QLabel('Centre Y'), self.region_y),
-            (self.sx_label, self.region_sx, self.sy_label, self.region_sy),
-            (QLabel('Rotation'), self.region_angle, None, None),
-        ]):
-            grid.addWidget(left_label, row, 0)
-            grid.addWidget(left, row, 1)
-            if right_label is not None:
-                grid.addWidget(right_label, row, 2)
-                grid.addWidget(right_widget, row, 3)
-        grid.setColumnStretch(1, 1)
-        grid.setColumnStretch(3, 1)
+        for label, widget in [(QLabel('Shape'), self.shape), (QLabel('Material'), self.region_material),
+                              (QLabel('Centre X'), self.region_x), (QLabel('Centre Y'), self.region_y),
+                              (self.sx_label, self.region_sx), (self.sy_label, self.region_sy),
+                              (QLabel('Rotation'), self.region_angle)]:
+            grid.addRow(label, widget)
         region_layout.addLayout(grid)
-        region_buttons = QHBoxLayout()
-        for text, op in [('Add region', 'add'), ('Apply region', 'apply'), ('Duplicate', 'copy'), ('Delete', 'delete')]:
+        region_buttons = QGridLayout()
+        for index, (text, op) in enumerate([('Add region', 'add'), ('Apply region', 'apply'), ('Duplicate', 'copy'), ('Delete', 'delete')]):
             region_buttons.addWidget(self._button(text, lambda checked=False, action=op: self.region_action(action),
-                                                   'region_' + op, op == 'apply'))
+                                                   'region_' + op, op == 'apply'), index//2, index%2)
         region_layout.addLayout(region_buttons)
         self.region_hint = QLabel()
         self.region_hint.setWordWrap(True)
         self.region_hint.setObjectName('muted')
         region_layout.addWidget(self.region_hint)
         region_layout.addStretch()
-        self.tabs.addTab(self._scroll(self.region_editor), 'Holes and regions')
+        self.tabs.addTab(self._scroll(self.region_editor), 'Regions')
 
         repeat_page = QWidget()
         repeat = QVBoxLayout(repeat_page)
@@ -458,10 +523,10 @@ class StructurePage(QWidget):
         repeat.addLayout(form)
         repeat.addWidget(self._button('Repeat layer block', lambda: self.layer_action('repeat'), 'repeatBlock', True))
         repeat.addStretch()
-        self.tabs.addTab(self._scroll(repeat_page), 'Repeat block')
+        self.tabs.addTab(self._scroll(repeat_page), 'Repeat')
         right.addWidget(self.tabs)
-        right.setStretchFactor(0, 5)
-        right.setStretchFactor(1, 4)
+        right.setStretchFactor(0, 7)
+        right.setStretchFactor(1, 3)
         right.setSizes([430, 285])
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 1)
@@ -544,7 +609,7 @@ class StructurePage(QWidget):
                 for index, layer in enumerate(stack):
                     count = counts.get(layer['Name'], 0)
                     thickness = ('Incident medium · ∞' if index == 0 else 'Exit medium · ∞' if index == len(stack)-1
-                                 else f"{float(layer['Thickness_um']) * 1000:g} nm")
+                                 else self._length_text(float(layer['Thickness_um'])))
                     extra = f' · {count} region' + ('s' if count != 1 else '') if count else ''
                     item = QListWidgetItem(f"{index+1:03d}  {layer['Name']}\n{layer['Material']}\n{thickness}{extra}")
                     item.setData(Qt.ItemDataRole.UserRole, layer['Name'])
@@ -557,10 +622,17 @@ class StructurePage(QWidget):
             _choices(self.repeat_start, finite)
             _choices(self.repeat_end, finite)
             total = sum(float(layer['Thickness_um']) for layer in stack[1:-1])
-            self.summary.setText(f'{max(0, len(stack)-2)} finite layers · {total * 1000:g} nm total')
-            with QSignalBlocker(self.lattice_x), QSignalBlocker(self.lattice_y):
-                self.lattice_x.setValue(float(self.store.settings.get('ax_um', .77)))
-                self.lattice_y.setValue(float(self.store.settings.get('ay_um', .77)))
+            self.summary.setText(f'{max(0, len(stack)-2)} finite layers · {self._length_text(total)} total')
+            saved_lattice = (float(self.store.settings.get('ax_um', .77)),
+                             float(self.store.settings.get('ay_um', .77)))
+            # Unrelated updates must not replace an un-applied lattice draft.
+            if saved_lattice != self._lattice_snapshot or reason == 'project':
+                self._lattice_snapshot = saved_lattice
+                with QSignalBlocker(self.lattice_x), QSignalBlocker(self.lattice_y), QSignalBlocker(self.square_lattice):
+                    self.lattice_x.setValue(saved_lattice[0] * self._display_factor())
+                    self.lattice_y.setValue(saved_lattice[1] * self._display_factor())
+                    self.square_lattice.setChecked(math.isclose(*saved_lattice, rel_tol=1e-10, abs_tol=1e-12))
+                self._lattice_mode_changed(self.square_lattice.isChecked())
             if geometry_changed or self._mutating:
                 self._load_layer()
             self.draw_preview()
@@ -636,16 +708,39 @@ class StructurePage(QWidget):
         if unit == self._unit:
             return
         factor = .001 if unit == 'µm' else 1000.
-        for widget in (self.layer_thickness, self.region_x, self.region_y, self.region_sx, self.region_sy):
-            widget.setValue(widget.value() * factor)
-            widget.setSuffix(' ' + unit)
+        for widget in (self.lattice_x, self.lattice_y, self.cut_y, self.layer_thickness,
+                       self.region_x, self.region_y, self.region_sx, self.region_sy):
+            with QSignalBlocker(widget):
+                widget.setValue(widget.value() * factor)
+                widget.setSuffix(' ' + unit)
         self._unit = unit
+        # Refreshes read-only stack labels without reloading unchanged draft fields.
+        self.refresh('units')
+
+    def _display_factor(self):
+        return 1000 if self._unit == 'nm' else 1
+
+    def _length_text(self, micrometres):
+        return f'{micrometres * self._display_factor():g} {self._unit}'
+
+    def _link_lattice_period(self, value):
+        if self.square_lattice.isChecked():
+            self.lattice_y.setValue(value)
+
+    def _lattice_mode_changed(self, square):
+        self.lattice_x_label.setText('Period' if square else 'Period X')
+        self.lattice_y_label.setVisible(not square)
+        self.lattice_y.setVisible(not square)
+        if square:
+            self.lattice_y.setValue(self.lattice_x.value())
 
     def apply_lattice(self):
         if self.store.busy:
             return
         try:
-            self.store.update_settings({'ax_um': self.lattice_x.value(), 'ay_um': self.lattice_y.value()})
+            y = self.lattice_x.value() if self.square_lattice.isChecked() else self.lattice_y.value()
+            self.store.update_settings({'ax_um': self.lattice_x.value() / self._display_factor(),
+                                        'ay_um': y / self._display_factor()})
             self._message('Unit cell updated across all workspaces.')
         except (ValueError, TypeError) as exc:
             self._message(exc, True)
@@ -775,17 +870,35 @@ class StructurePage(QWidget):
         for action in ('apply', 'copy', 'delete'):
             self.findChild(QPushButton, 'region_' + action).setEnabled(not busy and not halfspace and existing)
 
-    def draw_preview(self, *args):
+    def draw_preview(self, *args, reset=False):
         try:
-            figure = geometry_figure(self.store.layers, self.store.patterns, self._selected,
-                                     self.store.settings.get('ax_um', .77), self.store.settings.get('ay_um', .77),
-                                     self.cells.currentIndex()*2 + 1, self.cut_y.value())
+            try:
+                from addon_runtime import available
+                self.export_button.setVisible(available('cad_comsol'))
+            except ImportError:
+                self.export_button.setVisible(True)
+            three_d = self.view_mode.currentIndex() == 1
+            self.cut_y.setVisible(not three_d)
+            self.cut_label.setVisible(not three_d)
+            self.reset_view.setVisible(three_d)
+            inputs = (self.store.layers, self.store.patterns, self._selected,
+                      self.store.settings.get('ax_um', .77), self.store.settings.get('ay_um', .77),
+                      self.cells.currentIndex()*2 + 1)
+            if three_d:
+                from qt_structure_3d import geometry_figure_3d
+                old_axis = getattr(self.plot.figure, '_s4_geometry', {}).get('three_d')
+                view = (old_axis.elev, old_axis.azim) if old_axis is not None and not reset else None
+                figure = geometry_figure_3d(*inputs, view=view)
+            else:
+                figure = geometry_figure(*inputs, self.cut_y.value() / self._display_factor())
+            apply_geometry_units(figure, self._unit)
             self.plot.draw_figure(figure)
             self.plot.canvas.mpl_connect('button_press_event', self._plot_click)
             self.plot.canvas.mpl_connect('motion_notify_event', self._plot_hover)
             warnings = figure._s4_geometry['warnings']
-            self.preview_note.setText(' '.join(warnings) if warnings else
-                                      'Hover for layer details · click a section layer to select it · dashed box: unit cell')
+            self.preview_note.setText(' '.join(warnings) if warnings else (
+                'Drag: orbit · middle drag: pan · right drag: zoom · teal: selected layer · ∞: infinite media · sampled surface preview'
+                if three_d else 'Hover for layer details · click a section layer to select it · dashed box: unit cell'))
         except (ValueError, KeyError, TypeError, OverflowError) as exc:
             self.preview_note.setText('Preview: ' + str(exc))
 
@@ -809,7 +922,7 @@ class StructurePage(QWidget):
             layer = next((item for item in metadata.get('stack', [])
                           if item['z0'] <= event.ydata < item['z1']), None)
             if layer:
-                thickness = 'Semi-infinite medium' if layer['halfspace'] else f"{(layer['z1']-layer['z0'])*1000:g} nm"
+                thickness = 'Semi-infinite medium' if layer['halfspace'] else self._length_text(layer['z1']-layer['z0'])
                 detail = f"{layer['name']}\n{layer['material']}\n{thickness}"
         elif event.inaxes is not None:
             detail = metadata.get('selected', '')

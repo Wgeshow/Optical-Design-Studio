@@ -11,6 +11,8 @@ from structure_builder import validate_structure
 
 
 def cad_library():
+    from addon_runtime import activate
+    activate('cad_comsol')
     local = Path(__file__).parent / 'cad_runtime'
     if local.is_dir() and str(local) not in sys.path:
         sys.path.append(str(local))

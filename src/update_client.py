@@ -121,7 +121,8 @@ class GitHubUpdateClient:
     ``progress(done, total)`` is called on the caller's thread.
     """
 
-    def __init__(self, timeout=15, opener=None):
+    def __init__(self, timeout=15, opener=None, windows_portable_only=False):
+        self.windows_portable_only = bool(windows_portable_only)
         try:
             self.timeout = float(timeout)
         except (TypeError, ValueError):
@@ -235,6 +236,8 @@ class GitHubUpdateClient:
                 expected = [_PACKAGE_TEMPLATES[platform_id].format(version=version)]
                 if platform_id == 'windows-x64':
                     expected.insert(0, _WINDOWS_PORTABLE.format(version=version))
+                    if self.windows_portable_only:
+                        expected = expected[:1]
                 assets = release.get("assets")
                 if not isinstance(assets, list):
                     raise UpdateError("invalid_response", "GitHub returned invalid release assets.")

@@ -11,7 +11,7 @@ os.environ.setdefault('S4_LIBRARY_ROOT', _library.name)
 from PyQt6.QtCore import QCoreApplication, QEvent
 from PyQt6.QtWidgets import QApplication
 from data_library import DataLibrary
-from installer_smoke import inspect_busy_close_guard, inspect_window_chrome
+from installer_smoke import inspect_busy_close_guard, inspect_window_chrome, settle_window_layout
 from qt_app import OpticalStudio
 from qt_common import theme_manager
 from qt_core import ProjectStore
@@ -44,10 +44,14 @@ class InstalledChromeSmokeTests(unittest.TestCase):
             for width, height in ((1000, 720), (1460, 960)):
                 with self.subTest(mode=mode, width=width):
                     self.window.resize(width, height)
-                    self.app.processEvents()
+                    settle_window_layout(self.app, self.window)
                     detail = inspect_window_chrome(self.window)
                     self.assertEqual(detail['width'], width)
-                    self.assertEqual(detail['visible_controls'], 4 if sys.platform == 'win32' else 7)
+                    self.assertEqual(detail['visible_controls'], 7)
+                    self.assertTrue(detail['frameless'])
+                    self.assertEqual(detail['maximize_hit_test'], 9)
+                    self.assertEqual(detail['native_snap_adapter_enabled'],
+                                     sys.platform == 'win32' and self.app.platformName() == 'windows')
                     self.assertTrue(detail['project_commands_in_file_menu'])
                     self.assertFalse(hasattr(self.window, 'open_button'))
                     self.assertFalse(hasattr(self.window, 'save_button'))

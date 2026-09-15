@@ -11,6 +11,7 @@ sys.path.insert(0, str(source))
 env_bin = Path(sys.prefix)/'Library'/'bin'
 
 data = [(str(inputs/'seed_library.zip'), '.'), (str(inputs/'S4_Studio.ico'), '.'),
+        (str(source/'meep_runner.py'), '.'),
         (str(source/'pcs_s4_runtime'/'s4_runtime.py'), 'pcs_s4_runtime'),
         (str(source/'pcs_s4_runtime'/'s4_parallel.py'), 'pcs_s4_runtime'),
         (str(root/'assets'/'vtk-runtime-directory.txt'), 'cad_runtime/vtk.libs')]

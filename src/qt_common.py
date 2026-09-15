@@ -16,10 +16,10 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 
 COLORS = {
-    'light': dict(bg='#f2f5f8', panel='#ffffff', field='#ffffff', text='#172d3b', muted='#586d7d',
-                  border='#d6e0e8', accent='#087f78', hover='#e4f2f0', select='#d0ebe7', header='#eaf0f5', grid='#d7e0e7'),
-    'dark': dict(bg='#101821', panel='#18232f', field='#202e3c', text='#e5eef5', muted='#adbdcd',
-                 border='#344555', accent='#4ed6c1', hover='#24443f', select='#28594f', header='#223343', grid='#3a4b59'),
+    'light': dict(bg='#f3f6fa', panel='#ffffff', field='#f7f9fc', text='#18283d', muted='#60738b',
+                  border='#dbe4ee', accent='#008caa', hover='#eaf6fa', select='#d9f1f6', header='#edf2f8', grid='#dbe4ee'),
+    'dark': dict(bg='#081a27', panel='#0d2232', field='#132c3e', text='#e7eef8', muted='#9aacbf',
+                 border='#28485f', accent='#00d6ed', hover='#153b50', select='#10435b', header='#102b3d', grid='#284357'),
 }
 
 _icon_directory = None
@@ -63,7 +63,7 @@ class ThemeManager(QObject):
         if self.mode not in COLORS:
             self.mode = 'dark'
         try:
-            self.scale = max(80, min(140, int(self.settings.value('interface_scale', 100))))
+            self.scale = max(70, min(140, int(self.settings.value('interface_scale', 100))))
         except (ValueError, TypeError):
             self.scale = 100
         self.adaptive = self.settings.value('adaptive_layout', True, type=bool)
@@ -71,7 +71,7 @@ class ThemeManager(QObject):
 
     def set_appearance(self, scale=None, adaptive=None):
         if scale is not None:
-            self.scale = max(80, min(140, int(scale)))
+            self.scale = max(70, min(140, int(scale)))
         if adaptive is not None:
             self.adaptive = bool(adaptive)
         self.settings.setValue('interface_scale', self.scale)
@@ -81,14 +81,33 @@ class ThemeManager(QObject):
         self.appearance_changed.emit()
 
     def set_window_width(self, width):
-        factor = (0.9 if width < 1000 else 1.0 if width < 1600 else 1.1) if self.adaptive else 1.0
+        # Width is already in Qt logical pixels, so Windows 125%/150% scaling
+        # must not be applied again. Prefer tighter spacing before smaller text.
+        factor = self.window_density(width) if self.adaptive else 1.0
         if factor != self.window_factor:
             self.window_factor = factor
             self.apply(self.mode, persist=False)
 
     @property
     def effective_scale(self):
-        return max(0.8, min(1.54, self.scale / 100 * self.window_factor))
+        return max(0.60, min(1.40, self.scale / 100 * self.window_factor))
+
+    @staticmethod
+    def window_density(width):
+        stops = ((640, .76), (800, .80), (1100, .86), (1460, .92), (1920, 1.0))
+        if width <= stops[0][0]:
+            return stops[0][1]
+        for (left, low), (right, high) in zip(stops, stops[1:]):
+            if width <= right:
+                return round(low + (high-low)*(width-left)/(right-left), 3)
+        return 1.0
+
+    def scale_stylesheet(self, stylesheet):
+        def size(match):
+            value, unit = float(match[1]), match[2]
+            scaled = max(9, round(value*self.effective_scale, 1)) if unit == 'pt' else max(0, round(value*self.effective_scale))
+            return f'{scaled:g}{unit}'
+        return re.sub(r'(\d+(?:\.\d+)?)(pt|px)', size, stylesheet)
 
     def apply(self, mode, persist=True):
         self.mode = mode if mode in COLORS else 'dark'
@@ -123,14 +142,16 @@ class ThemeManager(QObject):
                 QScrollArea {{ border:0; }}
                 QWidget#page {{ background:{c['bg']}; }}
                 QLabel {{ background:transparent; }}
-                QLabel#pageTitle {{ font-size:23pt; font-weight:650; }}
-                QLabel#sectionTitle {{ font-size:15pt; font-weight:600; }}
+                QLabel#pageTitle {{ font-size:19pt; font-weight:650; }}
+                QLabel#sectionTitle {{ font-size:12pt; font-weight:600; }}
                 QLabel#muted {{ color:{c['muted']}; }}
                 QLabel[error="true"] {{ color:{'#ffaaa5' if self.mode=='dark' else '#b42318'}; }}
                 QLabel#brand {{ font-size:20pt; font-weight:700; color:{c['accent']}; }}
                 QFrame#sidebar {{ background:{c['panel']}; border-right:1px solid {c['border']}; }}
                 QFrame#projectHeader {{ background:{c['panel']}; border-bottom:1px solid {c['border']}; }}
                 QFrame#windowChrome {{ background:{c['panel']}; border-bottom:1px solid {c['border']}; }}
+                QFrame#workspaceFooter {{ background:{c['panel']}; border-top:1px solid {c['border']}; }}
+                QLabel#workspaceLabel {{ color:{c['muted']}; font-size:9pt; font-weight:600; }}
                 QLabel#windowTitle {{ color:{c['text']}; font-size:10pt; font-weight:600; }}
                 QFrame#captionDivider {{ background:{c['border']}; border:0; }}
                 QToolButton#chromeAction {{ padding:4px 11px; border:0; border-radius:5px; }}
@@ -143,20 +164,20 @@ class ThemeManager(QObject):
                 QFrame#structureNotice {{ background:{c['panel']}; border:1px solid {c['accent']}; border-radius:9px; }}
                 QLabel#noticeTitle {{ color:{c['accent']}; font-size:11pt; font-weight:600; }}
                 QGroupBox {{ background:{c['panel']}; border:1px solid {c['border']}; border-radius:9px;
-                    margin-top:15px; padding:17px 13px 13px; font-weight:600; }}
+                    margin-top:13px; padding:12px 10px 10px; font-weight:600; }}
                 QGroupBox::title {{ subcontrol-origin:margin; left:14px; padding:0 5px; }}
                 QPushButton {{ background:{c['field']}; border:1px solid {c['border']}; border-radius:6px;
-                    padding:8px 13px; min-height:18px; font-weight:500; }}
+                    padding:4px 9px; min-height:18px; font-weight:500; }}
                 QPushButton:hover {{ background:{c['hover']}; border-color:{c['accent']}; }}
                 QPushButton:pressed {{ background:{c['select']}; }}
-                QPushButton[primary="true"] {{ background:#087f78; color:#ffffff; border-color:#087f78; font-weight:600; }}
-                QPushButton[primary="true"]:hover {{ background:#096b65; }}
+                QPushButton[primary="true"] {{ background:{c['select']}; color:{c['text']}; border:1px solid {c['accent']}; font-weight:600; }}
+                QPushButton[primary="true"]:hover {{ background:{c['hover']}; color:{c['accent']}; }}
                 QPushButton:disabled {{ color:{c['muted']}; background:{c['panel']}; }}
                 QLineEdit,QSpinBox,QDoubleSpinBox,QComboBox,QPlainTextEdit,QTextEdit {{ background:{c['field']};
-                    border:1px solid {c['border']}; border-radius:5px; padding:7px; selection-background-color:{c['select']}; }}
+                    border:1px solid {c['border']}; border-radius:5px; padding:4px; selection-background-color:{c['select']}; }}
                 QLineEdit:focus,QSpinBox:focus,QDoubleSpinBox:focus,QComboBox:focus {{ border-color:{c['accent']}; }}
                 QSpinBox,QDoubleSpinBox {{ padding-right:24px; }}
-                QComboBox {{ min-height:20px; padding-right:22px; }}
+                QComboBox {{ min-height:18px; padding-right:22px; }}
                 QComboBox::drop-down {{ border:0; width:22px; }}
                 QComboBox::down-arrow {{ image:url("{arrow_icon(self.mode,'down')}"); width:12px; height:8px; }}
                 QSpinBox::up-button,QDoubleSpinBox::up-button {{ width:19px; background:{c['header']}; border:0; }}
@@ -172,16 +193,20 @@ class ThemeManager(QObject):
                 QTableWidget::item {{ padding:4px; }}
                 QListWidget::item {{ padding:10px 8px; border-radius:5px; }}
                 QListWidget#navigation {{ background:transparent; border:0; font-size:11pt; }}
-                QListWidget#navigation::item {{ padding:14px 16px; margin:3px 0; }}
+                QListWidget#navigation::item {{ padding:8px 10px; margin:2px 0; border-radius:7px; }}
                 QListWidget#navigation::item:selected {{ background:{c['select']}; border-left:3px solid {c['accent']}; }}
                 QListWidget#navigation::item:hover {{ background:{c['hover']}; }}
                 QListWidget#layerList::item:selected {{ background:{c['select']}; border:1px solid {c['accent']}; }}
                 QTabWidget::pane {{ border:1px solid {c['border']}; border-radius:7px; background:{c['panel']}; }}
-                QTabBar::tab {{ background:{c['bg']}; padding:10px 17px; border-bottom:2px solid transparent; }}
+                QTabBar::tab {{ background:{c['bg']}; padding:7px 12px; border-bottom:2px solid transparent; }}
                 QTabBar::tab:selected {{ background:{c['panel']}; color:{c['accent']}; border-bottom:2px solid {c['accent']}; }}
                 QSplitter::handle {{ background:{c['border']}; }}
                 QProgressBar {{ border:0; border-radius:4px; background:{c['header']}; min-height:7px; text-align:center; }}
-                QProgressBar::chunk {{ background:#087f78; border-radius:4px; }}
+                QProgressBar::chunk {{ background:{c['accent']}; border-radius:4px; }}
+                QCheckBox {{ spacing:8px; padding:4px 0; }}
+                QSlider::groove:horizontal {{ height:5px; background:{c['border']}; border-radius:2px; }}
+                QSlider::sub-page:horizontal {{ background:{c['accent']}; border-radius:2px; }}
+                QSlider::handle:horizontal {{ background:{c['accent']}; width:16px; margin:-6px 0; border-radius:8px; }}
                 QToolBar {{ background:{c['panel']}; border:0; spacing:4px; }}
                 QToolButton {{ background:transparent; border:0; padding:5px; }}
                 QToolButton:hover {{ background:{c['hover']}; border-radius:4px; }}
@@ -192,8 +217,7 @@ class ThemeManager(QObject):
                 QToolTip {{ background:{c['panel']}; color:{c['text']}; border:1px solid {c['border']}; padding:6px; }}
             '''
             # Qt already accounts for monitor DPI; this is the independent user zoom.
-            stylesheet = re.sub(r'(\d+(?:\.\d+)?)(pt|px)',
-                lambda m: f'{max(1, round(float(m[1]) * self.effective_scale))}{m[2]}', stylesheet)
+            stylesheet = self.scale_stylesheet(stylesheet)
             app.setStyleSheet(stylesheet)
         for widget in list(_plots):
             if sip.isdeleted(widget):
@@ -222,6 +246,14 @@ def apply_plot_theme(figure):
         ax.tick_params(colors=c['muted'])
         ax.xaxis.label.set_color(c['text'])
         ax.yaxis.label.set_color(c['text'])
+        if hasattr(ax, 'zaxis'):
+            ax.zaxis.label.set_color(c['text'])
+            for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+                axis.set_pane_color(QColor(c['panel']).getRgbF())
+                axis.line.set_color(c['border'])
+                # Matplotlib's 3D grid styling lives on each axis rather than
+                # the ordinary 2D grid line artists.
+                axis._axinfo['grid']['color'] = c['grid']
         ax.title.set_color(c['text'])
         for spine in ax.spines.values():
             spine.set_color(c['border'])

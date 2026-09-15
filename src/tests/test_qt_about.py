@@ -85,6 +85,15 @@ class AboutPageTests(unittest.TestCase):
     def setUp(self):
         self.service = FakeService()
         self.store = Mock()
+        self.store.busy = False
+        self.store._worker = None
+        self.store._set_busy.side_effect = lambda value: setattr(self.store, 'busy', value)
+        self.cache_directory = tempfile.TemporaryDirectory(prefix='s4_about_cache_')
+        self.cache = Path(self.cache_directory.name)
+        self.store.library.root = self.cache/'library'
+        self.store.library.root.mkdir()
+        self.cache_patch = patch.object(qt_about, 'update_cache_root', return_value=self.cache)
+        self.cache_patch.start()
         self.pages = []
         self.old_theme = theme_manager().mode
         theme_manager().apply('dark', persist=False)
@@ -101,6 +110,8 @@ class AboutPageTests(unittest.TestCase):
         self.settle()
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         self.info_patch.stop()
+        self.cache_patch.stop()
+        self.cache_directory.cleanup()
         theme_manager().apply(self.old_theme, persist=False)
 
     def settle(self):
@@ -210,7 +221,7 @@ class AboutPageTests(unittest.TestCase):
         page = self.make_page()
         self.check(page)
         with tempfile.TemporaryDirectory(prefix='s4_about_download_') as folder:
-            with patch.object(qt_about.QFileDialog, 'getExistingDirectory', return_value=folder), \
+            with patch.object(qt_about, 'update_cache_root', return_value=Path(folder)), \
                     patch.object(qt_about.QDesktopServices, 'openUrl', return_value=True) as open_url:
                 page.download_update()
                 self.wait_idle(page)
@@ -220,14 +231,14 @@ class AboutPageTests(unittest.TestCase):
                 open_url.assert_not_called()
                 page.download_update()
                 open_url.assert_called_once()
-                self.assertEqual(Path(open_url.call_args.args[0].toLocalFile()), Path(folder))
+                self.assertEqual(Path(open_url.call_args.args[0].toLocalFile()), Path(folder)/'downloads')
                 self.assertNotIn('.exe', open_url.call_args.args[0].toString())
 
     def test_cancelled_or_failed_download_never_exposes_a_downloaded_action(self):
         page = self.make_page()
         self.check(page)
         with tempfile.TemporaryDirectory(prefix='s4_about_cancel_') as folder:
-            with patch.object(qt_about.QFileDialog, 'getExistingDirectory', return_value=folder):
+            with patch.object(qt_about, 'update_cache_root', return_value=Path(folder)):
                 self.service.block = True
                 page.download_update()
                 self.assertEqual(page.state, 'downloading')
@@ -235,7 +246,7 @@ class AboutPageTests(unittest.TestCase):
                 self.wait_idle(page)
                 self.assertEqual(page.state, 'cancelled')
                 self.assertFalse(page.download_button.isVisible())
-                self.assertEqual(list(Path(folder).iterdir()), [])
+                self.assertEqual(list((Path(folder)/'downloads').iterdir()), [])
                 self.service.block = False
                 self.check(page)
                 self.service.error = UpdateError('integrity', 'The package checksum did not match.')
@@ -263,15 +274,154 @@ class AboutPageTests(unittest.TestCase):
                     self.assertGreaterEqual(control.width(), control.minimumSizeHint().width())
                 self.assertFalse(page.grab().isNull())
 
-    def test_cancelled_destination_dialog_does_not_start_download(self):
+    def test_download_uses_cache_without_destination_dialog(self):
         page = self.make_page()
         self.check(page)
-        with patch.object(qt_about.QFileDialog, 'getExistingDirectory', return_value=''):
+        with patch.object(qt_about.QFileDialog, 'getExistingDirectory', side_effect=AssertionError('No folder picker')):
             page.download_update()
-        self.assertEqual(page.state, 'available')
-        self.assertEqual(len(self.service.calls), 1)
+            self.wait_idle(page)
+        self.assertEqual(page.state, 'downloaded')
+        self.assertEqual(len(self.service.calls), 2)
         self.assertFalse(page.busy)
-        self.assertIsNone(self.service.completed_path)
+        self.assertEqual(self.service.completed_path.parent, self.cache/'downloads')
+
+    def test_frozen_one_click_saves_downloads_stages_and_launches(self):
+        page = self.make_page()
+        self.check(page)
+        with patch.object(sys, 'frozen', True, create=True), patch.object(qt_about, 'application_root', return_value=self.cache), \
+             patch.object(qt_about, 'preflight_update', return_value=self.cache) as preflight, \
+             patch.object(qt_about, 'stage_update', return_value=self.cache/'plan.json') as stage, \
+             patch.object(qt_about, 'launch_update') as launch, patch.object(QApplication, 'quit') as quit_app:
+            page.download_update()
+            self.wait_idle(page)
+            self.store._autosave.assert_called_once()
+            preflight.assert_called_once_with(self.cache, RELEASE.asset_size)
+            stage.assert_called_once()
+            launch.assert_called_once_with(self.cache/'plan.json')
+            quit_app.assert_called_once()
+        self.assertFalse(self.store.busy)
+
+    def test_frozen_busy_store_prevents_network_or_save(self):
+        page = self.make_page()
+        self.check(page)
+        self.store.busy = True
+        with patch.object(sys, 'frozen', True, create=True):
+            page.download_update()
+        self.assertEqual(len(self.service.calls), 1)
+        self.store._autosave.assert_not_called()
+        self.assertFalse(page.busy)
+
+    def test_stage_failure_keeps_verified_package_for_retry(self):
+        page = self.make_page()
+        self.check(page)
+        with patch.object(sys, 'frozen', True, create=True), patch.object(qt_about, 'application_root', return_value=self.cache), \
+             patch.object(qt_about, 'preflight_update', return_value=self.cache), \
+             patch.object(qt_about, 'stage_update', side_effect=RuntimeError('stage failed')) as stage, \
+             patch.object(qt_about, 'launch_update') as launch, patch.object(QApplication, 'quit') as quit_app:
+            page.download_update()
+            self.wait_idle(page)
+            self.assertTrue(page._downloaded_path.is_file())
+            self.assertEqual(page.state, 'error')
+            stage.side_effect = None
+            stage.return_value = self.cache/'plan.json'
+            page.download_update()
+            self.wait_idle(page)
+            self.assertEqual(len([c for c in self.service.calls if c[0]=='download']), 1)
+            launch.assert_called_once()
+            quit_app.assert_called_once()
+
+    def test_helper_failure_does_not_close_application(self):
+        page = self.make_page()
+        self.check(page)
+        with patch.object(sys, 'frozen', True, create=True), patch.object(qt_about, 'application_root', return_value=self.cache), \
+             patch.object(qt_about, 'preflight_update', return_value=self.cache), \
+             patch.object(qt_about, 'stage_update', return_value=self.cache/'plan.json'), \
+             patch.object(qt_about, 'launch_update', side_effect=OSError('no helper')), patch.object(QApplication, 'quit') as quit_app:
+            page.download_update()
+            self.wait_idle(page)
+            self.assertEqual(page.state, 'error')
+            self.assertTrue(page._downloaded_path.is_file())
+            quit_app.assert_not_called()
+        self.assertFalse(self.store.busy)
+
+    def test_preflight_failure_prevents_download(self):
+        page = self.make_page()
+        self.check(page)
+        with patch.object(sys, 'frozen', True, create=True), patch.object(qt_about, 'preflight_update', side_effect=OSError('no space')), \
+             patch.object(qt_about, 'launch_update') as launch:
+            page.download_update()
+            self.wait_idle(page)
+            self.assertEqual(page.state, 'error')
+            self.assertEqual(len(self.service.calls), 1)
+            launch.assert_not_called()
+        self.assertFalse(self.store.busy)
+
+    def test_local_preflight_diagnostics_remain_actionable(self):
+        for error in (PermissionError('Use a writable per-user installation.'),
+                      ValueError('Not enough free disk space. Free at least 2 GB.')):
+            page = self.make_page()
+            self.check(page)
+            before = len(self.service.calls)
+            with patch.object(sys, 'frozen', True, create=True), patch.object(qt_about, 'preflight_update', side_effect=error):
+                page.download_update()
+                self.wait_idle(page)
+            self.assertEqual(page.status_detail.text(), str(error))
+            self.assertEqual(len(self.service.calls), before)
+
+    def test_cancelled_frozen_download_never_stages_or_launches(self):
+        page = self.make_page()
+        self.check(page)
+        self.service.block = True
+        with patch.object(sys, 'frozen', True, create=True), patch.object(qt_about, 'preflight_update', return_value=self.cache), \
+             patch.object(qt_about, 'stage_update') as stage, patch.object(qt_about, 'launch_update') as launch:
+            page.download_update()
+            page.cancel_request()
+            self.wait_idle(page)
+            self.assertEqual(page.state, 'cancelled')
+            stage.assert_not_called()
+            launch.assert_not_called()
+        self.assertFalse(self.store.busy)
+
+    def test_cancelled_stage_keeps_package_and_never_launches(self):
+        page = self.make_page()
+        self.check(page)
+        with patch.object(sys, 'frozen', True, create=True), patch.object(qt_about, 'preflight_update', return_value=self.cache), \
+             patch.object(qt_about, 'stage_update', side_effect=UpdateCancelled()), patch.object(qt_about, 'launch_update') as launch:
+            page.download_update()
+            self.wait_idle(page)
+            self.assertEqual(page.state, 'cancelled')
+            self.assertTrue(page._downloaded_path.is_file())
+            launch.assert_not_called()
+        self.assertFalse(self.store.busy)
+
+    def test_late_stage_cancellation_discards_plan_without_launch(self):
+        page = self.make_page()
+        self.check(page)
+        plan = self.cache/'plan.json'
+        def staged_then_cancelled(*args, cancel, progress):
+            cancel.set()
+            return plan
+        with patch.object(sys, 'frozen', True, create=True), patch.object(qt_about, 'preflight_update', return_value=self.cache), \
+             patch.object(qt_about, 'stage_update', side_effect=staged_then_cancelled), \
+             patch('update_install.discard_staged') as discard, patch.object(qt_about, 'launch_update') as launch, \
+             patch.object(QApplication, 'quit') as quit_app:
+            page.download_update()
+            self.wait_idle(page)
+            self.assertEqual(page.state, 'cancelled')
+            discard.assert_called_once_with(plan)
+            launch.assert_not_called()
+            quit_app.assert_not_called()
+        self.assertFalse(self.store.busy)
+
+    def test_autosave_failure_prevents_update_download(self):
+        page = self.make_page()
+        self.check(page)
+        self.store._autosave.side_effect = OSError('read only')
+        with patch.object(sys, 'frozen', True, create=True):
+            page.download_update()
+        self.assertEqual(page.state, 'error')
+        self.assertEqual(len(self.service.calls), 1)
+        self.assertFalse(self.store.busy)
 
 
 if __name__ == '__main__':

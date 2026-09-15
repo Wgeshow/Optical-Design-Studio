@@ -92,6 +92,18 @@ def release_info():
 
 
 class ReleaseCheckTests(unittest.TestCase):
+    def test_desktop_portable_only_rejects_legacy_installer(self):
+        record = release('1.0.4')
+        client = GitHubUpdateClient(opener=check_opener([record]), windows_portable_only=True)
+        result = client.check('1.0.3')
+        self.assertEqual(result.status, 'no_compatible')
+        self.assertIsNone(result.release)
+        record['assets'].append(dict(record['assets'][0], id=456,
+            name='OpticalDesignStudio-Portable-1.0.4-Windows-x64.zip'))
+        result = GitHubUpdateClient(opener=check_opener([record]), windows_portable_only=True).check('1.0.3')
+        self.assertEqual(result.status, 'available')
+        self.assertEqual(result.release.asset_id, 456)
+
     def test_portable_zip_preferred_with_legacy_installer_fallback(self):
         record = release('1.0.4')
         zip_asset = dict(record['assets'][0], id=456,

@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
 
 from app_version import installation_info
 from desktop_runtime import resource_root, application_root
-from update_install import stage_update, launch_update
+from update_install import stage_update, launch_update, preflight_update, update_cache_root
 from qt_common import COLORS, button, note, theme_manager
 from update_client import GitHubUpdateClient, REPOSITORY_URL, UpdateCancelled, UpdateError
 
@@ -92,9 +92,20 @@ class UpdateWorker(QThread):
         try:
             client = self._factory()
             if self.operation == 'install':
-                self.result = stage_update(*self.args)
+                self.result = stage_update(*self.args, cancel=self.cancel_event,
+                    progress=lambda done, total: self.progress.emit(done, total))
             elif self.operation == 'download':
-                self.result = client.download(*self.args,
+                release, target = self.args
+                try:
+                    cache = preflight_update(target, release.asset_size) if target is not None else update_cache_root()
+                except (PermissionError, ValueError) as exc:
+                    # These are local, actionable preflight diagnostics, not
+                    # transport exceptions that might contain signed URLs.
+                    self.error = str(exc)
+                    return
+                directory = Path(cache) / 'downloads'
+                directory.mkdir(parents=True, exist_ok=True)
+                self.result = client.download(release, directory,
                     progress=lambda done, total: self.progress.emit(done, total), cancel=self.cancel_event)
             else:
                 self.result = client.check(*self.args, cancel=self.cancel_event)
@@ -113,11 +124,13 @@ class AboutPage(QWidget):
     def __init__(self, store, client_factory=None):
         super().__init__()
         self.store = store
-        self._client_factory = client_factory or GitHubUpdateClient
+        self._client_factory = client_factory or (lambda: GitHubUpdateClient(windows_portable_only=True))
         self._worker = None
         self._release = None
         self._downloaded_path = None
         self._install_after_download = False
+        self._owns_store = False
+        self._previous_worker = None
         self.info = installation_info()
         self._build()
         self._set_state('not_checked')
@@ -127,13 +140,13 @@ class AboutPage(QWidget):
     @property
     def busy(self):
         # Keep the guard through queued finished handling, not only QThread.run().
-        return self._worker is not None
+        return self._worker is not None or self._owns_store
 
     def _build(self):
         self.setObjectName('page')
         root = QVBoxLayout(self)
         root.setContentsMargins(34, 28, 34, 28)
-        root.setSpacing(22)
+        root.setSpacing(14)
         titles = QVBoxLayout()
         titles.setSpacing(6)
         titles.addWidget(label('About', 'pageTitle'))
@@ -142,18 +155,22 @@ class AboutPage(QWidget):
         identity = QFrame()
         identity.setObjectName('aboutCard')
         card = QVBoxLayout(identity)
-        card.setContentsMargins(26, 26, 26, 24)
-        card.setSpacing(22)
-        brand = QHBoxLayout()
-        brand.setSpacing(18)
+        card.setContentsMargins(18, 18, 18, 18)
+        card.setSpacing(14)
+        brand = QVBoxLayout()
+        brand.setSpacing(8)
         logo = QLabel()
         logo.setPixmap(QIcon(str(resource_root() / 'S4_Studio.ico')).pixmap(68, 68))
         logo.setFixedSize(72, 72)
-        brand.addWidget(logo)
+        brand.addWidget(logo, 0, Qt.AlignmentFlag.AlignHCenter)
         branding = QVBoxLayout()
         branding.setSpacing(7)
-        branding.addWidget(label('Optical Design Studio', 'aboutBrand', True))
-        branding.addWidget(plain_note('Design, simulate and optimize optical structures.'))
+        brand_title = label('Optical Design Studio', 'aboutBrand', True)
+        brand_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        branding.addWidget(brand_title)
+        tagline = plain_note('Integrated photonic structure design, simulation and optimization')
+        tagline.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        branding.addWidget(tagline)
         brand.addLayout(branding, 1)
         card.addLayout(brand)
         line = QFrame()
@@ -179,8 +196,8 @@ class AboutPage(QWidget):
         self.update_card = QFrame()
         self.update_card.setObjectName('aboutCard')
         update = QVBoxLayout(self.update_card)
-        update.setContentsMargins(26, 24, 26, 24)
-        update.setSpacing(21)
+        update.setContentsMargins(18, 16, 18, 16)
+        update.setSpacing(12)
         top = QHBoxLayout()
         top.addWidget(label('Software updates', 'sectionTitle'), 1)
         top.addWidget(label('PUBLIC UPDATES', 'publicBadge'))
@@ -230,6 +247,12 @@ class AboutPage(QWidget):
         self.download_note = plain_note('')
         update.addWidget(self.download_note)
         root.addWidget(self.update_card)
+        links = QHBoxLayout()
+        for caption, url in [('GitHub', REPOSITORY_URL), ('Releases', REPOSITORY_URL + '/releases')]:
+            link = button(caption)
+            link.clicked.connect(lambda checked=False, target=url: QDesktopServices.openUrl(QUrl(target)))
+            links.addWidget(link)
+        root.addLayout(links)
         root.addWidget(plain_note('Software updates are available without an account or sign-in.'))
         root.addStretch(1)
 
@@ -239,9 +262,9 @@ class AboutPage(QWidget):
             QFrame#aboutCard {{ background:{c['panel']}; border:1px solid {c['border']}; border-radius:12px; }}
             QFrame#aboutDivider {{ background:{c['border']}; border:0; }}
             QFrame#updateStatusBox {{ background:{c['bg']}; border:1px solid {c['border']}; border-radius:8px; }}
-            QLabel#aboutBrand {{ font-size:23pt; font-weight:650; }}
-            QLabel#aboutValue {{ font-size:13pt; font-weight:600; }}
-            QLabel#updateTitle {{ font-size:16pt; font-weight:600; }}
+            QLabel#aboutBrand {{ font-size:19pt; font-weight:650; }}
+            QLabel#aboutValue {{ font-size:11pt; font-weight:600; }}
+            QLabel#updateTitle {{ font-size:12pt; font-weight:600; }}
             QLabel#publicBadge {{ color:{c['accent']}; background:{c['hover']}; border-radius:5px; padding:5px 9px; font-size:8pt; font-weight:650; }}
             QPushButton#aboutLink {{ border:0; background:transparent; color:{c['accent']}; padding:7px 0; }}
         ''')
@@ -256,7 +279,7 @@ class AboutPage(QWidget):
             'current': ('You’re up to date', 'You have the latest compatible stable version of Optical Design Studio.'),
             'no_releases': ('No releases published yet', 'The update service is reachable. Check again after a release is published.'),
             'no_compatible': ('No compatible update is available', 'No published package matches this platform. This does not confirm that the application is up to date.'),
-            'error': ('Could not check for updates', 'Please try again.'),
+            'error': ('Update could not be completed', 'Please try again.'),
             'cancelled': ('Update request cancelled', 'Check again whenever you are ready.'),
             'downloading': ('Downloading update', 'The package will be checked before it is saved.'),
             'downloaded': ('Update downloaded', 'Open the download folder when you are ready to install the update.'),
@@ -268,21 +291,21 @@ class AboutPage(QWidget):
         self.mark.kind = state
         self.mark.update()
         can_download = state == 'available' and self._release is not None
-        downloaded = state == 'downloaded' and self._downloaded_path is not None
+        downloaded = state in ('downloaded', 'error', 'cancelled') and self._downloaded_path is not None
         self.download_button.setVisible(can_download or downloaded)
         installable = getattr(sys, 'frozen', False) and sys.platform == 'win32'
-        self.download_button.setText(('Install and restart' if installable else 'Open download folder') if downloaded else ('Download and install' if installable else 'Download update'))
+        self.download_button.setText(('Retry install & restart' if installable else 'Open download folder') if downloaded else ('Update & restart' if installable else 'Download update'))
         self.notes_button.setVisible((can_download or downloaded) and self._release is not None)
         self.progress_row.setVisible(state in ('checking', 'downloading', 'installing'))
         self.check_button.setEnabled(not self.busy)
         self.cancel_button.setEnabled(True)
-        self.cancel_button.setVisible(state != 'installing')
+        self.cancel_button.setVisible(True)
         self.download_note.setText('Download the update, then choose when to install it.' if can_download else
             ('Extract the ZIP, then run Optical Design Studio.exe from the extracted folder. Keep your User Data folder and portable_settings.json when updating.' if downloaded and self._downloaded_path.suffix.lower() == '.zip' else
              'The application will not run the installer automatically.' if downloaded else
              'Your projects, materials and saved results remain in your local library.'))
         if installable and (can_download or downloaded):
-            self.download_note.setText('Updates replace this application in its current folder and restart it. Your data and settings are preserved.')
+            self.download_note.setText('One click downloads, verifies, installs in the current location and restarts. Your work is saved first; data and settings are preserved.')
 
     def check_for_updates(self):
         if self.busy:
@@ -292,7 +315,7 @@ class AboutPage(QWidget):
     def download_update(self):
         if self.busy:
             return
-        if self.state == 'downloaded' and self._downloaded_path is not None:
+        if self._downloaded_path is not None:
             if getattr(sys, 'frozen', False) and sys.platform == 'win32':
                 self.install_update()
                 return
@@ -302,14 +325,36 @@ class AboutPage(QWidget):
             return
         self._install_after_download = getattr(sys, 'frozen', False) and sys.platform == 'win32'
         if self._install_after_download:
-            if self.store.busy:
-                self.status_detail.setText('Wait for the current calculation or library operation before updating.')
+            if not self._reserve_store():
                 return
-            if self.install_confirmation().exec() != QDialog.DialogCode.Accepted:
-                return
-        directory = QFileDialog.getExistingDirectory(self, 'Save update in folder', str(Path.home() / 'Downloads'))
-        if directory:
-            self._start('download', (self._release, Path(directory)))
+        self._start('download', (self._release, application_root() if self._install_after_download else None))
+
+    def _reserve_store(self):
+        if self._owns_store:
+            return True
+        if self.store.busy:
+            self.status_detail.setText('Wait for the current calculation or package installation before updating.')
+            return False
+        try:
+            self.store._autosave()
+        except Exception:
+            self._set_state('error', 'Your work could not be saved. Save your project before updating.')
+            return False
+        self._previous_worker = self.store._worker
+        self._owns_store = True
+        self.store._worker = self
+        self.store._set_busy(True)
+        return True
+
+    def _release_store(self):
+        if self._owns_store:
+            self._owns_store = False
+            if self.store._worker is self:
+                self.store._worker = self._previous_worker
+            self.store._set_busy(False)
+
+    def cancel(self):
+        self.cancel_request()
 
     def install_confirmation(self):
         # A Qt dialog deliberately inherits the app palette in both themes.
@@ -331,24 +376,20 @@ class AboutPage(QWidget):
         return dialog
 
     def install_update(self):
-        if self.busy or self.store.busy:
-            self.status_detail.setText('Wait for active work to finish, then choose Install and restart.')
+        if self._worker is not None:
             return
         if self._downloaded_path is None or self._release is None:
             return
-        try:
-            self.store._autosave()
-            self._start('install', (self._downloaded_path, self._release, application_root(), self.store.library.root))
-            self.store._set_busy(True)
-        except Exception as exc:
-            self.status_detail.setText('Could not prepare installation: ' + str(exc))
+        if not self._reserve_store():
+            return
+        self._start('install', (self._downloaded_path, self._release, application_root(), self.store.library.root))
 
     def _start(self, operation, args):
-        if self.busy:
+        if self._worker is not None:
             return
         if operation == 'check':
             self._release = None
-        self._downloaded_path = None
+            self._downloaded_path = None
         worker = UpdateWorker(self._client_factory, operation, args, self)
         self._worker = worker
         worker.progress.connect(self._update_progress)
@@ -359,7 +400,10 @@ class AboutPage(QWidget):
         worker.start()
 
     def _update_progress(self, done, total):
-        if not self.busy or self._worker.operation != 'download':
+        if self._worker is None:
+            return
+        if self._worker.operation == 'install':
+            self.progress_bar.setFormat('Verifying and staging…')
             return
         if total and total > 0:
             self.progress_bar.setRange(0, 1000)
@@ -379,23 +423,29 @@ class AboutPage(QWidget):
         if worker is None:
             return
         self._worker = None
-        if worker.operation == 'install':
-            self.store._set_busy(False)
+        continuing = False
         try:
             if worker.cancelled:
-                self._release = None
                 self._set_state('cancelled')
             elif worker.error is not None:
-                self._release = None
                 self._set_state('error', worker.error)
                 self.status_title.setText('Could not prepare installation' if worker.operation == 'install' else 'Could not download update' if worker.operation == 'download'
                     else 'Could not check for updates')
             elif worker.operation == 'download':
                 self._downloaded_path = Path(worker.result)
                 self._set_state('downloaded', f'Verified package saved as {self._downloaded_path.name}.')
-                if self._install_after_download:
-                    QTimer.singleShot(0, self.install_update)
+                if self._install_after_download and not worker.cancel_event.is_set():
+                    continuing = True
+                    self.install_update()
             elif worker.operation == 'install':
+                if worker.cancel_event.is_set():
+                    from update_install import discard_staged
+                    try:
+                        discard_staged(worker.result)
+                    except (OSError, ValueError):
+                        pass  # Retain recovery files; never launch after Cancel.
+                    self._set_state('cancelled', 'Installation cancelled. The current application is unchanged.')
+                    return
                 try:
                     launch_update(worker.result)
                     # Closing a secondary window is not guaranteed to end the
@@ -403,8 +453,8 @@ class AboutPage(QWidget):
                     # so request an explicit event-loop shutdown.
                     from PyQt6.QtWidgets import QApplication
                     QApplication.instance().quit()
-                except Exception as exc:
-                    self._set_state('error', 'Could not start installation: ' + str(exc))
+                except Exception:
+                    self._set_state('error', 'Could not start installation. The current application is unchanged; retry when ready.')
             else:
                 result = worker.result
                 self._release = result.release if result.status == 'available' else None
@@ -414,7 +464,10 @@ class AboutPage(QWidget):
                     self.status_detail.setText(f'Version {self._release.version} is ready to download for {self.info["platform"]}.')
         finally:
             worker.deleteLater()
-            self.idle.emit()
+            if not continuing:
+                self._release_store()
+                self.check_button.setEnabled(True)
+                self.idle.emit()
 
     def show_release_notes(self):
         if self._release is None:

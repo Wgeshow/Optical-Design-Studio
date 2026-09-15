@@ -128,7 +128,7 @@ class NativeComputationTests(unittest.TestCase):
                      columns=['wavelength_nm', 'angle_deg', 'R', 'T', 'A']).to_csv(path, index=False)
         self.store.run_finished.emit(dict(run_kind='simulation', output=str(path), info={'gpu_gemm_calls': 8}))
         self.assertEqual(page.results.rowCount(), 2)
-        self.assertIn('99.8%', page.metrics.text())
+        self.assertIn('99.8%', page.peak_summary.text())
         self.assertIn('GPU matrix products: 8', page.metrics.text())
         self.assertEqual(len(page.plot.figure.axes[0].lines), 3)
 

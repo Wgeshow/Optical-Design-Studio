@@ -1,10 +1,123 @@
 """Theme-aware window chrome, with movement and resizing owned by the OS."""
+import sys
 from PyQt6.QtCore import Qt, QEvent, QPoint, QRect, QRectF
 from PyQt6.QtGui import QColor, QPainter, QPen, QIcon, QKeySequence, QAction, QActionGroup, QShortcut
 from PyQt6.QtWidgets import QWidget, QFrame, QHBoxLayout, QLabel, QToolButton, QMenu
 
 from qt_common import COLORS, theme_manager
 from desktop_runtime import resource_root
+
+
+class WindowsCustomFrame:
+    """Keep the Win32 resize/maximize contract while drawing one Qt title bar.
+
+    Microsoft requires HTMAXBUTTON for the Windows 11 Snap flyout. Coordinates
+    in native messages are physical pixels, unlike Qt widget geometry.
+    """
+    def __init__(self, window):
+        self.window = window
+        self.enabled = False
+        if sys.platform != 'win32':
+            return
+        from PyQt6.QtWidgets import QApplication
+        if QApplication.platformName() != 'windows':
+            return
+        import ctypes
+        from ctypes import wintypes
+        self.ctypes, self.types = ctypes, wintypes
+        self.user = ctypes.WinDLL('user32', use_last_error=True)
+        self.user.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
+        self.user.GetWindowLongW.restype = wintypes.LONG
+        self.user.SetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.LONG]
+        self.user.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wintypes.UINT]
+        self.user.ScreenToClient.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
+        self.user.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+        self.user.IsZoomed.argtypes = [wintypes.HWND]
+        self.user.MonitorFromWindow.argtypes = [wintypes.HWND, wintypes.DWORD]
+        self.user.MonitorFromWindow.restype = wintypes.HANDLE
+        self.hwnd = int(window.winId())
+        self.enabled = True
+        window._windows_frame = self
+        # Subclass the HWND directly: the PyQt build shipped in the application
+        # has a pointer-result nativeEvent binding that crashes on HWND creation.
+        # Keep the callback alive for this HWND's lifetime.
+        proc_type = ctypes.WINFUNCTYPE(ctypes.c_ssize_t, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
+        self.user.SetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_void_p]
+        self.user.SetWindowLongPtrW.restype = ctypes.c_void_p
+        self.user.CallWindowProcW.argtypes = [ctypes.c_void_p, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        self.user.CallWindowProcW.restype = ctypes.c_ssize_t
+        def window_proc(hwnd, message, wparam, lparam):
+            msg = wintypes.MSG()
+            msg.hWnd, msg.message, msg.wParam, msg.lParam = hwnd, message, wparam, lparam
+            if message == 0x0082:  # WM_NCDESTROY: detach before Qt frees HWND.
+                self.user.SetWindowLongPtrW(hwnd, -4, self._old_proc)
+                self.enabled = False
+            try:
+                result = self.event(ctypes.addressof(msg))
+            except Exception:
+                result = None  # Never unwind a Python exception into Win32.
+            if result is not None:
+                return result[1]
+            return self.user.CallWindowProcW(self._old_proc, hwnd, message, wparam, lparam)
+        self._callback = proc_type(window_proc)
+        self._old_proc = self.user.SetWindowLongPtrW(self.hwnd, -4, ctypes.cast(self._callback, ctypes.c_void_p))
+        # WS_CAPTION preserves shell snap eligibility; WM_NCCALCSIZE removes
+        # its visual non-client area. Keep minimize/maximize/system menu styles.
+        style = self.user.GetWindowLongW(self.hwnd, -16)
+        self.user.SetWindowLongW(self.hwnd, -16, style | 0x00CF0000)
+        self.user.SetWindowPos(self.hwnd, None, 0, 0, 0, 0, 0x0027)
+
+    def hit_test(self, point):
+        """Return a Win32 hit code for a Qt logical client point."""
+        w = self.window
+        x, y = point.x(), point.y()
+        if not (w.isMaximized() or w.isFullScreen()):
+            left, right = x < 6, x >= w.width()-6
+            top, bottom = y < 6, y >= w.height()-6
+            if top and left: return 13
+            if top and right: return 14
+            if bottom and left: return 16
+            if bottom and right: return 17
+            if left: return 10
+            if right: return 11
+            if top: return 12
+            if bottom: return 15
+        chrome = w.chrome
+        local = chrome.mapFrom(w, point)
+        if chrome.maximize_button.geometry().contains(local):
+            return 9  # HTMAXBUTTON: Windows owns hover and Snap Layout menu.
+        return 1  # Interactive Qt controls and startSystemMove handle client.
+
+    def event(self, message):
+        if not self.enabled:
+            return None
+        c, t = self.ctypes, self.types
+        msg = t.MSG.from_address(int(message))
+        if msg.message == 0x0083:  # WM_NCCALCSIZE
+            if msg.wParam and self.user.IsZoomed(msg.hWnd):
+                class MonitorInfo(c.Structure):
+                    _fields_ = [('size', t.DWORD), ('monitor', t.RECT), ('work', t.RECT), ('flags', t.DWORD)]
+                info = MonitorInfo()
+                info.size = c.sizeof(info)
+                self.user.GetMonitorInfoW.argtypes = [t.HANDLE, c.POINTER(MonitorInfo)]
+                monitor = self.user.MonitorFromWindow(msg.hWnd, 2)
+                if self.user.GetMonitorInfoW(monitor, c.byref(info)):
+                    rect = t.RECT.from_address(msg.lParam)
+                    rect.left, rect.top = info.work.left, info.work.top
+                    rect.right, rect.bottom = info.work.right, info.work.bottom
+            return True, 0
+        if msg.message == 0x0084:  # WM_NCHITTEST
+            point = t.POINT(c.c_short(msg.lParam & 0xffff).value, c.c_short((msg.lParam >> 16) & 0xffff).value)
+            self.user.ScreenToClient(msg.hWnd, c.byref(point))
+            ratio = self.window.devicePixelRatioF()
+            return True, self.hit_test(QPoint(round(point.x/ratio), round(point.y/ratio)))
+        if msg.message in (0x00A1, 0x00A2) and msg.wParam == 9:
+            # Non-client hits bypass QPushButton mouse events. Consume both
+            # halves and toggle once on release, avoiding a second OS toggle.
+            if msg.message == 0x00A2:
+                self.window.chrome.toggle_maximize()
+            return True, 0
+        return None
 
 
 class CaptionButton(QToolButton):
@@ -174,6 +287,11 @@ class WindowChrome(QFrame):
     def retheme(self, mode):
         for key, action in self.theme_actions.items():
             action.setChecked(key == mode)
+        # Density changes alter stylesheet padding. Refresh the layout's cached
+        # menu-button hints as well as repainting the caption controls.
+        for button in (self.file_button, self.view_button):
+            button.updateGeometry()
+        self.layout().invalidate()
         self.update()
         for button in (self.minimize_button, self.maximize_button, self.close_button):
             button.update()

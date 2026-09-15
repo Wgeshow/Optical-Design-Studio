@@ -17,11 +17,11 @@ import traceback
 def inspect_window_chrome(window):
     """Check the shipped title bar at its actual laid-out size."""
     from PyQt6.QtCore import Qt
-    from qt_chrome import WindowChrome
+    from PyQt6.QtWidgets import QApplication
+    from qt_chrome import WindowChrome, WindowsCustomFrame
 
-    native_frame = sys.platform == 'win32'
-    if bool(window.windowFlags() & Qt.WindowType.FramelessWindowHint) == native_frame:
-        raise AssertionError('Windows must use native resizing/Snap chrome; other platforms use custom chrome.')
+    if not window.windowFlags() & Qt.WindowType.FramelessWindowHint:
+        raise AssertionError('The application must draw its integrated custom title bar.')
     chrome = window.chrome
     if not isinstance(chrome, WindowChrome) or chrome.height() != 44:
         raise AssertionError('The integrated 44-pixel title bar is missing.')
@@ -29,9 +29,19 @@ def inspect_window_chrome(window):
         raise AssertionError('The title bar does not span the top of the application.')
     if chrome.title.text() != window.windowTitle():
         raise AssertionError('The integrated title differs from the application title.')
-    controls = [chrome.logo, chrome.title, chrome.file_button, chrome.view_button]
-    if not native_frame:
-        controls += [chrome.minimize_button, chrome.maximize_button, chrome.close_button]
+    controls = [chrome.logo, chrome.title, chrome.file_button, chrome.view_button,
+                chrome.minimize_button, chrome.maximize_button, chrome.close_button]
+    if chrome.native_frame:
+        raise AssertionError('Custom caption controls must remain enabled on every platform.')
+    frame = window._windows_frame
+    if not isinstance(frame, WindowsCustomFrame):
+        raise AssertionError('The Windows resizing/Snap adapter is missing.')
+    expected_native = sys.platform == 'win32' and QApplication.platformName() == 'windows'
+    if frame.enabled != expected_native:
+        raise AssertionError('The Windows resizing/Snap adapter has the wrong activation state.')
+    maximize_center = chrome.mapTo(window, chrome.maximize_button.geometry().center())
+    if frame.hit_test(maximize_center) != 9:
+        raise AssertionError('The maximize caption must expose HTMAXBUTTON for Windows Snap.')
     for control in controls:
         label = control.accessibleName() or control.objectName() or type(control).__name__
         if not control.isVisible() or not chrome.rect().contains(control.geometry()):
@@ -48,9 +58,19 @@ def inspect_window_chrome(window):
     if not all(action in chrome.file_menu.actions() and action in window.actions()
                for action in (chrome.open_action, chrome.save_action)):
         raise AssertionError('File must retain project commands and their window shortcuts.')
-    return dict(frameless=not native_frame, height=chrome.height(), width=chrome.width(),
+    return dict(frameless=True, native_snap_adapter_enabled=frame.enabled,
+                maximize_hit_test=9, height=chrome.height(), width=chrome.width(),
                 visible_controls=len(controls), title=chrome.title.text(),
                 project_commands_in_file_menu=True)
+
+
+def settle_window_layout(application, window):
+    """Deliver the responsive-density debounce and its queued layout changes."""
+    from PyQt6.QtCore import QEventLoop, QTimer
+    loop = QEventLoop()
+    QTimer.singleShot(window.appearance_timer.interval() + 80, loop.quit)
+    loop.exec()
+    application.processEvents()
 
 
 def inspect_busy_close_guard(window, application):
@@ -163,7 +183,7 @@ def run(report_path):
                 theme_manager().apply(mode, persist=False)
                 for width, height in ((1000, 720), (1460, 960)):
                     window.resize(width, height)
-                    application.processEvents()
+                    settle_window_layout(application, window)
                     chrome_layouts.append(dict(theme=mode, **inspect_window_chrome(window)))
                 for index, name in enumerate(expected):
                     window.navigation.setCurrentRow(index)

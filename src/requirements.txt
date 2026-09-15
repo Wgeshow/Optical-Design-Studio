@@ -1,6 +1,4 @@
-gradio==6.5.1
 numpy==1.26.4
 pandas==2.2.2
 matplotlib==3.8.4
-plotly==6.3.0
 -r requirements-desktop.txt

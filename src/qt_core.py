@@ -498,7 +498,11 @@ class ProjectStore(QObject):
         project=self.portable_project()
         self.save_search(kind,options)
         project['desktop_search']=copy.deepcopy(self.search_state)
-        worker=BackendWorker(kind,project,options,self.library,self)
+        if kind == 'fdtd':
+            from qt_fdtd import MeepWorker
+            worker=MeepWorker(kind,project,options,self.library,self)
+        else:
+            worker=BackendWorker(kind,project,options,self.library,self)
         self._worker=worker
         worker.event.connect(self.progress)
         worker.completed.connect(self._completed)
@@ -521,7 +525,7 @@ class ProjectStore(QObject):
             worker.deleteLater()
 
     def cancel(self):
-        if isinstance(self._worker,BackendWorker):
+        if callable(getattr(self._worker, 'cancel', None)):
             self._worker.cancel()
             self.message.emit('Cancellation requested; waiting for native workers to stop…')
 

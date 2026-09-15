@@ -1,6 +1,6 @@
 """Persistent appearance controls, independent from solver settings."""
 from PyQt6.QtCore import Qt, QSignalBlocker
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QComboBox, QSlider, QCheckBox, QLabel
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QComboBox, QSlider, QCheckBox, QLabel, QGroupBox
 from qt_common import theme_manager, button, note
 
 
@@ -10,7 +10,10 @@ class AppearancePage(QWidget):
         self.manager = theme_manager()
         layout = QVBoxLayout(self)
         layout.addWidget(note('Customize the interface. Changes apply immediately and are saved on this computer.'))
-        form = QFormLayout()
+        colors = QGroupBox('UI elements & color')
+        form = QFormLayout(colors)
+        form.setContentsMargins(18, 24, 18, 18)
+        form.setSpacing(14)
         form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
         self.theme = QComboBox()
         self.theme.addItem('Dark mode', 'dark')
@@ -18,17 +21,21 @@ class AppearancePage(QWidget):
         self.theme.setAccessibleName('Color theme')
         form.addRow('Theme', self.theme)
         self.scale = QSlider(Qt.Orientation.Horizontal)
-        self.scale.setRange(80, 140)
+        self.scale.setRange(70, 140)
         self.scale.setSingleStep(5)
         self.scale.setAccessibleName('Interface size percentage')
         self.scale.setTracking(False)
         self.value = QLabel()
         form.addRow('Interface size', self.scale)
         form.addRow('', self.value)
-        layout.addLayout(form)
+        layout.addWidget(colors)
+        responsive = QGroupBox('Window & layout')
+        responsive_layout = QVBoxLayout(responsive)
+        responsive_layout.setContentsMargins(18, 24, 18, 18)
         self.adaptive = QCheckBox('Adapt layout and control size to the window')
-        layout.addWidget(self.adaptive)
-        layout.addWidget(note('Smaller windows use compact navigation and stacked panels. Large tables remain scrollable. Windows display scaling is respected automatically.'))
+        responsive_layout.addWidget(self.adaptive)
+        responsive_layout.addWidget(note('Smaller windows use compact navigation and stacked panels. Large tables remain scrollable. Windows display scaling is respected automatically.'))
+        layout.addWidget(responsive)
         layout.addWidget(button('Reset appearance', self.reset))
         layout.addStretch()
         self.theme.currentIndexChanged.connect(lambda: self.manager.apply(self.theme.currentData()))
@@ -47,7 +54,7 @@ class AppearancePage(QWidget):
                     widget.setValue(value)
                 else:
                     widget.setChecked(value)
-        self.value.setText(f'{self.manager.scale}% · range 80–140%')
+        self.value.setText(f'{self.manager.scale}% · range 70–140% · text stays readable as spacing compacts')
 
     def reset(self):
         self.manager.set_appearance(scale=100, adaptive=True)

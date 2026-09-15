@@ -8,7 +8,7 @@ from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QComboBox,
-    QLineEdit, QPlainTextEdit, QPushButton, QCheckBox, QFileDialog, QTabWidget,
+    QLineEdit, QPlainTextEdit, QPushButton, QCheckBox, QFileDialog, QTabWidget, QSplitter,
 )
 
 from data_library import read_json
@@ -32,6 +32,7 @@ class LibraryPage(QWidget):
         root.addWidget(title)
         lead = QLabel('Reopen a saved structure, inspect every result, or share the complete application and its material data.')
         lead.setWordWrap(True)
+        lead.setObjectName('muted')
         root.addWidget(lead)
         files = QHBoxLayout()
         self.open_project_button = QPushButton('Open project JSON')
@@ -59,7 +60,11 @@ class LibraryPage(QWidget):
         self.selection = QComboBox()
         self.selection.setAccessibleName('Saved run or project')
         controls_body.addWidget(self.selection)
-        restore = QHBoxLayout()
+        self.selection.hide()
+        self.entry_list = make_table(['Name', 'Type', 'Status'])
+        controls_body.addWidget(self.entry_list, 1)
+        self.entry_list.cellClicked.connect(self.select_entry_row)
+        restore = QVBoxLayout()
         self.design = QComboBox()
         self.design.setAccessibleName('Saved setup to reopen')
         self.restore = QPushButton('Reopen in Structure')
@@ -67,9 +72,13 @@ class LibraryPage(QWidget):
         restore.addWidget(self.design, 1)
         restore.addWidget(self.restore)
         controls_body.addLayout(restore)
-        root.addWidget(controls)
+        self.browser_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.browser_splitter.setChildrenCollapsible(False)
+        self.browser_splitter.addWidget(controls)
+        root.addWidget(self.browser_splitter, 1)
         self.tabs = QTabWidget()
-        root.addWidget(self.tabs, 1)
+        self.browser_splitter.addWidget(self.tabs)
+        self.browser_splitter.setSizes([480, 680])
         self._build_results()
         self._build_details()
         self._build_sharing()
@@ -195,7 +204,23 @@ class LibraryPage(QWidget):
         query = self.query.text().strip().lower()
         entries = [item for item in self._entries if (not self.kind.currentData() or item.get('kind') == self.kind.currentData()) and (not self.run_status.currentData() or item.get('status') == self.run_status.currentData()) and query in json.dumps(item, ensure_ascii=False).lower()]
         choices(self.selection, saved_entry_choices(entries))
+        self._visible_entries = [self.selection.itemData(i) for i in range(self.selection.count())]
+        by_id = {entry['id']: entry for entry in entries}
+        rows = [{'Name': by_id.get(identifier, {}).get('title') or identifier,
+                 'Type': by_id.get(identifier, {}).get('kind', ''),
+                 'Status': by_id.get(identifier, {}).get('status', '')} for identifier in self._visible_entries]
+        show_frame(self.entry_list, pd.DataFrame(rows, columns=['Name', 'Type', 'Status']))
+        if self.selection.currentIndex() >= 0:
+            self.entry_list.selectRow(self.selection.currentIndex())
         self.inspect()
+
+    def select_entry_row(self, row, column=0):
+        if 0 <= row < self.selection.count():
+            self.selection.setCurrentIndex(row)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.browser_splitter.setOrientation(Qt.Orientation.Vertical if self.width() < 900 else Qt.Orientation.Horizontal)
 
     def inspect(self, *_):
         identifier = self.selection.currentData()

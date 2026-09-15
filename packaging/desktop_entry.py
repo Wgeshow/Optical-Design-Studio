@@ -7,6 +7,10 @@ import traceback
 
 if __name__ == '__main__':
     multiprocessing.freeze_support()
+    from desktop_runtime import dispatch_startup_helper
+    helper_result = dispatch_startup_helper()
+    if helper_result is not None:
+        raise SystemExit(helper_result)
     if '--apply-update' in sys.argv:
         from update_install import helper_main
         raise SystemExit(helper_main(sys.argv[sys.argv.index('--apply-update') + 1]))

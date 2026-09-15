@@ -7,6 +7,8 @@ _handles = []
 
 
 def initialize(threads=1):
+    from addon_runtime import activate
+    activate('gpu')
     for name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "BLIS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
         os.environ[name] = str(threads)
     os.environ["MKL_DYNAMIC"] = "FALSE"

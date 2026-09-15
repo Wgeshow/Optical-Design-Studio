@@ -17,13 +17,13 @@ matplotlib.use('Agg')
 from PyQt6.QtCore import Qt, QSettings, QTimer, QSignalBlocker, QSize
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (QApplication,QMainWindow,QWidget,QHBoxLayout,QVBoxLayout,
-    QFrame,QLabel,QListWidget,QStackedWidget,QComboBox,QFileDialog,QMessageBox,QProgressBar,QToolButton)
+    QFrame,QLabel,QListWidget,QStackedWidget,QComboBox,QFileDialog,QMessageBox,QProgressBar,QToolButton,QTabWidget)
 
 from qt_common import theme_manager,button,note,scroll,preferences,COLORS
 from qt_icons import navigation_icon
 from qt_core import ProjectStore,BackendWorker
 from data_library import DataLibrary
-from qt_chrome import WindowChrome
+from qt_chrome import WindowChrome, WindowsCustomFrame
 from app_version import APP_VERSION
 
 
@@ -72,8 +72,8 @@ class OpticalStudio(QMainWindow):
         self._closing=False
         self._updates_closing=False
         self.setWindowTitle('Optical Design Studio')
-        native_frame = sys.platform == 'win32'
-        self.setWindowFlags(Qt.WindowType.Window | (Qt.WindowType.Widget if native_frame else Qt.WindowType.FramelessWindowHint) |
+        native_frame = False
+        self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint |
                             Qt.WindowType.WindowMinMaxButtonsHint | Qt.WindowType.WindowCloseButtonHint)
         self.setMinimumSize(640,480)
         self.resize(1460,960)
@@ -101,11 +101,7 @@ class OpticalStudio(QMainWindow):
         self.sidebar_toggle.setMinimumSize(36, 32)
         self.sidebar_toggle.clicked.connect(self.toggle_sidebar)
         side.addWidget(self.sidebar_toggle, 0, Qt.AlignmentFlag.AlignRight)
-        brand=QLabel('S⁴  Studio')
-        brand.setObjectName('brand')
-        side.addWidget(brand)
-        side.addWidget(note('OPTICAL DESIGN\nNative desktop workspace'))
-        side.addSpacing(26)
+        side.addSpacing(6)
         self.navigation=QListWidget()
         self.navigation.setObjectName('navigation')
         self.navigation.addItems(['Structure','Materials','Simulate','Optimize','Fields','Saved work','Settings','About'])
@@ -123,7 +119,7 @@ class OpticalStudio(QMainWindow):
         location=note('Saved locally\nYour data stays with the project library.')
         location.setToolTip(str(self.store.library.root))
         side.addWidget(location)
-        self.sidebar_details = [brand, location, self.theme_select] + sidebar.findChildren(QLabel)
+        self.sidebar_details = [location, self.theme_select] + sidebar.findChildren(QLabel)
         body.addWidget(sidebar)
         workspace=QWidget()
         self.workspace=workspace
@@ -136,6 +132,7 @@ class OpticalStudio(QMainWindow):
         from qt_library import LibraryPage
         from qt_compute import SimulationPage,OptimizePage,FieldsPage,SettingsPage
         from qt_about import AboutPage
+        from qt_fdtd import FDTDPage
         classes=[StructurePage,MaterialsPage,SimulationPage,OptimizePage,FieldsPage,LibraryPage,SettingsPage,AboutPage]
         self.pages={}
         for index,cls in enumerate(classes):
@@ -143,10 +140,21 @@ class OpticalStudio(QMainWindow):
             page.setObjectName('page')
             page.layout().setContentsMargins(*( (34,28,34,28) if cls is AboutPage else (20,14,20,14) ))
             self.pages[self.navigation.item(index).text()]=page
-            self.stack.addWidget(scroll(page))
+            if cls is SimulationPage:
+                self.simulation_engines = QTabWidget()
+                self.fdtd_page = FDTDPage(self.store)
+                self.simulation_engines.addTab(scroll(page), 'S4 · RCWA')
+                self.simulation_engines.addTab(scroll(self.fdtd_page), 'MEEP · FDTD')
+                self.stack.addWidget(self.simulation_engines)
+            else:
+                self.stack.addWidget(scroll(page))
         self.pages['About'].idle.connect(self._close_after_updates)
+        self.pages['Settings'].addons_panel.idle.connect(self._close_after_updates)
+        self.pages['Settings'].addons_panel.restart_requested.connect(self._restart_for_addons)
+        self.pages['Settings'].addons_panel.runtime_changed.connect(self.fdtd_page.refresh_runtime)
         content.addWidget(self.stack,1)
-        footer=QWidget()
+        footer=QFrame()
+        footer.setObjectName('workspaceFooter')
         footer_layout=QHBoxLayout(footer)
         footer_layout.setContentsMargins(24,10,24,12)
         self.status=note('Ready · Applied Structure edits are shared across every workflow.')
@@ -163,6 +171,7 @@ class OpticalStudio(QMainWindow):
         content.addWidget(footer)
         body.addWidget(workspace,1)
         self.setCentralWidget(central)
+        self._windows_frame = WindowsCustomFrame(self)
         self.structure_notice=StructureNotice(workspace)
         self._structure_snapshot=self.structure_signature()
         self.navigation.currentRowChanged.connect(self.stack.setCurrentIndex)
@@ -204,30 +213,36 @@ class OpticalStudio(QMainWindow):
         self.sidebar_toggle.setText('›' if compact else '‹')
         self.sidebar_toggle.setAccessibleName('Expand sidebar' if compact else 'Collapse sidebar')
         self.sidebar_toggle.setToolTip('Expand sidebar' if compact else 'Collapse sidebar')
-        self.sidebar.setFixedWidth(76 if compact else round(225 * manager.effective_scale))
-        self.navigation.setIconSize(QSize(round(22 * manager.effective_scale), round(22 * manager.effective_scale)))
-        self.sidebar.layout().setContentsMargins(4 if compact else 18, 14, 4 if compact else 18, 12)
+        self.sidebar.setFixedWidth(60 if compact else max(156, round(180 * manager.effective_scale)))
+        icon_size = max(18, round(22 * manager.effective_scale))
+        self.navigation.setIconSize(QSize(icon_size, icon_size))
+        self.sidebar.layout().setContentsMargins(3 if compact else 10, 8, 3 if compact else 10, 8)
         labels = ['Structure','Materials','Simulate','Optimize','Fields','Saved work','Settings','About']
         for index, label in enumerate(labels):
             item = self.navigation.item(index)
             item.setText('' if compact else label)
-            item.setIcon(navigation_icon(label, COLORS[manager.mode]['text']))
+            item.setIcon(navigation_icon(label, COLORS[manager.mode]['accent']))
             item.setToolTip(label)
             item.setData(Qt.ItemDataRole.AccessibleTextRole, label)
         for widget in self.sidebar_details:
             widget.setVisible(not compact)
         from PyQt6.QtWidgets import QFormLayout, QTableWidget
         for page in self.pages.values():
+            margin = max(8, round(16 * manager.effective_scale))
+            page.layout().setContentsMargins(margin, margin, margin, margin)
+            page.layout().setSpacing(max(5, round(8 * manager.effective_scale)))
             for form in page.findChildren(QFormLayout):
                 form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+                form.setVerticalSpacing(max(5, round(8 * manager.effective_scale)))
+                form.setHorizontalSpacing(max(8, round(12 * manager.effective_scale)))
             for table in page.findChildren(QTableWidget):
-                table.verticalHeader().setDefaultSectionSize(max(32, round(36 * manager.effective_scale)))
+                table.verticalHeader().setDefaultSectionSize(max(table.fontMetrics().height()+8, round(30 * manager.effective_scale)))
 
     def refresh_theme(self,mode):
         with QSignalBlocker(self.theme_select):
             self.theme_select.setCurrentIndex(self.theme_select.findData(mode))
         for index, label in enumerate(('Structure','Materials','Simulate','Optimize','Fields','Saved work','Settings','About')):
-            self.navigation.item(index).setIcon(navigation_icon(label, COLORS[mode]['text']))
+            self.navigation.item(index).setIcon(navigation_icon(label, COLORS[mode]['accent']))
         if hasattr(self,'structure_notice') and self.structure_notice.isVisible():
             self.position_structure_notice()
 
@@ -278,6 +293,20 @@ class OpticalStudio(QMainWindow):
             self._updates_closing=False
             QTimer.singleShot(0,self.close)
 
+    def _restart_for_addons(self):
+        from application_restart import prepare_restart, launch_restart
+        try:
+            plan = prepare_restart(self.store.library.root, store=self.store,
+                busy_checks=(lambda: self.pages['About'].busy,
+                             lambda: self.pages['Settings'].addons_panel.busy))
+            launch_restart(plan)
+            # prepare_restart has saved the session; helper waits for this PID.
+            self.preferences.setValue('geometry', self.saveGeometry())
+            self.preferences.setValue('page', self.navigation.currentRow())
+            QApplication.instance().quit()
+        except Exception:
+            self.show_error('The add-on is staged, but automatic restart could not start. Close and reopen the application when your work is saved.')
+
     def open_project(self):
         path,_=QFileDialog.getOpenFileName(self,'Open portable project','','S4 project (*.json)')
         if path:
@@ -323,9 +352,15 @@ class OpticalStudio(QMainWindow):
         self.status.setText(f"{event.get('run_kind','Calculation').title()}: {summary.get('status','complete')} · Saved to your library.")
 
     def closeEvent(self,event):
+        for page in (self.pages['About'], self.pages['Settings'].addons_panel):
+            if not page.shutdown():
+                self._updates_closing=True
+                self.status.setText('Cancelling the package operation safely before closing…')
+                event.ignore()
+                return
         if self.store.busy:
             event.ignore()
-            if not isinstance(self.store._worker,BackendWorker):
+            if not callable(getattr(self.store._worker, 'cancel', None)):
                 self.status.setText('The library operation is finishing. Close the window when it completes.')
                 return
             answer=QMessageBox.question(self,'Calculation running','Cancel the active calculation and close after its workers stop?',
@@ -337,6 +372,11 @@ class OpticalStudio(QMainWindow):
         if not self.pages['About'].shutdown():
             self._updates_closing=True
             self.status.setText('Stopping the update request safely. The window will close when it finishes.')
+            event.ignore()
+            return
+        if not self.pages['Settings'].addons_panel.shutdown():
+            self._updates_closing=True
+            self.status.setText('Stopping the add-on request safely. The window will close when it finishes.')
             event.ignore()
             return
         try:
@@ -358,6 +398,7 @@ def main(argv=None):
     parser.add_argument('--project',type=Path)
     parser.add_argument('--library',type=Path)
     parser.add_argument('--no-restore',action='store_true')
+    parser.add_argument('--update-ack', type=Path)
     args=parser.parse_args(argv)
     selected_library=initialize_desktop(argv)
     set_windows_app_id()
@@ -377,6 +418,24 @@ def main(argv=None):
         store.load_project(args.project)
     window=OpticalStudio(store)
     window.show()
+    def save_window_preferences():
+        window.preferences.setValue('geometry', window.saveGeometry())
+        window.preferences.setValue('page', window.navigation.currentRow())
+        window.preferences.sync()
+    application.aboutToQuit.connect(save_window_preferences)
+    def startup_ready():
+        from desktop_runtime import startup_addon_results
+        if startup_addon_results:
+            messages = [f"{result['id']}: " + ('installed and verified' if result['status']=='activated'
+                else 'installation failed; previous version preserved') for result in startup_addon_results]
+            window.status.setText(' · '.join(messages))
+            window.status.setToolTip('\n'.join(str(result.get('error', '')) for result in startup_addon_results))
+        from application_restart import acknowledge_restart
+        acknowledge_restart()
+        if args.update_ack:
+            from update_install import acknowledge_startup
+            acknowledge_startup(args.update_ack)
+    QTimer.singleShot(0, startup_ready)
     return application.exec()
 
 

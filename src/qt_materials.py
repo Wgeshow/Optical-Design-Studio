@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
     QComboBox, QLineEdit, QPushButton, QLabel, QCheckBox, QDoubleSpinBox,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QFileDialog,
-    QTabWidget, QPlainTextEdit, QSizePolicy, QMessageBox,
+    QTabWidget, QPlainTextEdit, QSizePolicy, QMessageBox, QSplitter,
 )
 
 from model import MAT_COLS
@@ -101,31 +101,53 @@ class MaterialsPage(QWidget):
         self.store = store
         self._presets = {}
         root = QVBoxLayout(self)
-        title = QLabel('Materials & optical constants')
+        title = QLabel('Materials')
         title.setObjectName('pageTitle')
         root.addWidget(title)
         lead = QLabel('Saved materials appear immediately in every layer and region material selector.')
         lead.setWordWrap(True)
+        lead.setObjectName('muted')
         root.addWidget(lead)
         self.tabs = QTabWidget()
         root.addWidget(self.tabs)
         inspect = QWidget()
-        body = QVBoxLayout(inspect)
+        inspect_layout = QVBoxLayout(inspect)
+        self.inspect_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.inspect_splitter.setChildrenCollapsible(False)
+        inspect_layout.addWidget(self.inspect_splitter)
+        details_panel = QWidget()
+        body = QVBoxLayout(details_panel)
+        self.inspect_splitter.addWidget(details_panel)
+        chart_panel = QWidget()
+        chart_layout = QVBoxLayout(chart_panel)
+        self.inspect_splitter.addWidget(chart_panel)
+        self.inspect_splitter.setStretchFactor(0, 0)
+        self.inspect_splitter.setStretchFactor(1, 1)
+        self.inspect_splitter.setSizes([330, 760])
         self.selection = QComboBox()
         self.selection.setMinimumWidth(220)
         self.selection.setAccessibleName('Material to inspect')
         body.addWidget(self.selection)
-        top = QHBoxLayout()
+        self.selection.hide()
+        self.material_query = QLineEdit()
+        self.material_query.setPlaceholderText('Search project materials and saved presets…')
+        self.material_query.setClearButtonEnabled(True)
+        body.addWidget(self.material_query)
+        self.material_list = make_table(['Material', 'Source'])
+        self.material_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        body.addWidget(self.material_list, 1)
+        self.material_query.textChanged.connect(self.filter_materials)
+        self.material_list.cellClicked.connect(self.select_material_row)
+        top = QVBoxLayout()
         self.add_preset = QPushButton('Add to structure materials')
         self.remove = QPushButton('Remove from project')
         top.addWidget(self.add_preset)
         top.addWidget(self.remove)
-        top.addStretch()
         body.addLayout(top)
         self.description = QLabel()
         self.description.setWordWrap(True)
         self.description.setTextFormat(Qt.TextFormat.PlainText)
-        body.addWidget(self.description)
+        chart_layout.addWidget(self.description)
         self.range_box = QWidget()
         form = readable_form(self.range_box)
         form.setContentsMargins(0, 0, 0, 0)
@@ -138,14 +160,14 @@ class MaterialsPage(QWidget):
         limits.addWidget(connector)
         limits.addWidget(self.high, 1)
         form.addRow('Display range for constants (nm)', limits)
-        body.addWidget(self.range_box)
+        chart_layout.addWidget(self.range_box)
         self.plot = PlotWidget()
-        self.plot.setMinimumHeight(430)
-        body.addWidget(self.plot, 1)
+        self.plot.setMinimumHeight(280)
+        chart_layout.addWidget(self.plot, 1)
         self.values = make_table(['wavelength_nm', 'n', 'k'])
         self.values.setMaximumHeight(210)
-        body.addWidget(self.values)
-        save_box, save_layout = group('Save a project material as a reusable preset')
+        chart_layout.addWidget(self.values)
+        save_box, save_layout = group('Save material preset')
         save_form = readable_form()
         self.preset_name = QLineEdit()
         self.preset_name.setPlaceholderText('Optional display name')
@@ -155,6 +177,7 @@ class MaterialsPage(QWidget):
         save_form.addRow('Source & notes', self.preset_notes)
         save_layout.addLayout(save_form)
         self.save_preset = QPushButton('Save selected material to library')
+        self.save_preset.setProperty('primary', True)
         save_layout.addWidget(self.save_preset)
         body.addWidget(save_box)
         self.tabs.addTab(inspect, 'Inspect & manage')
@@ -176,6 +199,15 @@ class MaterialsPage(QWidget):
         store.busy_changed.connect(self._busy)
         self.refresh()
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        orientation = Qt.Orientation.Vertical if self.width() < 900 else Qt.Orientation.Horizontal
+        if self.inspect_splitter.orientation() != orientation:
+            self.inspect_splitter.setOrientation(orientation)
+            self.inspect_splitter.setSizes([330, 760])
+        if hasattr(self, 'online_splitter'):
+            self.online_splitter.setOrientation(orientation)
+
     def _build_online(self):
         page = QWidget()
         layout = QVBoxLayout(page)
@@ -196,22 +228,28 @@ class MaterialsPage(QWidget):
         self.online_results = make_table(['Material', 'Dataset', 'Wavelength range', 'Reference'])
         self.online_results.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         results_body.addWidget(self.online_results)
+        detail_box, detail_body = group('Selected dataset')
         self.online_details = QLabel('Search for a material, then select a dataset to review it.')
         self.online_details.setWordWrap(True)
         self.online_details.setTextFormat(Qt.TextFormat.PlainText)
-        results_body.addWidget(self.online_details)
-        actions = QHBoxLayout()
+        detail_body.addWidget(self.online_details)
+        detail_body.addStretch()
+        actions = QVBoxLayout()
         self.online_open = QPushButton('Open source page')
         self.online_download = QPushButton('Download & review…')
         self.online_download.setProperty('primary', True)
         actions.addWidget(self.online_open)
         actions.addWidget(self.online_download)
-        actions.addStretch()
-        results_body.addLayout(actions)
+        detail_body.addLayout(actions)
         reminder = QLabel('Nothing downloads until you click Download & review… and confirm the import.')
         reminder.setWordWrap(True)
-        results_body.addWidget(reminder)
-        layout.addWidget(results_box, 1)
+        detail_body.addWidget(reminder)
+        self.online_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.online_splitter.setChildrenCollapsible(False)
+        self.online_splitter.addWidget(results_box)
+        self.online_splitter.addWidget(detail_box)
+        self.online_splitter.setSizes([700, 330])
+        layout.addWidget(self.online_splitter, 1)
         self._online_items = []
         self.online_search.clicked.connect(self.search_online)
         self.online_query.returnPressed.connect(self.search_online)
@@ -402,7 +440,27 @@ class MaterialsPage(QWidget):
         values += [('Built-in · ' + name, 'builtin:' + name) for name in self.store.context.PRESETS]
         values += [('Saved · ' + name, 'saved:' + name) for name in self._presets]
         choices(self.selection, values)
+        self.filter_materials()
         self.draw()
+
+    def filter_materials(self, *_):
+        query = self.material_query.text().strip().casefold()
+        self._visible_materials = [i for i in range(self.selection.count())
+            if query in self.selection.itemText(i).casefold()]
+        rows = []
+        for index in self._visible_materials:
+            source, _, name = self.selection.itemText(index).partition(' · ')
+            rows.append({'Material': name, 'Source': source})
+        show_frame(self.material_list, pd.DataFrame(rows, columns=['Material', 'Source']))
+        self.material_list.horizontalHeader().setStretchLastSection(False)
+        self.material_list.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.material_list.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        if self.selection.currentIndex() in self._visible_materials:
+            self.material_list.selectRow(self._visible_materials.index(self.selection.currentIndex()))
+
+    def select_material_row(self, row, column=0):
+        if 0 <= row < len(self._visible_materials):
+            self.selection.setCurrentIndex(self._visible_materials[row])
 
     def selected_row(self):
         key = self.selection.currentData() or ''

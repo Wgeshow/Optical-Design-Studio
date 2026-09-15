@@ -15,6 +15,55 @@ import tempfile
 import time
 import zipfile
 
+_startup_addons_checked = set()
+startup_addon_results = []
+
+
+def dispatch_startup_helper(argv=None):
+    """Handle private child modes before Qt, numpy or native libraries import."""
+    args = list(sys.argv[1:] if argv is None else argv)
+    if not args or args[0] not in ('--restart-app', '--addon-probe'):
+        return None
+    if args[0] == '--restart-app':
+        if len(args) != 2:
+            raise ValueError('Restart helper requires exactly one prepared plan.')
+        from application_restart import restart_helper_main
+        return restart_helper_main(args[1])
+    if len(args) != 3:
+        raise ValueError('Add-on probe requires an identifier and staged directory.')
+    from addon_runtime import addon_root, _pending, probe_native_payload
+    identifier, directory = args[1], Path(args[2]).resolve(strict=True)
+    root = addon_root().resolve()
+    receipt = _pending(identifier, root)
+    if receipt is None or directory != root/(identifier+'-'+receipt['sha256']):
+        raise ValueError('Native probe target is not the staged add-on receipt.')
+    return 0 if probe_native_payload(identifier, directory) is True else 1
+
+
+def _probe_addon_child(identifier, directory):
+    import subprocess
+    command = [str(Path(sys.executable).resolve())]
+    if not getattr(sys, 'frozen', False):
+        command.append(str(Path(__file__).resolve()))
+    command += ['--addon-probe', identifier, str(Path(directory).resolve())]
+    result = subprocess.run(command, cwd=str(application_root()),
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        timeout=120, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    return result.returncode == 0
+
+
+def validate_startup_addons(root):
+    """Validate staged candidates once, before parent native activation."""
+    key = str(Path(root).resolve())
+    if key in _startup_addons_checked:
+        return startup_addon_results
+    _startup_addons_checked.add(key)
+    from addon_runtime import pending_addons, validate_pending
+    startup_addon_results.clear()
+    for identifier in pending_addons():
+        startup_addon_results.append(validate_pending(identifier, _probe_addon_child))
+    return startup_addon_results
+
 
 def resource_root():
     return Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)).resolve()
@@ -243,10 +292,14 @@ merged once so that removing a supplied run later is respected on next launch.
 
 
 def initialize_desktop(argv=None):
+    helper_result = dispatch_startup_helper(argv)
+    if helper_result is not None:
+        raise SystemExit(helper_result)
     root = library_root(argv)
     os.environ['S4_LIBRARY_ROOT'] = str(root)
     if getattr(sys, 'frozen', False):
         seed_library(resource_root() / 'seed_library.zip', root)
+    validate_startup_addons(root)
     return root
 
 
@@ -254,3 +307,14 @@ def set_windows_app_id():
     if os.name == 'nt':
         import ctypes
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('OpticalDesignStudio.Desktop')
+
+
+if __name__ == '__main__':
+    try:
+        result = dispatch_startup_helper()
+        if result is None:
+            raise ValueError('This entry point is reserved for application helpers.')
+        raise SystemExit(result)
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1)
