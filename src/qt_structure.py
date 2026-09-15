@@ -743,7 +743,10 @@ class StructurePage(QWidget):
 
     def _export_finished(self, name, result):
         if name == 'structure-export':
-            self._message('Model exported: ' + str(result))
+            if str(result).lower().endswith('.java'):
+                self._message('Java source exported: ' + str(result) + '. Compile with COMSOL, then open the resulting .class (not the .java). Instructions and a .build.ps1 helper were saved beside it.')
+            else:
+                self._message('Model exported: ' + str(result))
 
     def _export_failed(self, name, error):
         if name == 'structure-export':

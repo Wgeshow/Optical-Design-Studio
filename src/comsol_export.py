@@ -11,6 +11,88 @@ from structure_preview import normalize_region, periodic_centers
 from export_geometry import ExportOptions, dimensions, array_centers
 
 
+BUILD_HELPER = r'''# Compile the adjacent Java source with your installed COMSOL version.
+param([string]$ComsolBin, [switch]$BuildMph, [string]$Source)
+$ErrorActionPreference = 'Stop'
+$source = if ($Source) { (Resolve-Path -LiteralPath $Source).Path } else { Join-Path $PSScriptRoot '@@NAME@@.java' }
+if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Missing Java source: $source" }
+$modelName = [IO.Path]::GetFileNameWithoutExtension($source)
+if ([IO.Path]::GetExtension($source) -cne '.java' -or $modelName -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') { throw 'Select the original .java source with its original Java class filename.' }
+if (-not $ComsolBin) {
+    $found = Get-Command comsolcompile.exe -ErrorAction SilentlyContinue
+    if ($found) { $ComsolBin = Split-Path $found.Source }
+}
+if (-not $ComsolBin) {
+    $candidates = @(
+        "$env:ProgramFiles\COMSOL\COMSOL*\Multiphysics\bin\win64\comsolcompile.exe",
+        "$env:ProgramFiles\COMSOL*\Multiphysics\bin\win64\comsolcompile.exe"
+    )
+    $found = @(Get-ChildItem -Path $candidates -ErrorAction SilentlyContinue | Sort-Object FullName -Unique)
+    if ($found.Count -eq 1) { $ComsolBin = $found[0].DirectoryName }
+}
+if (-not $ComsolBin) { throw 'Specify -ComsolBin with your COMSOL Multiphysics bin\win64 folder. If several versions are installed, choose the version in which you will open the model.' }
+$compiler = Join-Path $ComsolBin 'comsolcompile.exe'
+if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) { throw "COMSOL compiler not found: $compiler" }
+# Keep each build separate so existing class/model files are never overwritten.
+$build = Join-Path (Split-Path $source) ($modelName + '_compiled_' + [Guid]::NewGuid().ToString('N').Substring(0,8))
+New-Item -ItemType Directory -Path $build | Out-Null
+Copy-Item -LiteralPath $source -Destination $build
+Push-Location -LiteralPath $build
+try {
+    & $compiler "$modelName.java" 2>&1 | Tee-Object -FilePath 'compile.log'
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath "$modelName.class")) {
+        throw "COMSOL compilation failed. Read $build\compile.log"
+    }
+    Write-Host "Compiled successfully: $build\$modelName.class"
+    Write-Host 'In COMSOL choose File > Open > Compiled Model File for Java (*.class), then select this class file.'
+    Write-Host 'After the model builds, save it as an MPH file. Do not import the Java source as geometry or rename it to .mph.'
+    if ($BuildMph) {
+        $batch = Join-Path $ComsolBin 'comsolbatch.exe'
+        if (-not (Test-Path -LiteralPath $batch -PathType Leaf)) { throw "COMSOL batch launcher not found: $batch" }
+        & $batch '-inputfile' "$modelName.class" '-outputfile' "$modelName.mph" '-batchlog' 'model-build.log'
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath "$modelName.mph")) {
+            throw "COMSOL model build failed. Read $build\model-build.log"
+        }
+        Write-Host "Open the completed model: $build\$modelName.mph"
+    }
+} finally { Pop-Location }
+'''
+
+
+def export_instructions(name):
+    return f'''COMSOL export: {name}
+
+The .java file is SOURCE CODE, not an MPH model or a geometry-import file.
+COMSOL File > Open accepts the COMPILED .class model. Compile with the same
+COMSOL version that you will use to open it. Renaming a file does not convert it.
+
+Windows (PowerShell opened in this export folder):
+  .\\{name}.build.ps1 -ComsolBin 'C:\\Program Files\\COMSOL\\COMSOL64\\Multiphysics\\bin\\win64'
+Replace the example installation path with your installed COMSOL version.
+If script execution is restricted, use the manual compiler command below;
+there is no need to change your system execution policy.
+
+Manual PowerShell command:
+  & 'C:\\Program Files\\COMSOL\\COMSOL64\\Multiphysics\\bin\\win64\\comsolcompile.exe' '{name}.java'
+
+Linux/macOS (from a terminal with COMSOL on PATH):
+  comsol compile {name}.java
+
+Then File > Open > Compiled Model File for Java (*.class), select {name}.class,
+wait for the geometry/model to build, and Save As an .mph model.
+The Windows helper optionally accepts -BuildMph to build the MPH in batch mode.
+The helper stores results and error logs in a new compiled subfolder each run.
+
+This exports geometry and material setup; physics, ports and PMLs still need setup.
+Tabulated n/k materials need manual interpolation setup before simulation.
+Compilation/model building requires a local COMSOL installation. Java export alone
+does not prove that COMSOL compiled or built the model successfully.
+
+Official instructions:
+https://doc.comsol.com/6.4/doc/com.comsol.help.comsol/comsol_api_intro.46.09.html
+'''
+
+
 def _tag(value, prefix="v"):
     text = re.sub(r"[^A-Za-z0-9_]", "_", str(value)).strip("_").lower()
     if not text or text[0].isdigit():
@@ -73,6 +155,8 @@ def comsol_java(materials, layers, patterns, settings, class_name="S4UnitCell", 
     if sum(len(array_centers(r, ax, ay, options)) for r in regions) > 100000:
         raise ValueError('Export exceeds 100,000 patterned copies. Reduce the repeat counts.')
     lines = [
+        '// Java SOURCE: compile with COMSOL before opening the resulting .class.',
+        '// See the adjacent .README.txt and .build.ps1 files.',
         "import com.comsol.model.*;",
         "import com.comsol.model.util.*;",
         "",
@@ -217,8 +301,7 @@ def comsol_java(materials, layers, patterns, settings, class_name="S4UnitCell", 
         "  }",
         "",
         "  public static void main(String[] args) throws java.io.IOException {",
-        "    Model model = run();",
-        '    model.save("S4_unit_cell.mph");',
+        "    run();",
         "  }",
         "}",
         "",
@@ -233,5 +316,7 @@ def export_comsol_java(path, materials, layers, patterns, settings, options=None
     if _class_name(destination.stem) != destination.stem or destination.stem in {'class', 'public', 'void', 'int', 'package', 'import'}:
         raise ValueError('Choose a Java filename starting with a letter and containing only letters, digits, and underscores.')
     text = comsol_java(materials, layers, patterns, settings, destination.stem, options)
+    destination.with_suffix('.build.ps1').write_text(BUILD_HELPER.replace('@@NAME@@', destination.stem), encoding='utf-8')
+    destination.with_suffix('.README.txt').write_text(export_instructions(destination.stem), encoding='utf-8')
     destination.write_text(text, encoding="utf-8", newline="\n")
     return destination

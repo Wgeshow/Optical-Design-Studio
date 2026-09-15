@@ -47,6 +47,10 @@ class ExportDialog(QDialog):
         note = QLabel('1 × 1 is one unit cell (ax × ay). Export uses the applied structure; repeat counts are independent of preview cells. Large arrays take longer; at most 100,000 patterned copies can be exported.')
         note.setWordWrap(True)
         layout.addWidget(note)
+        if not cad:
+            java_note = QLabel('COMSOL export creates Java source plus build instructions. Compile it with COMSOL before using File → Open → Compiled Model File for Java (*.class). The .java file cannot be opened as an MPH model or imported as geometry.')
+            java_note.setWordWrap(True)
+            layout.addWidget(java_note)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)

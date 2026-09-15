@@ -1,2 +1,2 @@
 ; Generated from app_version.py by prepare_payload.py.
-#define Version "1.1.0"
+#define Version "1.1.1"

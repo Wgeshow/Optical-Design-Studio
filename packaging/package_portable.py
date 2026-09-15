@@ -1,5 +1,6 @@
 """Package only verified public inventory into a portable ZIP and test extraction."""
 import hashlib
+import argparse
 import json
 from pathlib import Path, PurePosixPath
 import subprocess
@@ -14,13 +15,17 @@ def sha256(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--integrity-only', action='store_true', help='Verify payload/archive hashes without running application tests.')
+    args = parser.parse_args()
     manifest = json.loads((PAYLOAD/'PAYLOAD-MANIFEST.json').read_text(encoding='utf-8'))
     version = manifest['version']
     if manifest['delivery_profile'] != 'public' or manifest['build_input']['seed_files'] != 0:
         raise ValueError('Portable public ZIP must have an empty research seed.')
-    report = json.loads((ROOT/f'portable-{version}-verification'/'report.json').read_text(encoding='utf-8'))
-    if not report['passed'] or report['version'] != version:
-        raise ValueError('Frozen verification must pass first.')
+    if not args.integrity_only:
+        report = json.loads((ROOT/f'portable-{version}-verification'/'report.json').read_text(encoding='utf-8'))
+        if not report['passed'] or report['version'] != version:
+            raise ValueError('Frozen verification must pass first.')
     target = ROOT.parent/f'OpticalDesignStudio-Portable-{version}-Windows-x64.zip'
     if target.exists():
         raise FileExistsError(target)
@@ -52,7 +57,8 @@ def main():
     for name, record in manifest['files'].items():
         if sha256(extracted/name) != record['sha256']:
             raise ValueError('Extracted file differs: ' + name)
-    subprocess.run([sys.executable, str(ROOT/'verify_frozen.py'),
+    if not args.integrity_only:
+        subprocess.run([sys.executable, str(ROOT/'verify_frozen.py'),
                     str(extracted/'Optical Design Studio.exe'),
                     str(ROOT/f'portable-extracted-{version}-verification'), '--gpu', '--expect-empty-library'], check=True)
     temporary.replace(target)
@@ -60,7 +66,7 @@ def main():
     target.with_suffix('.zip.sha256').write_text(digest + '  ' + target.name + '\n', encoding='ascii')
     result = dict(version=version, artifact=str(target), size=target.stat().st_size, sha256=digest,
                   format='portable-zip', source_included=True, personal_data_included=False,
-                  extracted_runtime_verified=True, files=len(names),
+                  extracted_runtime_verified=not args.integrity_only, packaging_integrity_verified=True, files=len(names),
                   data_default='User Data beside the program', data_setting='Settings → Data output folder',
                   requires_restart_after_data_change=True)
     (ROOT.parent/f'OPTICAL_DESIGN_STUDIO_PORTABLE_{version}.json').write_text(json.dumps(result, indent=2), encoding='utf-8')

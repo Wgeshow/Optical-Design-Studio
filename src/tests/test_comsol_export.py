@@ -49,6 +49,9 @@ class ComsolExportTests(unittest.TestCase):
                                         self.patterns, self.settings)
             self.assertEqual(result.suffix, '.java')
             self.assertIn('public class OpticalDevice', result.read_text(encoding='utf8'))
+            self.assertIn('Compiled Model File for Java', result.with_suffix('.README.txt').read_text(encoding='utf8'))
+            self.assertIn('& $compiler "$modelName.java"', result.with_suffix('.build.ps1').read_text(encoding='utf8'))
+            self.assertNotIn('model.save(', result.read_text(encoding='utf8'))
         with self.assertRaisesRegex(ValueError, 'Lattice periods'):
             comsol_java(self.materials, self.layers, self.patterns, {'ax_um': 0, 'ay_um': 1})
 
