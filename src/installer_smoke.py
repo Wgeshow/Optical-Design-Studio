@@ -325,10 +325,8 @@ def run(report_path):
             import scipy
             import sklearn
             import PyQt6.QtCore
-            import gradio
             import matplotlib
-            import plotly
-            modules = [numpy, scipy, sklearn, PyQt6.QtCore, gradio, matplotlib, plotly]
+            modules = [numpy, scipy, sklearn, PyQt6.QtCore, matplotlib]
             origins = {module.__name__: str(module.__file__) for module in modules}
             if report['frozen']:
                 root = Path(sys.executable).resolve().parent

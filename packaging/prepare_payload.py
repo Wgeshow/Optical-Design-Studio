@@ -100,8 +100,16 @@ def main():
         if item.is_file() and item.suffix.lower() in SOURCE_SUFFIXES:
             copy_current_file(item, source/item.name)
         elif item.is_dir() and item.name in SOURCE_FOLDERS:
+            patterns = ['__pycache__', '*.pyc', '.git']
+            if item.name == 'cad_runtime':
+                # STEP export calls OCP directly; VTK is only CadQuery's
+                # optional visualization layer and is not shipped.
+                # Keep native vtk.libs only as an audit source: the OCP binary
+                # links its small IVtk bridge even when visualization is unused.
+                # The post-build audit copies only that bridge's transitive DLLs.
+                patterns += ['vtk.py', 'vtkmodules', 'vtk-*.dist-info', 'IVtk*']
             shutil.copytree(item, source/item.name, dirs_exist_ok=True,
-                            ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.git'))
+                            ignore=shutil.ignore_patterns(*patterns))
     icon = ROOT/'assets'/'S4_Studio.ico'
     if not icon.is_file():
         icon = ROOT.parent/'S4_Studio.ico'

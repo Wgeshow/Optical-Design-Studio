@@ -62,10 +62,13 @@ class InstallTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             target, package, release = self.fixture(Path(tmp))
             plan = stage_update(package, release, target, target/'User Data')
-            with patch('update_install.wait_for_exit') as wait, patch('update_install.subprocess.Popen') as start:
+            with patch('update_install.wait_for_exit') as wait, \
+                    patch('update_install.os.startfile') as start, \
+                    patch('update_install.subprocess.Popen') as fallback:
                 apply_staged(plan)
                 wait.assert_called_once()
                 start.assert_called_once()
+                fallback.assert_not_called()
             self.assertEqual((target/EXE).read_bytes(), b'new-exe')
             self.assertEqual((target/'_internal'/'runtime').read_bytes(), b'new-runtime')
             self.assertEqual((target/'User Data'/'saved-project').read_bytes(), b'keep')

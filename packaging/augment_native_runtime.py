@@ -180,7 +180,9 @@ def main(argv=None):
     parser.add_argument('--audit-only', action='store_true')
     parser.add_argument('--report', type=Path, default=ROOT / 'native-runtime-audit.json')
     args = parser.parse_args(argv)
-    report = augment(args.payload, args.environment, extra=args.extra_dll_dir, audit_only=args.audit_only)
+    vtk_source = ROOT/'build_input'/'source'/'cad_runtime'/'vtk.libs'
+    extra = [*args.extra_dll_dir, vtk_source]
+    report = augment(args.payload, args.environment, extra=extra, audit_only=args.audit_only)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2), encoding='utf-8')
     print(json.dumps({key: report[key] for key in ('passed', 'inspected', 'copied', 'would_copy', 'unresolved',

@@ -152,7 +152,25 @@ def apply_staged(plan):
         for name in reversed(moved):
             (backup / name).rename(target / name)
         raise
-    subprocess.Popen([str(target / EXE)], cwd=target)
+    restart = target / EXE
+    restart_error = None
+    # ShellExecute starts the replacement independently of this temporary
+    # helper.  A normal child process can be terminated with the helper when
+    # the launcher is running inside a Windows job object.
+    try:
+        os.startfile(str(restart), 'open', cwd=str(target))
+    except (AttributeError, OSError) as exc:
+        restart_error = exc
+        flags = (getattr(subprocess, 'DETACHED_PROCESS', 0) |
+                 getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0))
+        try:
+            subprocess.Popen([str(restart)], cwd=target, creationflags=flags,
+                             close_fds=True)
+            restart_error = None
+        except OSError as fallback:
+            restart_error = fallback
+    if restart_error is not None:
+        raise RuntimeError('Update installed, but the application could not restart: ' + str(restart_error))
 
 
 def helper_main(plan):

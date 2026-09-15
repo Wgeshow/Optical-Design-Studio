@@ -398,7 +398,11 @@ class AboutPage(QWidget):
             elif worker.operation == 'install':
                 try:
                     launch_update(worker.result)
-                    self.window().close()
+                    # Closing a secondary window is not guaranteed to end the
+                    # Qt process.  The update helper waits for this exact PID,
+                    # so request an explicit event-loop shutdown.
+                    from PyQt6.QtWidgets import QApplication
+                    QApplication.instance().quit()
                 except Exception as exc:
                     self._set_state('error', 'Could not start installation: ' + str(exc))
             else:
