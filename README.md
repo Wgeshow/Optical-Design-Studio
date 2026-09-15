@@ -1,6 +1,6 @@
 # Optical Design Studio
 
-Application source code and public Windows releases for Optical Design Studio.
+Application source code and public Windows releases for Optical Design Studio. Simulations are completed by the use of S4 (Stanford Stratified Structure Solver) https://web.stanford.edu/group/fan/S4/index.html#. This is a user interface to be able to complete optical simulation without the need to write python code. 
 
 ## Download
 
