@@ -1,0 +1,256 @@
+{
+  "status": "complete",
+  "settings": {
+    "grid": 25,
+    "depth_samples": 3,
+    "contour_step": 0.1
+  },
+  "samples": [
+    {
+      "point_index": 0,
+      "wavelength_nm": 1515.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000001.csv"
+    },
+    {
+      "point_index": 1,
+      "wavelength_nm": 1516.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000002.csv"
+    },
+    {
+      "point_index": 2,
+      "wavelength_nm": 1517.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000003.csv"
+    },
+    {
+      "point_index": 3,
+      "wavelength_nm": 1518.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000004.csv"
+    },
+    {
+      "point_index": 4,
+      "wavelength_nm": 1519.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000005.csv"
+    },
+    {
+      "point_index": 5,
+      "wavelength_nm": 1520.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000006.csv"
+    },
+    {
+      "point_index": 6,
+      "wavelength_nm": 1521.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000007.csv"
+    },
+    {
+      "point_index": 7,
+      "wavelength_nm": 1522.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000008.csv"
+    },
+    {
+      "point_index": 8,
+      "wavelength_nm": 1523.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000009.csv"
+    },
+    {
+      "point_index": 9,
+      "wavelength_nm": 1524.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000010.csv"
+    },
+    {
+      "point_index": 10,
+      "wavelength_nm": 1525.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000011.csv"
+    },
+    {
+      "point_index": 11,
+      "wavelength_nm": 1526.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000012.csv"
+    },
+    {
+      "point_index": 12,
+      "wavelength_nm": 1527.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000013.csv"
+    },
+    {
+      "point_index": 13,
+      "wavelength_nm": 1528.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000014.csv"
+    },
+    {
+      "point_index": 14,
+      "wavelength_nm": 1529.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000015.csv"
+    },
+    {
+      "point_index": 15,
+      "wavelength_nm": 1530.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000016.csv"
+    },
+    {
+      "point_index": 16,
+      "wavelength_nm": 1531.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000017.csv"
+    },
+    {
+      "point_index": 17,
+      "wavelength_nm": 1532.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000018.csv"
+    },
+    {
+      "point_index": 18,
+      "wavelength_nm": 1533.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000019.csv"
+    },
+    {
+      "point_index": 19,
+      "wavelength_nm": 1534.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000020.csv"
+    },
+    {
+      "point_index": 20,
+      "wavelength_nm": 1535.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000021.csv"
+    },
+    {
+      "point_index": 21,
+      "wavelength_nm": 1536.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000022.csv"
+    },
+    {
+      "point_index": 22,
+      "wavelength_nm": 1537.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000023.csv"
+    },
+    {
+      "point_index": 23,
+      "wavelength_nm": 1538.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000024.csv"
+    },
+    {
+      "point_index": 24,
+      "wavelength_nm": 1539.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000025.csv"
+    },
+    {
+      "point_index": 25,
+      "wavelength_nm": 1540.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000026.csv"
+    },
+    {
+      "point_index": 26,
+      "wavelength_nm": 1541.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000027.csv"
+    },
+    {
+      "point_index": 27,
+      "wavelength_nm": 1542.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000028.csv"
+    },
+    {
+      "point_index": 28,
+      "wavelength_nm": 1543.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000029.csv"
+    },
+    {
+      "point_index": 29,
+      "wavelength_nm": 1544.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000030.csv"
+    },
+    {
+      "point_index": 30,
+      "wavelength_nm": 1545.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000031.csv"
+    },
+    {
+      "point_index": 31,
+      "wavelength_nm": 1546.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000032.csv"
+    },
+    {
+      "point_index": 32,
+      "wavelength_nm": 1547.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000033.csv"
+    },
+    {
+      "point_index": 33,
+      "wavelength_nm": 1548.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000034.csv"
+    },
+    {
+      "point_index": 34,
+      "wavelength_nm": 1549.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000035.csv"
+    },
+    {
+      "point_index": 35,
+      "wavelength_nm": 1550.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000036.csv"
+    },
+    {
+      "point_index": 36,
+      "wavelength_nm": 1551.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000037.csv"
+    },
+    {
+      "point_index": 37,
+      "wavelength_nm": 1552.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000038.csv"
+    },
+    {
+      "point_index": 38,
+      "wavelength_nm": 1553.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000039.csv"
+    },
+    {
+      "point_index": 39,
+      "wavelength_nm": 1554.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000040.csv"
+    },
+    {
+      "point_index": 40,
+      "wavelength_nm": 1555.0,
+      "angle_deg": 0.0,
+      "file": "all-wavelength-fields/sample-000041.csv"
+    }
+  ]
+}

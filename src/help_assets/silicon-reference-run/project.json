@@ -1,0 +1,105 @@
+{
+  "format_version": 3,
+  "materials": [
+    {
+      "Name": "Air",
+      "Model": "constant_nk",
+      "A": 1.0,
+      "B": 0,
+      "DataFile": "",
+      "WavelengthUnit": "nm"
+    },
+    {
+      "Name": "Silicon",
+      "Model": "constant_nk",
+      "A": 3.48,
+      "B": 0,
+      "DataFile": "",
+      "WavelengthUnit": "nm"
+    },
+    {
+      "Name": "SiO2",
+      "Model": "constant_nk",
+      "A": 1.45,
+      "B": 0,
+      "DataFile": "",
+      "WavelengthUnit": "nm"
+    }
+  ],
+  "layers": [
+    {
+      "Name": "Air",
+      "Thickness_um": 0.0,
+      "Material": "Air"
+    },
+    {
+      "Name": "Silicon",
+      "Thickness_um": 0.22,
+      "Material": "Silicon"
+    },
+    {
+      "Name": "SiO2",
+      "Thickness_um": 0.0,
+      "Material": "SiO2"
+    }
+  ],
+  "patterns": [
+    {
+      "Shape": "circle",
+      "Layer": "Silicon",
+      "Material": "Air",
+      "CenterX_um": 0,
+      "CenterY_um": 0,
+      "SizeX_um": 0.1,
+      "SizeY_um": 0.1,
+      "Angle_deg": 0
+    }
+  ],
+  "settings": {
+    "ax_um": 0.54,
+    "ay_um": 0.54,
+    "NumG": 81,
+    "mode": "Wavelength sweep",
+    "wl_start_nm": 1515.0,
+    "wl_stop_nm": 1555.0,
+    "wl_step_nm": 1.0,
+    "fixed_wl_nm": 1550.0,
+    "theta_deg": 0.0,
+    "phi_deg": 0.0,
+    "angle_start": 0.0,
+    "angle_stop": 60.0,
+    "angle_step": 2.0,
+    "polarization": "p"
+  },
+  "performance": {
+    "mode": "CPU only",
+    "workers": 1,
+    "threads": 1,
+    "gpu_device": 0,
+    "gpu_min_n": 1024,
+    "gpu_block": 256,
+    "chunk_size": 8,
+    "timeout_seconds": 3600,
+    "require_gpu": false
+  },
+  "desktop_search": {
+    "simulation": {
+      "measure_phase": false,
+      "electric_fields": {
+        "grid": 25,
+        "depth_samples": 3,
+        "contour_step": 0.1
+      }
+    },
+    "fields": {
+      "wavelength_nm": 1550.0,
+      "layer": "Silicon",
+      "grid": 25,
+      "depth_samples": 3
+    }
+  },
+  "appearance": {
+    "layer_colors": {}
+  },
+  "optical_constants": {}
+}

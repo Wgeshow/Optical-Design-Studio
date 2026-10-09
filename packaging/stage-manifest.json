@@ -1,0 +1,1984 @@
+{
+  "version": "1.3.1",
+  "build_date": "2026-10-09",
+  "profile": "public",
+  "production_bytes_preserved": true,
+  "seed_files": 0,
+  "seed_runs": 0,
+  "seed_presets": 0,
+  "dependencies": {
+    "pyqtgraph": "0.14.0",
+    "colorama": "0.4.6",
+    "pinned_native_inputs": {
+      "S4.cp312-win_amd64.pyd": {
+        "size": 1089024,
+        "sha256": "feebcca5078672a6382bf0bd5c94f0014635f9c2c88e6427de77f599d37ffea1"
+      },
+      "cublas64_11.dll": {
+        "size": 88668160,
+        "sha256": "8ca516b96b29c2fba2344909a896bc1cd7951f6cd11fe595a8a3929c02cccbed"
+      },
+      "cublasLt64_11.dll": {
+        "size": 544070144,
+        "sha256": "3d06ca4e4893adb7a153ecd23a540e92817c967312b44646d8c3f91b089196e6"
+      },
+      "cudart64_110.dll": {
+        "size": 526848,
+        "sha256": "ba5c2fb526c4ee4bb218ceb3fa5e8bfde89ce474f38711fdcce802549bf9fc6f"
+      }
+    }
+  },
+  "help": {
+    "scientific_csv_files": 45,
+    "scientific_csv_bytes_unchanged": true,
+    "metadata_rebased": [
+      "manifest.json",
+      "silicon-reference-run/backend-events.json",
+      "silicon-reference-run/basis-121/backend_stdout.jsonl",
+      "silicon-reference-run/basis-121/diagnostics.json",
+      "silicon-reference-run/basis-49/backend_stdout.jsonl",
+      "silicon-reference-run/basis-49/diagnostics.json",
+      "silicon-reference-run/diagnostics.json",
+      "silicon-reference-run/field-samples-source.json",
+      "silicon-reference-run/provenance.json",
+      "silicon-reference-run/scientific-validation.json"
+    ],
+    "files": {
+      "ai-search-training.png": {
+        "size": 216952,
+        "sha256": "58231cd49dd8d68a6fb8966fb0f67eef26658712c2312f2a2ba992798fd83deb"
+      },
+      "ai-search.png": {
+        "size": 75351,
+        "sha256": "a04e6c15c57fd56326ab31e225705e61f785c8b2b995c2a2983c48f188ffb5ad"
+      },
+      "air-hole-example.json": {
+        "size": 2386,
+        "sha256": "076da5115f7271edd1c49c0553d84dacba3f8d9e2824fe506b5f012e7be75a93"
+      },
+      "build_assets.py": {
+        "size": 4351,
+        "sha256": "cb61d5f3443c216cdc557d542f6be2c1ddefa8ea86a28c47f8f0af7f99236c80"
+      },
+      "bundle_actual_results.py": {
+        "size": 4725,
+        "sha256": "dd3e565cb66cc5b9daddbc62877f00d4c7ef49f61f35eb9a1fdd44f693aee663"
+      },
+      "capture_help.py": {
+        "size": 2460,
+        "sha256": "9d4c303f9423f5705b8658272171f2dc550411a3c474c02459ce9bb7d40ce8b0"
+      },
+      "field-playback.png": {
+        "size": 43992,
+        "sha256": "f85f35b5550c8de3d97425c7be933c7a716590abb03e3945c38d31759334f769"
+      },
+      "first-device-light.png": {
+        "size": 146451,
+        "sha256": "17543f76edebb36bc0d756880ef945a4dae5e115a313f9f3c6d5aa7b4a246a33"
+      },
+      "first-device.png": {
+        "size": 145365,
+        "sha256": "1916d47ba7a81c9efba21c3e0d5d1b02f04d9eb49da5b1fec6ecd7a300663a8c"
+      },
+      "help-about-proof.png": {
+        "size": 337254,
+        "sha256": "af6e14f6939a70637773d94efed01b0e473f3c65511d8b5b65453c011c95b212"
+      },
+      "help-actual-fields-proof.png": {
+        "size": 377953,
+        "sha256": "2e4ba7c7fb8e754bd012c5508ac17e72d2f83055837fc801ddf321abb7e81c42"
+      },
+      "help-actual-spectrum-proof.png": {
+        "size": 388921,
+        "sha256": "0a43efa90339c8822a638422135455367b8a8329dd35e0ef6afc56b5305246ab"
+      },
+      "help-compact-proof.png": {
+        "size": 291621,
+        "sha256": "293bdf5a07974f53c2afffdf7b55c6fbc8feb952c91ab74eddb87ae673730e40"
+      },
+      "help-materials-proof.png": {
+        "size": 456357,
+        "sha256": "2a7c7b5303c3d78e71dfd10c348802484ab5dc39c766590fb45637caab1a83e9"
+      },
+      "help-native-proof.png": {
+        "size": 517725,
+        "sha256": "da8db032278b829f6b4fe5dac94fd150e0bb50050f3cd159410a566568ac0a3b"
+      },
+      "help-updates-proof.png": {
+        "size": 333028,
+        "sha256": "31483d61c283ac8e7a6c2578ca8e2e74e503cf6bd83b98884ba3fe158e272856"
+      },
+      "manifest.json": {
+        "size": 11184,
+        "sha256": "37a08dc8c34a9bbefc05a21e3fed2110849822cec69a0aee62fa884f4dbddfad"
+      },
+      "materials-import-csv.png": {
+        "size": 237705,
+        "sha256": "80b2b13506bfba9933a10fa9b3e298a41a17c51c0d8f7bff5ee666cb68ce27ad"
+      },
+      "materials.png": {
+        "size": 125577,
+        "sha256": "6fc9da37a17a9244ab1767ac551052cc0587167e469dca7518db3fe8a202d4f1"
+      },
+      "settings-performance.png": {
+        "size": 159982,
+        "sha256": "4114bb6250170e8e1e3cdc20ed64a398c40984c791f829c4a7cd19651f85ab0d"
+      },
+      "settings.png": {
+        "size": 148066,
+        "sha256": "7309cd6fb5db76975ea2ca5cc5d8b23c65ef7f99cfaa831bfeda0b1cf9c109b5"
+      },
+      "silicon-reference-run/actual-3d-fields-native.png": {
+        "size": 448136,
+        "sha256": "5f35bee0da7fa764954eeeddd5688a5a231321e86ed5f0def37a84c6c2bbc7f4"
+      },
+      "silicon-reference-run/actual-3d-fields-plot.png": {
+        "size": 193855,
+        "sha256": "953acc389d91143cc579fe3e80bbe8c5823d8a16f8fdd18982d96f00aa0beb69"
+      },
+      "silicon-reference-run/actual-electric-field-maps.png": {
+        "size": 269372,
+        "sha256": "d02176927e5623eb248808ba668059e8e5fae13a9b55a47b32d6ecdaf3613f7e"
+      },
+      "silicon-reference-run/actual-fields-native.png": {
+        "size": 270537,
+        "sha256": "37e29cb459f9be128746c984d7b6555cb915e4ad3079a89fa590096de2e847bd"
+      },
+      "silicon-reference-run/actual-fields-plot.png": {
+        "size": 35369,
+        "sha256": "e5fb779517ffed768d1e07ab54fb787da053bb30d9555cfccbcae6c055e17c44"
+      },
+      "silicon-reference-run/actual-materials-native.png": {
+        "size": 268562,
+        "sha256": "2607a8411818b298edce9bf7c1707621bde0723f9b8d82968cab3adb72248ee3"
+      },
+      "silicon-reference-run/actual-spectrum-export.png": {
+        "size": 218549,
+        "sha256": "ef1efe7267f37ffbe7bdd9dddcbaae6f97abbc85134a8390727df0d4e5a8fa9a"
+      },
+      "silicon-reference-run/actual-spectrum-native.png": {
+        "size": 274143,
+        "sha256": "f2d25dac75366a355172703f8228a9e3c27565a7e5a4dff7c90fe541da2593ad"
+      },
+      "silicon-reference-run/actual-spectrum-plot.png": {
+        "size": 27100,
+        "sha256": "d267c3b3987fe58a786855d6d5122b52dd81f5bda95a0e73584042ae55cc55d6"
+      },
+      "silicon-reference-run/actual-structure-native.png": {
+        "size": 203287,
+        "sha256": "cfe47378cc79786554605abbbb65e9f79c0794ec5a1a3be1c8db3584652606c6"
+      },
+      "silicon-reference-run/actual-unit-cell-native.png": {
+        "size": 220931,
+        "sha256": "a0a29b15880e79ce3d8dd75c53fbbeb690d17820ec718eafcf9af07c133e6766"
+      },
+      "silicon-reference-run/airhole_field_metrics.json": {
+        "size": 9483,
+        "sha256": "d6db63dfb66bf8b166b81e9099b945f1490b49cacf6f9d7c269c5ecadca4d747"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000001.csv": {
+        "size": 1257347,
+        "sha256": "a090a3da1db2a8ef2cd450a4c517ab33cbe52618865899129805f34655264ea3"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000002.csv": {
+        "size": 1257847,
+        "sha256": "b1750f3ac06f76a714ff2dcab9182db2103bd9d19e22dd1c5acfebd46b507bc6"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000003.csv": {
+        "size": 1257845,
+        "sha256": "b788262d6139f0192a92f81875029c87e60a452daa6f34d5951c38c33cabec81"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000004.csv": {
+        "size": 1257609,
+        "sha256": "0a597a77ab6edf67e3645039498b403747ae07d6f550175820705a18073bb246"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000005.csv": {
+        "size": 1257726,
+        "sha256": "61615c69ecf751438f131f0bcf46f07565985cbc1866925cbf5675824cc349c6"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000006.csv": {
+        "size": 1257555,
+        "sha256": "1dcae03897174b37594012f089dd3424f9ca7d9d9060bc5d8ead9bdaa5f58066"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000007.csv": {
+        "size": 1257679,
+        "sha256": "e435e9b25caf254525708d9af6677be9c0821782c4c4c1cfe189eebec63c7af4"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000008.csv": {
+        "size": 1256687,
+        "sha256": "be8805ede21cea6adcb697a9fa3651769d91a9ab4dda5cad840e1299298ea5fc"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000009.csv": {
+        "size": 1256933,
+        "sha256": "fa1add74f468ce8a0172d0a4df6e7dde7b702382c1bf0e32e15e7a220e83a082"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000010.csv": {
+        "size": 1256426,
+        "sha256": "09483e4e5fda317daa4ad60d23bec30a44a7491e4e2edf73aaed038f76d209c6"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000011.csv": {
+        "size": 1256725,
+        "sha256": "9b7c932f5b2846d487360d0c95a970ea046e900e92498727f1dfefb7d41ed74d"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000012.csv": {
+        "size": 1257198,
+        "sha256": "8f9c076b35b50ffcdf3b08473fc32e2355bff528ee1295c0ed0ee709b81b5751"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000013.csv": {
+        "size": 1256532,
+        "sha256": "d65cbfdd8369bd5f4aa7f76df1feba0b5a056da27c0289d7f1bce43765be1d67"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000014.csv": {
+        "size": 1256680,
+        "sha256": "032ff1349e0c215dcd4ffceda3c19e81c1ccb240a9ca193d93e1813bf37ddda5"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000015.csv": {
+        "size": 1256425,
+        "sha256": "632f35c57c309e5beb1a59ed9e28aa1c127438a4b88180edca6cebcfc0c53dca"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000016.csv": {
+        "size": 1257308,
+        "sha256": "83deb30fc3b362d3e2fb17a63aa831b3083ac5b0520a95d7ca9bf9108897b2e9"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000017.csv": {
+        "size": 1255363,
+        "sha256": "1d801056dc00324a7fd253890284e330aa5175ede3db85adedb702470ccb5fe7"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000018.csv": {
+        "size": 1256415,
+        "sha256": "0390f55bcf9e5dc360f6d5a28924ad84986d9e9b533ae0683ea710e55cce57f7"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000019.csv": {
+        "size": 1256642,
+        "sha256": "0390c4a88d504d3aa4dc348da71bb5af669b5a313d695d54b25610553e985452"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000020.csv": {
+        "size": 1256523,
+        "sha256": "9b8779eb14b75d37a8497f4af0e40288a7ec5e2cb7677b730ab5e703b642f5bc"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000021.csv": {
+        "size": 1256243,
+        "sha256": "db94b4595b8d985979bfa96c3e3483a71b3feee60787f8108ba232d1f09b107d"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000022.csv": {
+        "size": 1255577,
+        "sha256": "a6eed79d2e6095f326ddcbb1c9a5d8900e73958d781d4a8b09be38011b366d16"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000023.csv": {
+        "size": 1255412,
+        "sha256": "547ccac2b485a5a3fdc0ef62a32278dee537a61f3201e48ed21de9aa3804e1d9"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000024.csv": {
+        "size": 1255855,
+        "sha256": "34193c6248a9a3fa98dd5d9ad1b1e0d525b1d7c9290b83163b9bcc758933dc1e"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000025.csv": {
+        "size": 1256309,
+        "sha256": "a9861dde7bd4d4cc6c40c0adeb120061ee750886a3cfa97901c4eec93992b526"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000026.csv": {
+        "size": 1256725,
+        "sha256": "840b48cc1bc884b15994bf3bd39b7a8e077534e16beacfe8ad974a23baf0b3d5"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000027.csv": {
+        "size": 1255327,
+        "sha256": "85ac15f67e21be2a88461730847410f387f21746ab29a0f9912a156f771fa699"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000028.csv": {
+        "size": 1255917,
+        "sha256": "bfb32556a395946f756ca281347a66d0ea568977c112c3a8a5bfa3a4348d67aa"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000029.csv": {
+        "size": 1255721,
+        "sha256": "d7a720ede0b93186d3d24a25c156488f54edf069459178816a4d329978e5a65b"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000030.csv": {
+        "size": 1255529,
+        "sha256": "5b5af79f37d9689a682d7957ffb15bfca315c6e0311dc8acff5091b391efd736"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000031.csv": {
+        "size": 1255313,
+        "sha256": "b1d5cb9270a6f3aa34dcc5f6b63363362a2c99718f7a52a561856d9d2cc153c2"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000032.csv": {
+        "size": 1255174,
+        "sha256": "5e41fbe0b6d319392fe32efa1c101ce39874aec4b7bedf5c8336714a3cc19063"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000033.csv": {
+        "size": 1255795,
+        "sha256": "c4b5a071aad194bcb029bbd244b35705da5ae71d7737e07cf731d2d52743a98f"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000034.csv": {
+        "size": 1256383,
+        "sha256": "2be2de4c53e20bdee7a0ec054e7611e85295039ff4da00bc581aaf87a9223a87"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000035.csv": {
+        "size": 1256204,
+        "sha256": "dcd22347f1cfaa3b7ef37519e882e3237c7a89b84ee30abd23e0d97540151a0a"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000036.csv": {
+        "size": 1255054,
+        "sha256": "78c9da7fbfaf0aa16c6ec4f0b2287fe15ba23ad6a92e908de688eee7cd52a18d"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000037.csv": {
+        "size": 1255034,
+        "sha256": "8878176f4eacbe7841903472a8a351502a5eaeea44e23b13fe42eabbd2c7fb68"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000038.csv": {
+        "size": 1254369,
+        "sha256": "eef3b295becf6c494e42feb45e013e596766d28f6b06ae42dd5dba8c0685af3e"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000039.csv": {
+        "size": 1255154,
+        "sha256": "b7933d6f13afcbcf618d24eee20c519d0f3e968ea6fa2f375b532f4e38187238"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000040.csv": {
+        "size": 1255191,
+        "sha256": "071a205215d830d4560a68c7ccb78460495c68a6435884fdceca97b3f57e923c"
+      },
+      "silicon-reference-run/all-wavelength-fields/sample-000041.csv": {
+        "size": 1255351,
+        "sha256": "1ec1acd36b7f03e272c447736f2d45d7933723514ea67a66b8072e24a4eae73d"
+      },
+      "silicon-reference-run/backend-events.json": {
+        "size": 1046,
+        "sha256": "1cbc2ff64ec21f1850a9d4937a951eeac3136dc22f0e5636d037c54d6e964844"
+      },
+      "silicon-reference-run/backend_stderr.txt": {
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "silicon-reference-run/basis-121/backend_stderr.txt": {
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "silicon-reference-run/basis-121/backend_stdout.jsonl": {
+        "size": 3442,
+        "sha256": "f5c78455c728a38b24d6a89062a41ba033de371035df01795efb87712cf577dd"
+      },
+      "silicon-reference-run/basis-121/diagnostics.json": {
+        "size": 683,
+        "sha256": "29f81e30915fa2f850a0496abb0ebf711e663eb31301e11430c7cc1da8375f28"
+      },
+      "silicon-reference-run/basis-121/job.json": {
+        "size": 3993,
+        "sha256": "66591b747310f1960734619895ff77678543336d733c06322b443def77553513"
+      },
+      "silicon-reference-run/basis-121/project.json": {
+        "size": 2260,
+        "sha256": "5bd7ce495199d72f584882cd9f2db1bed5b34730ce3eda027f03b30ff360a449"
+      },
+      "silicon-reference-run/basis-121/results.csv": {
+        "size": 3332,
+        "sha256": "03b64a315e768be10dfbb74e6435e388c6f737ee83236b8f6bedcdec34332818"
+      },
+      "silicon-reference-run/basis-49/backend_stderr.txt": {
+        "size": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "silicon-reference-run/basis-49/backend_stdout.jsonl": {
+        "size": 1621,
+        "sha256": "826dcde17f67629714d24c1f577385a32580023e292767b6941c30b080575a99"
+      },
+      "silicon-reference-run/basis-49/diagnostics.json": {
+        "size": 669,
+        "sha256": "4d8260a207b4dbe869c636d166c2a827507ca3ba81362181a833bc580b2b24a0"
+      },
+      "silicon-reference-run/basis-49/job.json": {
+        "size": 3992,
+        "sha256": "f6c16fc3b89455a89832467786209b4835b774a4f9acda6c7b688f77a83980e2"
+      },
+      "silicon-reference-run/basis-49/project.json": {
+        "size": 2259,
+        "sha256": "9301450b92f9bde29c684e0840bf3d1df52adcb48deff82cee5637f7905ab9c0"
+      },
+      "silicon-reference-run/basis-49/results.csv": {
+        "size": 3299,
+        "sha256": "5663bc41fd30e4ec44fda9715133468d108398aa654e6cee270907634b5fc4c2"
+      },
+      "silicon-reference-run/bundle.json": {
+        "size": 18719,
+        "sha256": "2e68545095d324dbea5bb4a09a94d9417b020c43b16c32f1189c0222f0b375a8"
+      },
+      "silicon-reference-run/desktop_request.json": {
+        "size": 185,
+        "sha256": "f2f53d15ad2a60cc15bd1d427dd8a0fdd80b633bdd479fdd7d26fae41959dba0"
+      },
+      "silicon-reference-run/diagnostics.json": {
+        "size": 769,
+        "sha256": "2108a6ca4f8e74ed1a1e23335c1ef093184ee1e8683591a34346bc3ddc8ab313"
+      },
+      "silicon-reference-run/electric_fields.csv": {
+        "size": 1255054,
+        "sha256": "78c9da7fbfaf0aa16c6ec4f0b2287fe15ba23ad6a92e908de688eee7cd52a18d"
+      },
+      "silicon-reference-run/field-samples-source.json": {
+        "size": 6618,
+        "sha256": "e329b879a2535e43cb93d53721d98b61e3c2ee24045f4bd8ccaa782ad5e6feef"
+      },
+      "silicon-reference-run/field-samples.json": {
+        "size": 6484,
+        "sha256": "f8763d6bcc48a999166087faf1f451797582eeb8408719a0f39f41cd29cb97b1"
+      },
+      "silicon-reference-run/field_diagnostics.json": {
+        "size": 529,
+        "sha256": "d8a4f654c439f7f6f07dea87267a93433758e981e342e279caa9a390ae212d40"
+      },
+      "silicon-reference-run/field_features.json": {
+        "size": 1060267,
+        "sha256": "a0b174caf523c17b346094b9f891297c8106bf3f678af9445ef8c2b5c9f482a8"
+      },
+      "silicon-reference-run/field_model.json": {
+        "size": 1384,
+        "sha256": "33a38b573e3c4fee3bb2460763aaee1daa254c9827cf725ad442fe649142cc6a"
+      },
+      "silicon-reference-run/job.json": {
+        "size": 4091,
+        "sha256": "b47dba1bc20c0ec86db145b895557212bbb0afce66637b0416ea9ab2e6c25c58"
+      },
+      "silicon-reference-run/project.json": {
+        "size": 2060,
+        "sha256": "07873a53c6e0465ba0a201ac166fcbf2d8103cdb8a56a30d3b8322ae705928c2"
+      },
+      "silicon-reference-run/provenance.json": {
+        "size": 53881,
+        "sha256": "524f7427dd3984805c11bafc40fc7f7f7ad579e2ee46c335dae4f57f2bb14a70"
+      },
+      "silicon-reference-run/results.csv": {
+        "size": 3326,
+        "sha256": "4bac651533cb450cc01673d38e9a2ecdbb207a89e002b15484e56c877b859f73"
+      },
+      "silicon-reference-run/run_and_capture.py": {
+        "size": 15820,
+        "sha256": "5785bfe6a4a9c47ea2e8e92673b0f56360033afb638193b79e8def92c46a889e"
+      },
+      "silicon-reference-run/scientific-validation.json": {
+        "size": 5881,
+        "sha256": "f315cb9c194d7899863c6f5d074fc92632f1e9fe1ef1b20edc1afd7adf3e11b6"
+      },
+      "simulation-fields.png": {
+        "size": 109297,
+        "sha256": "3356ed1d23419c73b21b1605092618e9d8c54d1f551854c7636965bdf3a90bbd"
+      },
+      "simulation-index-shift.png": {
+        "size": 113741,
+        "sha256": "ead0a2d05c5847811058ced80612fe3523e5e8f5e3b1e2a6edb452e3105739de"
+      },
+      "simulation-meep.png": {
+        "size": 87759,
+        "sha256": "6393322eaaa87bfcd33856eee230c3426eae1bfb598c6674da0221ec9d909d4d"
+      },
+      "simulation-phase.png": {
+        "size": 255036,
+        "sha256": "e0b6d804647222e778144b66f6267cfdacbf28692a66338b1b78b870ee698d6a"
+      },
+      "simulation-rcwa.png": {
+        "size": 95364,
+        "sha256": "a51e2fdea1f9f978b635e69180d48815d72457526dcbaa53252297ccb3188fdd"
+      },
+      "simulation-saved-results.png": {
+        "size": 215435,
+        "sha256": "0b8c524e7e9a5c408e0db94e80a483b2e1875448b5b7c16adf0678bc4835f35c"
+      },
+      "simulation-sweep.png": {
+        "size": 107169,
+        "sha256": "ab7a7aca5682f251b0f70eb88d839615f8d27707a9f4ca1f892ffbe1aff167ac"
+      },
+      "structure-cross-section.png": {
+        "size": 60330,
+        "sha256": "628f665c97d1d262e54a60e35f564892b75edd6568ce4a2f9375e75771966ba2"
+      },
+      "structure-regions.png": {
+        "size": 69033,
+        "sha256": "93c33b39246a44b8930c87ae95e5502405076c5eb9239c280accfbbf811d4340"
+      },
+      "structure.png": {
+        "size": 146013,
+        "sha256": "5937bd811f20767f9ae551ef439f9ab0b3866fd99b1e933db693f308a2d7ac0f"
+      }
+    }
+  },
+  "files": {
+    "addon_runtime.py": {
+      "size": 20412,
+      "sha256": "e3d49b630ca7b9664126f428681b5f9bd8cfb2c4d387172f4fa27a2d282825fa"
+    },
+    "ai_campaign.py": {
+      "size": 25902,
+      "sha256": "51cb7e5fe9d14dc1631fd088994cc01e84163907b20ee46df66d86f2a2d9129c"
+    },
+    "ai_campaign_plots.py": {
+      "size": 5499,
+      "sha256": "08ef6a2e2bcfa3c4b87c7c4ad44666b837d5c63ab1c0aa71eb4f5b259ff081a9"
+    },
+    "AI_DESIGN_GUIDE.md": {
+      "size": 7275,
+      "sha256": "3480e03961c660337fbdbed4e7d6ec372f1dcba5f5f3c5f00a93ffa85051c364"
+    },
+    "AI_SEARCH_TRAINING_GUIDE.md": {
+      "size": 5779,
+      "sha256": "a8762ac832a9badca3c96d00a2ea65c6751777cffdc8f4c234888f04033e4bdb"
+    },
+    "airhole_field_objective.py": {
+      "size": 11886,
+      "sha256": "765419cf39b8b0cdbe17b61be3803b200bdc1243736e2ee7717b799019dad13b"
+    },
+    "app.py": {
+      "size": 16094,
+      "sha256": "fc2c73cc97431c3da12d78191c24ec71e47d72cc035969c7fed56c15a2663b2c"
+    },
+    "app_version.py": {
+      "size": 1748,
+      "sha256": "c2df562203902c1750db137acdce8a6456e17c3a1e0680395f80ec0a440fdb82"
+    },
+    "application_restart.py": {
+      "size": 7018,
+      "sha256": "ad1b0992c299afe0dd6c2301f3f9a353932e236514e2d1b31404564f069c2edc"
+    },
+    "backend.py": {
+      "size": 21309,
+      "sha256": "a509f838d58922f3c2f13db7396b564f30f60ffa015e2fa5049b5114c9ab1b44"
+    },
+    "bootstrap.py": {
+      "size": 1775,
+      "sha256": "7a07f49b9b078a22da5bd0d7f130a1393d716da688007e96d153dd0e86d4771f"
+    },
+    "bounds_editor.py": {
+      "size": 25539,
+      "sha256": "523c14b7ab41d5b3616f65b605416a76482181f02a4109bfe2bf2ad7ab2307d4"
+    },
+    "CAD_COMSOL_EXPORT_GUIDE.md": {
+      "size": 3947,
+      "sha256": "14d9e4ea436d6a3a550ee8a5193e10b88caad5c158259e001c758bd70d5cffc2"
+    },
+    "cad_export.py": {
+      "size": 8104,
+      "sha256": "fe297eae102112fd3ab989741d194d70517cf2190e79c6ea0e1f789f2175d6ea"
+    },
+    "carrier_index.py": {
+      "size": 18354,
+      "sha256": "33f69d41ae5f642e51c36ffd45df9abc33efdb2d07ada662c4568370cd1bf4d7"
+    },
+    "CARRIER_INDEX_GUIDE.md": {
+      "size": 10474,
+      "sha256": "86456132601cb47277ed9d01f0d452bad753af0ea3d505bf7f16041c28d63974"
+    },
+    "circle_geometry.py": {
+      "size": 6702,
+      "sha256": "b43078261da3dea23308aae15028207fd6c9ffd8c6a1800228c872345422c28a"
+    },
+    "comsol_carriers.py": {
+      "size": 5037,
+      "sha256": "73680edb5d36cc2830be6e4c33899685f490750d20e09b5d5565fc1ff7e00a93"
+    },
+    "comsol_export.py": {
+      "size": 19668,
+      "sha256": "d71f94fd477991d4714454f960702b1e161875367f0e7fca09de298110859c46"
+    },
+    "comsol_results.py": {
+      "size": 9059,
+      "sha256": "efef553a2c2b669620e3d517d2fdb153c4b337f81bfae41b1261f771a70349dc"
+    },
+    "constraints.txt": {
+      "size": 46,
+      "sha256": "7f5908cf18dbcebf6c18bb892e7e3a3d2db790511539d6e684b00120025f60a6"
+    },
+    "contour_sweep.py": {
+      "size": 13794,
+      "sha256": "0ad2e1c080cdccfbc5397b6aba3c91017c937a87686b26f8517b4fd85d0cecc9"
+    },
+    "crash_reporting.py": {
+      "size": 1107,
+      "sha256": "661a8710c138ebe242e3175a249e83e564ecc8f8a96d6639a4d741dc710e4567"
+    },
+    "data_library.py": {
+      "size": 28058,
+      "sha256": "bccb5352b50ce158d4ef5b96814a5823d18c73b9036af12c722d7a4935bb2090"
+    },
+    "DATA_LIBRARY_GUIDE.md": {
+      "size": 10312,
+      "sha256": "fc6099d38b1b74b18630993e0c84d57e4cd6051ae9ed6862886381a0f973da93"
+    },
+    "DESKTOP_GUIDE.md": {
+      "size": 19262,
+      "sha256": "6fdff47e9ae63a4e2565b1a572dfeaa4e72a0533112d0434572ed6048324325e"
+    },
+    "desktop_runtime.py": {
+      "size": 14230,
+      "sha256": "ce068bcc19a38c995b75dbb798f807291c8b5289f3c5c3fb572322e45a698a02"
+    },
+    "environment.yml": {
+      "size": 341,
+      "sha256": "76063002116e77e01fbfdb0c5579a2a0ba6a1751135d401a6172ac3f0c7eb4e2"
+    },
+    "evaluation_storage.py": {
+      "size": 2124,
+      "sha256": "05f22ddcc525120f180dcca8e73c2ab98e98c8f01a0e517aa48781b8792e6570"
+    },
+    "export_geometry.py": {
+      "size": 1772,
+      "sha256": "3b21c55e29d428d0d88f98ba0893e27c725378c58356bac08c027c7313a2706b"
+    },
+    "fdtd_model.py": {
+      "size": 12454,
+      "sha256": "07cbae1c08d959967691f621304f7666ab27c5098da8866e137942cd8201cea5"
+    },
+    "field_ml.py": {
+      "size": 8205,
+      "sha256": "dc49e09c3b93f03edc87c4af33e8024855794e9596ad2b29e28eef7900d84b60"
+    },
+    "field_sampling.py": {
+      "size": 5865,
+      "sha256": "e057cb9b31f87e6a780b1d777ec86ab68f692708d52a31f15b9b8b0638d69ae7"
+    },
+    "field_solver.py": {
+      "size": 13343,
+      "sha256": "1e3a0e0fe1b7e4c751441e2578615b0d7d44e34ae7f0ff26820f3512aeadac92"
+    },
+    "field_tracking.py": {
+      "size": 19094,
+      "sha256": "2ecc44da728d6a1edffe4d8c5600103dea8a9aadbd232224cc6493907f614cc1"
+    },
+    "FIELD_TRACKING_GUIDE.md": {
+      "size": 6578,
+      "sha256": "0d9e68129d3487cf7f4ce33b8a20d7e93c97bb792b895be7ac7870e9c26cdc4e"
+    },
+    "field_tracking_ui.py": {
+      "size": 30359,
+      "sha256": "18b01906bb302568fdd39b0d93acce7cc94108b8e9ded854000b2825c179fad1"
+    },
+    "field_volume.py": {
+      "size": 9346,
+      "sha256": "77b037037d37f386e578d7e0b279663427fe64d8ed70fa44562a0586b56eb2a6"
+    },
+    "gpu_status.py": {
+      "size": 2997,
+      "sha256": "222c6f6e0f2a966e3a06f0c342d63fe9a02d0ea2d08e2d8b77b571c826ad1569"
+    },
+    "gradio_compat.py": {
+      "size": 445,
+      "sha256": "735d74db5855213420e1b967b94d7c03d1ae87a2cf8a91fc9530eab23101adc8"
+    },
+    "help_assets/ai-search-training.png": {
+      "size": 216952,
+      "sha256": "58231cd49dd8d68a6fb8966fb0f67eef26658712c2312f2a2ba992798fd83deb"
+    },
+    "help_assets/ai-search.png": {
+      "size": 75351,
+      "sha256": "a04e6c15c57fd56326ab31e225705e61f785c8b2b995c2a2983c48f188ffb5ad"
+    },
+    "help_assets/air-hole-example.json": {
+      "size": 2386,
+      "sha256": "076da5115f7271edd1c49c0553d84dacba3f8d9e2824fe506b5f012e7be75a93"
+    },
+    "help_assets/build_assets.py": {
+      "size": 4351,
+      "sha256": "cb61d5f3443c216cdc557d542f6be2c1ddefa8ea86a28c47f8f0af7f99236c80"
+    },
+    "help_assets/bundle_actual_results.py": {
+      "size": 4725,
+      "sha256": "dd3e565cb66cc5b9daddbc62877f00d4c7ef49f61f35eb9a1fdd44f693aee663"
+    },
+    "help_assets/capture_help.py": {
+      "size": 2460,
+      "sha256": "9d4c303f9423f5705b8658272171f2dc550411a3c474c02459ce9bb7d40ce8b0"
+    },
+    "help_assets/field-playback.png": {
+      "size": 43992,
+      "sha256": "f85f35b5550c8de3d97425c7be933c7a716590abb03e3945c38d31759334f769"
+    },
+    "help_assets/first-device-light.png": {
+      "size": 146451,
+      "sha256": "17543f76edebb36bc0d756880ef945a4dae5e115a313f9f3c6d5aa7b4a246a33"
+    },
+    "help_assets/first-device.png": {
+      "size": 145365,
+      "sha256": "1916d47ba7a81c9efba21c3e0d5d1b02f04d9eb49da5b1fec6ecd7a300663a8c"
+    },
+    "help_assets/help-about-proof.png": {
+      "size": 337254,
+      "sha256": "af6e14f6939a70637773d94efed01b0e473f3c65511d8b5b65453c011c95b212"
+    },
+    "help_assets/help-actual-fields-proof.png": {
+      "size": 377953,
+      "sha256": "2e4ba7c7fb8e754bd012c5508ac17e72d2f83055837fc801ddf321abb7e81c42"
+    },
+    "help_assets/help-actual-spectrum-proof.png": {
+      "size": 388921,
+      "sha256": "0a43efa90339c8822a638422135455367b8a8329dd35e0ef6afc56b5305246ab"
+    },
+    "help_assets/help-compact-proof.png": {
+      "size": 291621,
+      "sha256": "293bdf5a07974f53c2afffdf7b55c6fbc8feb952c91ab74eddb87ae673730e40"
+    },
+    "help_assets/help-materials-proof.png": {
+      "size": 456357,
+      "sha256": "2a7c7b5303c3d78e71dfd10c348802484ab5dc39c766590fb45637caab1a83e9"
+    },
+    "help_assets/help-native-proof.png": {
+      "size": 517725,
+      "sha256": "da8db032278b829f6b4fe5dac94fd150e0bb50050f3cd159410a566568ac0a3b"
+    },
+    "help_assets/help-updates-proof.png": {
+      "size": 333028,
+      "sha256": "31483d61c283ac8e7a6c2578ca8e2e74e503cf6bd83b98884ba3fe158e272856"
+    },
+    "help_assets/manifest.json": {
+      "size": 11184,
+      "sha256": "37a08dc8c34a9bbefc05a21e3fed2110849822cec69a0aee62fa884f4dbddfad"
+    },
+    "help_assets/materials-import-csv.png": {
+      "size": 237705,
+      "sha256": "80b2b13506bfba9933a10fa9b3e298a41a17c51c0d8f7bff5ee666cb68ce27ad"
+    },
+    "help_assets/materials.png": {
+      "size": 125577,
+      "sha256": "6fc9da37a17a9244ab1767ac551052cc0587167e469dca7518db3fe8a202d4f1"
+    },
+    "help_assets/settings-performance.png": {
+      "size": 159982,
+      "sha256": "4114bb6250170e8e1e3cdc20ed64a398c40984c791f829c4a7cd19651f85ab0d"
+    },
+    "help_assets/settings.png": {
+      "size": 148066,
+      "sha256": "7309cd6fb5db76975ea2ca5cc5d8b23c65ef7f99cfaa831bfeda0b1cf9c109b5"
+    },
+    "help_assets/silicon-reference-run/actual-3d-fields-native.png": {
+      "size": 448136,
+      "sha256": "5f35bee0da7fa764954eeeddd5688a5a231321e86ed5f0def37a84c6c2bbc7f4"
+    },
+    "help_assets/silicon-reference-run/actual-3d-fields-plot.png": {
+      "size": 193855,
+      "sha256": "953acc389d91143cc579fe3e80bbe8c5823d8a16f8fdd18982d96f00aa0beb69"
+    },
+    "help_assets/silicon-reference-run/actual-electric-field-maps.png": {
+      "size": 269372,
+      "sha256": "d02176927e5623eb248808ba668059e8e5fae13a9b55a47b32d6ecdaf3613f7e"
+    },
+    "help_assets/silicon-reference-run/actual-fields-native.png": {
+      "size": 270537,
+      "sha256": "37e29cb459f9be128746c984d7b6555cb915e4ad3079a89fa590096de2e847bd"
+    },
+    "help_assets/silicon-reference-run/actual-fields-plot.png": {
+      "size": 35369,
+      "sha256": "e5fb779517ffed768d1e07ab54fb787da053bb30d9555cfccbcae6c055e17c44"
+    },
+    "help_assets/silicon-reference-run/actual-materials-native.png": {
+      "size": 268562,
+      "sha256": "2607a8411818b298edce9bf7c1707621bde0723f9b8d82968cab3adb72248ee3"
+    },
+    "help_assets/silicon-reference-run/actual-spectrum-export.png": {
+      "size": 218549,
+      "sha256": "ef1efe7267f37ffbe7bdd9dddcbaae6f97abbc85134a8390727df0d4e5a8fa9a"
+    },
+    "help_assets/silicon-reference-run/actual-spectrum-native.png": {
+      "size": 274143,
+      "sha256": "f2d25dac75366a355172703f8228a9e3c27565a7e5a4dff7c90fe541da2593ad"
+    },
+    "help_assets/silicon-reference-run/actual-spectrum-plot.png": {
+      "size": 27100,
+      "sha256": "d267c3b3987fe58a786855d6d5122b52dd81f5bda95a0e73584042ae55cc55d6"
+    },
+    "help_assets/silicon-reference-run/actual-structure-native.png": {
+      "size": 203287,
+      "sha256": "cfe47378cc79786554605abbbb65e9f79c0794ec5a1a3be1c8db3584652606c6"
+    },
+    "help_assets/silicon-reference-run/actual-unit-cell-native.png": {
+      "size": 220931,
+      "sha256": "a0a29b15880e79ce3d8dd75c53fbbeb690d17820ec718eafcf9af07c133e6766"
+    },
+    "help_assets/silicon-reference-run/airhole_field_metrics.json": {
+      "size": 9483,
+      "sha256": "d6db63dfb66bf8b166b81e9099b945f1490b49cacf6f9d7c269c5ecadca4d747"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000001.csv": {
+      "size": 1257347,
+      "sha256": "a090a3da1db2a8ef2cd450a4c517ab33cbe52618865899129805f34655264ea3"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000002.csv": {
+      "size": 1257847,
+      "sha256": "b1750f3ac06f76a714ff2dcab9182db2103bd9d19e22dd1c5acfebd46b507bc6"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000003.csv": {
+      "size": 1257845,
+      "sha256": "b788262d6139f0192a92f81875029c87e60a452daa6f34d5951c38c33cabec81"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000004.csv": {
+      "size": 1257609,
+      "sha256": "0a597a77ab6edf67e3645039498b403747ae07d6f550175820705a18073bb246"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000005.csv": {
+      "size": 1257726,
+      "sha256": "61615c69ecf751438f131f0bcf46f07565985cbc1866925cbf5675824cc349c6"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000006.csv": {
+      "size": 1257555,
+      "sha256": "1dcae03897174b37594012f089dd3424f9ca7d9d9060bc5d8ead9bdaa5f58066"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000007.csv": {
+      "size": 1257679,
+      "sha256": "e435e9b25caf254525708d9af6677be9c0821782c4c4c1cfe189eebec63c7af4"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000008.csv": {
+      "size": 1256687,
+      "sha256": "be8805ede21cea6adcb697a9fa3651769d91a9ab4dda5cad840e1299298ea5fc"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000009.csv": {
+      "size": 1256933,
+      "sha256": "fa1add74f468ce8a0172d0a4df6e7dde7b702382c1bf0e32e15e7a220e83a082"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000010.csv": {
+      "size": 1256426,
+      "sha256": "09483e4e5fda317daa4ad60d23bec30a44a7491e4e2edf73aaed038f76d209c6"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000011.csv": {
+      "size": 1256725,
+      "sha256": "9b7c932f5b2846d487360d0c95a970ea046e900e92498727f1dfefb7d41ed74d"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000012.csv": {
+      "size": 1257198,
+      "sha256": "8f9c076b35b50ffcdf3b08473fc32e2355bff528ee1295c0ed0ee709b81b5751"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000013.csv": {
+      "size": 1256532,
+      "sha256": "d65cbfdd8369bd5f4aa7f76df1feba0b5a056da27c0289d7f1bce43765be1d67"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000014.csv": {
+      "size": 1256680,
+      "sha256": "032ff1349e0c215dcd4ffceda3c19e81c1ccb240a9ca193d93e1813bf37ddda5"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000015.csv": {
+      "size": 1256425,
+      "sha256": "632f35c57c309e5beb1a59ed9e28aa1c127438a4b88180edca6cebcfc0c53dca"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000016.csv": {
+      "size": 1257308,
+      "sha256": "83deb30fc3b362d3e2fb17a63aa831b3083ac5b0520a95d7ca9bf9108897b2e9"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000017.csv": {
+      "size": 1255363,
+      "sha256": "1d801056dc00324a7fd253890284e330aa5175ede3db85adedb702470ccb5fe7"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000018.csv": {
+      "size": 1256415,
+      "sha256": "0390f55bcf9e5dc360f6d5a28924ad84986d9e9b533ae0683ea710e55cce57f7"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000019.csv": {
+      "size": 1256642,
+      "sha256": "0390c4a88d504d3aa4dc348da71bb5af669b5a313d695d54b25610553e985452"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000020.csv": {
+      "size": 1256523,
+      "sha256": "9b8779eb14b75d37a8497f4af0e40288a7ec5e2cb7677b730ab5e703b642f5bc"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000021.csv": {
+      "size": 1256243,
+      "sha256": "db94b4595b8d985979bfa96c3e3483a71b3feee60787f8108ba232d1f09b107d"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000022.csv": {
+      "size": 1255577,
+      "sha256": "a6eed79d2e6095f326ddcbb1c9a5d8900e73958d781d4a8b09be38011b366d16"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000023.csv": {
+      "size": 1255412,
+      "sha256": "547ccac2b485a5a3fdc0ef62a32278dee537a61f3201e48ed21de9aa3804e1d9"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000024.csv": {
+      "size": 1255855,
+      "sha256": "34193c6248a9a3fa98dd5d9ad1b1e0d525b1d7c9290b83163b9bcc758933dc1e"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000025.csv": {
+      "size": 1256309,
+      "sha256": "a9861dde7bd4d4cc6c40c0adeb120061ee750886a3cfa97901c4eec93992b526"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000026.csv": {
+      "size": 1256725,
+      "sha256": "840b48cc1bc884b15994bf3bd39b7a8e077534e16beacfe8ad974a23baf0b3d5"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000027.csv": {
+      "size": 1255327,
+      "sha256": "85ac15f67e21be2a88461730847410f387f21746ab29a0f9912a156f771fa699"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000028.csv": {
+      "size": 1255917,
+      "sha256": "bfb32556a395946f756ca281347a66d0ea568977c112c3a8a5bfa3a4348d67aa"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000029.csv": {
+      "size": 1255721,
+      "sha256": "d7a720ede0b93186d3d24a25c156488f54edf069459178816a4d329978e5a65b"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000030.csv": {
+      "size": 1255529,
+      "sha256": "5b5af79f37d9689a682d7957ffb15bfca315c6e0311dc8acff5091b391efd736"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000031.csv": {
+      "size": 1255313,
+      "sha256": "b1d5cb9270a6f3aa34dcc5f6b63363362a2c99718f7a52a561856d9d2cc153c2"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000032.csv": {
+      "size": 1255174,
+      "sha256": "5e41fbe0b6d319392fe32efa1c101ce39874aec4b7bedf5c8336714a3cc19063"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000033.csv": {
+      "size": 1255795,
+      "sha256": "c4b5a071aad194bcb029bbd244b35705da5ae71d7737e07cf731d2d52743a98f"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000034.csv": {
+      "size": 1256383,
+      "sha256": "2be2de4c53e20bdee7a0ec054e7611e85295039ff4da00bc581aaf87a9223a87"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000035.csv": {
+      "size": 1256204,
+      "sha256": "dcd22347f1cfaa3b7ef37519e882e3237c7a89b84ee30abd23e0d97540151a0a"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000036.csv": {
+      "size": 1255054,
+      "sha256": "78c9da7fbfaf0aa16c6ec4f0b2287fe15ba23ad6a92e908de688eee7cd52a18d"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000037.csv": {
+      "size": 1255034,
+      "sha256": "8878176f4eacbe7841903472a8a351502a5eaeea44e23b13fe42eabbd2c7fb68"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000038.csv": {
+      "size": 1254369,
+      "sha256": "eef3b295becf6c494e42feb45e013e596766d28f6b06ae42dd5dba8c0685af3e"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000039.csv": {
+      "size": 1255154,
+      "sha256": "b7933d6f13afcbcf618d24eee20c519d0f3e968ea6fa2f375b532f4e38187238"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000040.csv": {
+      "size": 1255191,
+      "sha256": "071a205215d830d4560a68c7ccb78460495c68a6435884fdceca97b3f57e923c"
+    },
+    "help_assets/silicon-reference-run/all-wavelength-fields/sample-000041.csv": {
+      "size": 1255351,
+      "sha256": "1ec1acd36b7f03e272c447736f2d45d7933723514ea67a66b8072e24a4eae73d"
+    },
+    "help_assets/silicon-reference-run/backend-events.json": {
+      "size": 1046,
+      "sha256": "1cbc2ff64ec21f1850a9d4937a951eeac3136dc22f0e5636d037c54d6e964844"
+    },
+    "help_assets/silicon-reference-run/backend_stderr.txt": {
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "help_assets/silicon-reference-run/basis-121/backend_stderr.txt": {
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "help_assets/silicon-reference-run/basis-121/backend_stdout.jsonl": {
+      "size": 3442,
+      "sha256": "f5c78455c728a38b24d6a89062a41ba033de371035df01795efb87712cf577dd"
+    },
+    "help_assets/silicon-reference-run/basis-121/diagnostics.json": {
+      "size": 683,
+      "sha256": "29f81e30915fa2f850a0496abb0ebf711e663eb31301e11430c7cc1da8375f28"
+    },
+    "help_assets/silicon-reference-run/basis-121/job.json": {
+      "size": 3993,
+      "sha256": "66591b747310f1960734619895ff77678543336d733c06322b443def77553513"
+    },
+    "help_assets/silicon-reference-run/basis-121/project.json": {
+      "size": 2260,
+      "sha256": "5bd7ce495199d72f584882cd9f2db1bed5b34730ce3eda027f03b30ff360a449"
+    },
+    "help_assets/silicon-reference-run/basis-121/results.csv": {
+      "size": 3332,
+      "sha256": "03b64a315e768be10dfbb74e6435e388c6f737ee83236b8f6bedcdec34332818"
+    },
+    "help_assets/silicon-reference-run/basis-49/backend_stderr.txt": {
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "help_assets/silicon-reference-run/basis-49/backend_stdout.jsonl": {
+      "size": 1621,
+      "sha256": "826dcde17f67629714d24c1f577385a32580023e292767b6941c30b080575a99"
+    },
+    "help_assets/silicon-reference-run/basis-49/diagnostics.json": {
+      "size": 669,
+      "sha256": "4d8260a207b4dbe869c636d166c2a827507ca3ba81362181a833bc580b2b24a0"
+    },
+    "help_assets/silicon-reference-run/basis-49/job.json": {
+      "size": 3992,
+      "sha256": "f6c16fc3b89455a89832467786209b4835b774a4f9acda6c7b688f77a83980e2"
+    },
+    "help_assets/silicon-reference-run/basis-49/project.json": {
+      "size": 2259,
+      "sha256": "9301450b92f9bde29c684e0840bf3d1df52adcb48deff82cee5637f7905ab9c0"
+    },
+    "help_assets/silicon-reference-run/basis-49/results.csv": {
+      "size": 3299,
+      "sha256": "5663bc41fd30e4ec44fda9715133468d108398aa654e6cee270907634b5fc4c2"
+    },
+    "help_assets/silicon-reference-run/bundle.json": {
+      "size": 18719,
+      "sha256": "2e68545095d324dbea5bb4a09a94d9417b020c43b16c32f1189c0222f0b375a8"
+    },
+    "help_assets/silicon-reference-run/desktop_request.json": {
+      "size": 185,
+      "sha256": "f2f53d15ad2a60cc15bd1d427dd8a0fdd80b633bdd479fdd7d26fae41959dba0"
+    },
+    "help_assets/silicon-reference-run/diagnostics.json": {
+      "size": 769,
+      "sha256": "2108a6ca4f8e74ed1a1e23335c1ef093184ee1e8683591a34346bc3ddc8ab313"
+    },
+    "help_assets/silicon-reference-run/electric_fields.csv": {
+      "size": 1255054,
+      "sha256": "78c9da7fbfaf0aa16c6ec4f0b2287fe15ba23ad6a92e908de688eee7cd52a18d"
+    },
+    "help_assets/silicon-reference-run/field-samples-source.json": {
+      "size": 6618,
+      "sha256": "e329b879a2535e43cb93d53721d98b61e3c2ee24045f4bd8ccaa782ad5e6feef"
+    },
+    "help_assets/silicon-reference-run/field-samples.json": {
+      "size": 6484,
+      "sha256": "f8763d6bcc48a999166087faf1f451797582eeb8408719a0f39f41cd29cb97b1"
+    },
+    "help_assets/silicon-reference-run/field_diagnostics.json": {
+      "size": 529,
+      "sha256": "d8a4f654c439f7f6f07dea87267a93433758e981e342e279caa9a390ae212d40"
+    },
+    "help_assets/silicon-reference-run/field_features.json": {
+      "size": 1060267,
+      "sha256": "a0b174caf523c17b346094b9f891297c8106bf3f678af9445ef8c2b5c9f482a8"
+    },
+    "help_assets/silicon-reference-run/field_model.json": {
+      "size": 1384,
+      "sha256": "33a38b573e3c4fee3bb2460763aaee1daa254c9827cf725ad442fe649142cc6a"
+    },
+    "help_assets/silicon-reference-run/job.json": {
+      "size": 4091,
+      "sha256": "b47dba1bc20c0ec86db145b895557212bbb0afce66637b0416ea9ab2e6c25c58"
+    },
+    "help_assets/silicon-reference-run/project.json": {
+      "size": 2060,
+      "sha256": "07873a53c6e0465ba0a201ac166fcbf2d8103cdb8a56a30d3b8322ae705928c2"
+    },
+    "help_assets/silicon-reference-run/provenance.json": {
+      "size": 53881,
+      "sha256": "524f7427dd3984805c11bafc40fc7f7f7ad579e2ee46c335dae4f57f2bb14a70"
+    },
+    "help_assets/silicon-reference-run/results.csv": {
+      "size": 3326,
+      "sha256": "4bac651533cb450cc01673d38e9a2ecdbb207a89e002b15484e56c877b859f73"
+    },
+    "help_assets/silicon-reference-run/run_and_capture.py": {
+      "size": 15820,
+      "sha256": "5785bfe6a4a9c47ea2e8e92673b0f56360033afb638193b79e8def92c46a889e"
+    },
+    "help_assets/silicon-reference-run/scientific-validation.json": {
+      "size": 5881,
+      "sha256": "f315cb9c194d7899863c6f5d074fc92632f1e9fe1ef1b20edc1afd7adf3e11b6"
+    },
+    "help_assets/simulation-fields.png": {
+      "size": 109297,
+      "sha256": "3356ed1d23419c73b21b1605092618e9d8c54d1f551854c7636965bdf3a90bbd"
+    },
+    "help_assets/simulation-index-shift.png": {
+      "size": 113741,
+      "sha256": "ead0a2d05c5847811058ced80612fe3523e5e8f5e3b1e2a6edb452e3105739de"
+    },
+    "help_assets/simulation-meep.png": {
+      "size": 87759,
+      "sha256": "6393322eaaa87bfcd33856eee230c3426eae1bfb598c6674da0221ec9d909d4d"
+    },
+    "help_assets/simulation-phase.png": {
+      "size": 255036,
+      "sha256": "e0b6d804647222e778144b66f6267cfdacbf28692a66338b1b78b870ee698d6a"
+    },
+    "help_assets/simulation-rcwa.png": {
+      "size": 95364,
+      "sha256": "a51e2fdea1f9f978b635e69180d48815d72457526dcbaa53252297ccb3188fdd"
+    },
+    "help_assets/simulation-saved-results.png": {
+      "size": 215435,
+      "sha256": "0b8c524e7e9a5c408e0db94e80a483b2e1875448b5b7c16adf0678bc4835f35c"
+    },
+    "help_assets/simulation-sweep.png": {
+      "size": 107169,
+      "sha256": "ab7a7aca5682f251b0f70eb88d839615f8d27707a9f4ca1f892ffbe1aff167ac"
+    },
+    "help_assets/structure-cross-section.png": {
+      "size": 60330,
+      "sha256": "628f665c97d1d262e54a60e35f564892b75edd6568ce4a2f9375e75771966ba2"
+    },
+    "help_assets/structure-regions.png": {
+      "size": 69033,
+      "sha256": "93c33b39246a44b8930c87ae95e5502405076c5eb9239c280accfbbf811d4340"
+    },
+    "help_assets/structure.png": {
+      "size": 146013,
+      "sha256": "5937bd811f20767f9ae551ef439f9ab0b3866fd99b1e933db693f308a2d7ac0f"
+    },
+    "index_shift.py": {
+      "size": 15366,
+      "sha256": "dd146733784b5b5fe9e809e60440c4fdd1a18adb166f6ae2827aba370dc76f1b"
+    },
+    "INDEX_SHIFT_GUIDE.md": {
+      "size": 4695,
+      "sha256": "0fa716fd34e4a33180f7ae7d4b3ec6136a52c2018e79e352dc1cb1ee9c1f4a85"
+    },
+    "install_desktop_dependencies.cmd": {
+      "size": 247,
+      "sha256": "0990fa00b652da82bc156ea6e27c5e40a84ce5d216bdf5ab89e9b5adfda9fa01"
+    },
+    "install_ml_dependencies.cmd": {
+      "size": 279,
+      "sha256": "8914456a166cb6a4eb149988a53a15d91d79984682a5dd041479935cb3e12eeb"
+    },
+    "installer_smoke.py": {
+      "size": 41664,
+      "sha256": "352483de579dbaa90337acd23a94b678e2b1074264ed5b9c1fdd29964d5e8452"
+    },
+    "ioffe_parameters.py": {
+      "size": 10947,
+      "sha256": "20103e686f3110827dfec95654bef725ea808e6fc7d3115c0067afd3942f1f0f"
+    },
+    "laser_model.py": {
+      "size": 9692,
+      "sha256": "bda33b9e9738a2fa64930d329196aa965ddd36e65929ee01f19b430cb2f2e52c"
+    },
+    "launch_ai_search.cmd": {
+      "size": 234,
+      "sha256": "e01ed91cdc7dc84347d1ba95bc23582470d2b06bdc1fc2f018b2643d0cda77db"
+    },
+    "launch_ai_search_test.cmd": {
+      "size": 329,
+      "sha256": "d5fb9ad7bdef08a719187b21d2689788ad2676b2550764aa362d85a8bffd0952"
+    },
+    "launch_gui.cmd": {
+      "size": 43,
+      "sha256": "cdc7735aae5dcdf979e5fd14c5db9a922ea59524a325648db788b99987d7d8dd"
+    },
+    "launch_peak_gui.cmd": {
+      "size": 44,
+      "sha256": "c9bc1404a910bf0980ec2b90357b015618725e0616e0b698a2038df80a94d465"
+    },
+    "launch_peak_gui.sh": {
+      "size": 137,
+      "sha256": "60a2d29ee6da7435198b61501aa1ac4673d7277801fb149589b38c18a41ce8a2"
+    },
+    "launch_qt_gui.cmd": {
+      "size": 369,
+      "sha256": "2eb1db3b79aea5c17dc82f0626939cdca13e74ef3b281dca9f0b4b53b7e0856b"
+    },
+    "launch_qt_gui.sh": {
+      "size": 262,
+      "sha256": "3e71bcd6e4a277ee9ea1b6e1ec14e03c6a975d3914b7d349afb2d84b8643bfaf"
+    },
+    "library_ui.py": {
+      "size": 21422,
+      "sha256": "dfc68c1d1701a0aeba8bb8039057b220ba5e2bfc2caa4448c8966833b4c41e18"
+    },
+    "linked_hole_sweep.py": {
+      "size": 7289,
+      "sha256": "24d43d3634bb5d70f0e3c7bc0cebd665850d21985170ea616087f4cc76160808"
+    },
+    "material_import_ui.py": {
+      "size": 8459,
+      "sha256": "a2058cd2bb46aa94045ad27c1b13c352f3479d3865c97fa81d129fe94a8c0c10"
+    },
+    "material_viewer.py": {
+      "size": 7507,
+      "sha256": "4a08b7e0b4f88577502d8df3b02c9a39ae23056edcfc2369b6461574305f0543"
+    },
+    "meep_bootstrap.py": {
+      "size": 14209,
+      "sha256": "6b695d6114d4d51e443be0fa57e5ba031ff956aa3c6dedfface04d01a4f46998"
+    },
+    "MEEP_FDTD.md": {
+      "size": 6804,
+      "sha256": "88aef56351d595a09e91038e0f2dc1559b7d2836a35ac984e0675cd38f2fa20f"
+    },
+    "meep_managed.py": {
+      "size": 18321,
+      "sha256": "e1ad428f042bab2e9a848cb350f0caf3613513b8a4cb4185e739ad7e00024540"
+    },
+    "meep_runner.py": {
+      "size": 8948,
+      "sha256": "a2e8ec495668531f8de28e3573f885be60dd19d204cab92f5db8f964f5dac4ec"
+    },
+    "meep_runtime.py": {
+      "size": 8738,
+      "sha256": "beaca9d7e1880134bede82ebf012c664b96b340f8d043c21b0c5760d0db24873"
+    },
+    "ml_optimizer.py": {
+      "size": 35162,
+      "sha256": "214499cec7f6d1ac417a2f38186a8151bd45b65d1da961aed5392fcfa652ba68"
+    },
+    "ML_SEARCH_GUIDE.md": {
+      "size": 11853,
+      "sha256": "660ededdf1b591fe6521e665d2d2254405821ae090ac95ef1af40959ad95ecb6"
+    },
+    "model.py": {
+      "size": 14495,
+      "sha256": "2709a1c6ac07ad1ee02598e4abab8ef731128218854648c3697e25a53c872233"
+    },
+    "nk_import.py": {
+      "size": 4361,
+      "sha256": "4029c20c118769e0f94c2ed989591bc672a6af66ff45782450bdb9d2eed90b9e"
+    },
+    "optical_objective.py": {
+      "size": 825,
+      "sha256": "3dba509cf7a2453f4eddba3172f606214cbf178d51beb368880f9a70cdef9539"
+    },
+    "pcs_s4_runtime/S4.cp312-win_amd64.pyd": {
+      "size": 1089024,
+      "sha256": "feebcca5078672a6382bf0bd5c94f0014635f9c2c88e6427de77f599d37ffea1"
+    },
+    "pcs_s4_runtime/s4_parallel.py": {
+      "size": 3881,
+      "sha256": "d9837c6fdf2d8f5fdb38cd31f83d026558e0f8db13828f22a844c0476f5b9bf6"
+    },
+    "pcs_s4_runtime/s4_runtime.py": {
+      "size": 3316,
+      "sha256": "a68910621d586aaca619fa65531f2e2a46d0e1df36df695be7c835422fc2c636"
+    },
+    "pcsel_design.py": {
+      "size": 1230,
+      "sha256": "a65f1fb12b1b9096f8be5f030dc2f8393a65a0a05a5c29be922d8e35a24a749f"
+    },
+    "peak_optimizer.py": {
+      "size": 21188,
+      "sha256": "1b11db9b37b6a62c52ee6376bd9cea29e658fac5fc19f0e1b5ecd30cfebf7e3d"
+    },
+    "PEAK_SEARCH_GUIDE.md": {
+      "size": 9727,
+      "sha256": "3afc5e21dffaa42b5cf541e13498de4276ea15108341b438728d1abcf6f7637c"
+    },
+    "peak_search_ui.py": {
+      "size": 20434,
+      "sha256": "734af9845cf6293bf8553a644609d795fd72a023425a4f3a9f8237bf683931ab"
+    },
+    "platform_setup.py": {
+      "size": 1921,
+      "sha256": "2df2a06c7fc5427cc5adad0c5a1984ed959d1d05fd5efac9e7e67f2beba2e80d"
+    },
+    "PUBLICATION_FIGURES.md": {
+      "size": 1639,
+      "sha256": "4137b36188c3c4f3c3679a507ac5842da17238063004e61881397ff45f393d0d"
+    },
+    "publication_plot.py": {
+      "size": 10485,
+      "sha256": "9234bae04295d05761928ce9ce259544f1d8f2ecfc6ac14906ffc979fc54eab3"
+    },
+    "qt_about.py": {
+      "size": 23412,
+      "sha256": "7b219356b45a8d1686ca165f3b20f642fabf4668f10a26d00cfb0483573be1df"
+    },
+    "qt_addons.py": {
+      "size": 11568,
+      "sha256": "92f82dab4d3eba31871895f11be4b150d312054d7fc2cc0c8bd8787b5a5a5e5f"
+    },
+    "qt_ai_search.py": {
+      "size": 25314,
+      "sha256": "527268d2285238829db067bdc60205a8f0aabf4c454467aeac3e13abd187a14c"
+    },
+    "qt_app.py": {
+      "size": 46795,
+      "sha256": "0edc6e5cbf7fe773c1ffa10f4b86bcc29b50dcab9232ccd43cb14fae285c28e8"
+    },
+    "qt_appearance.py": {
+      "size": 19163,
+      "sha256": "2579dda0a6f09eb48214ca39d67aa5767cb76f53a3c35d7e420e35042f8933ea"
+    },
+    "qt_carrier_index.py": {
+      "size": 17563,
+      "sha256": "2fe5be5cc44b30036dd04d71d310def0cf5ae88581988c6eb280cdf8f0ca1904"
+    },
+    "qt_chrome.py": {
+      "size": 18872,
+      "sha256": "d643caddaa35f3eccb7c1c71009bb4649a7402031c2b75cb2d2ae8358790640b"
+    },
+    "qt_common.py": {
+      "size": 44561,
+      "sha256": "918dd830786a8e52873e8f2a1029aa798de3f8be3bbd5c0dbc78f4af55cefd32"
+    },
+    "qt_compute.py": {
+      "size": 99826,
+      "sha256": "f1598ec2fed438d3f743ceda690b2974ff35ece7131cfd3f02dcbb8a2803eb15"
+    },
+    "qt_comsol_import.py": {
+      "size": 2703,
+      "sha256": "ee53969ffef8d9749e2ee45d09a639ba99c62b3c0ad36cac52dd009b5137b225"
+    },
+    "qt_core.py": {
+      "size": 37369,
+      "sha256": "f7c0a74e1a96e4f1c9126acee6f501a22c0ac8c11de6202b2fa05e2eb5c31551"
+    },
+    "qt_design_materials.py": {
+      "size": 5612,
+      "sha256": "74bb90d3469ff9d7c09b4c35c5b3b6de8a58ef89ee24bebfcfbe6e01839312f8"
+    },
+    "qt_device_builder.py": {
+      "size": 58892,
+      "sha256": "24f835f85827d73c24297f964ebfe5a481f108fcfdda948a05abad322b1b0890"
+    },
+    "qt_export.py": {
+      "size": 3621,
+      "sha256": "4e6132972490fdbc4a8979d1a32bc7fa907f573de9cab3762c22ab74904907c5"
+    },
+    "qt_fdtd.py": {
+      "size": 33889,
+      "sha256": "f07062caef0b8405415740f8b7d7d7a5f0c34149e098277c7b54983d5ae6f4a4"
+    },
+    "qt_field_compare.py": {
+      "size": 10535,
+      "sha256": "9c0ff7a976c3e18e4d8f80772b792bc295c1979f4b1eb1b7e6d587dcb92910df"
+    },
+    "qt_field_volume.py": {
+      "size": 16424,
+      "sha256": "18b62d0d9c71639f720758f0bae6b5674834c092e7b3fc11fe24dfaf50771f79"
+    },
+    "qt_help.py": {
+      "size": 65079,
+      "sha256": "49809dbcf5ce02afbe1177e56791097f7f5ede6b05675b081cfd934fb4819fd8"
+    },
+    "qt_icons.py": {
+      "size": 3276,
+      "sha256": "d31e9d4f35bb9a5b7d0576821a410be67dee465c7c66ff4d7009622bdbb279ac"
+    },
+    "qt_index_shift.py": {
+      "size": 21411,
+      "sha256": "b066e358f9891c8d09ba428ddb0257f11fcb5a1b4ed53304b38bbb62efb720d6"
+    },
+    "qt_lattice_diagram.py": {
+      "size": 8867,
+      "sha256": "085865e4d225c15fcfb508fd9c1bc7c0e75c43b2e57a7871971e5c3e2e51550a"
+    },
+    "qt_library.py": {
+      "size": 22242,
+      "sha256": "d9acbd3f40631406ff2bd150990fa9022a87e45d009e74c1de29cbd6c6ed2b9d"
+    },
+    "qt_materials.py": {
+      "size": 67446,
+      "sha256": "6babf1ed85f15ba040040b167a3dd916cffc1fe70f0c3c4469609f412ee5e54a"
+    },
+    "qt_multi_hole.py": {
+      "size": 6693,
+      "sha256": "40dc375f3c7c46f863fc4ace877f79ad26dc7a0c79f205ddc022a778ea032975"
+    },
+    "qt_native_field_volume.py": {
+      "size": 25275,
+      "sha256": "0b9737bb0404c2f299156c1b5456cee5599ab520c3ea6383e6e071a8bdbba7e0"
+    },
+    "qt_native_figure.py": {
+      "size": 43408,
+      "sha256": "817267bcb1709efd2b018262e2802628ef609476258cc41038a06f1cbb4f0b49"
+    },
+    "qt_native_plot.py": {
+      "size": 22009,
+      "sha256": "bc5ccc8b2927cd8829a2d8b7791419c0eab5edd1bb87d559308e66bd9a0db79c"
+    },
+    "qt_pcsel.py": {
+      "size": 40259,
+      "sha256": "01767c650c34f335d6500ee2dd098d744d7736be98e52310bb31329e547ae384"
+    },
+    "qt_ranges.py": {
+      "size": 21221,
+      "sha256": "63d9e249672aae338ee638a03e496d770ca1b918060294284995c002d21a7577"
+    },
+    "qt_result_export.py": {
+      "size": 1428,
+      "sha256": "c68f1cc44f42eb931f5a1df9285fd0e3411a87f3e54b50bfbcc9e5a777a62eee"
+    },
+    "qt_structure.py": {
+      "size": 48517,
+      "sha256": "f27b33fc99613af194753fae865065cddb420ba29ad4287f69a218990fff2349"
+    },
+    "qt_structure_3d.py": {
+      "size": 8132,
+      "sha256": "0e21710c8d1aff4578b6e68bf7a6911b69c8593b6bd5f3a6e4f3a2643e890c46"
+    },
+    "qt_surfaces.py": {
+      "size": 5212,
+      "sha256": "0fd86045a750fe04e9902e4c405a82cfca78915497cea7327821d633c3a98873"
+    },
+    "qt_windows_glass.py": {
+      "size": 12553,
+      "sha256": "6afdd15330aa574de0ad39ea0bd7095563bdd563c4192f0e876afccfa2cc05f4"
+    },
+    "README.md": {
+      "size": 17572,
+      "sha256": "76820712360e073e47724e33e5f213e6652c65b0c4f9077ed91439742a583b0b"
+    },
+    "refractiveindex_online.py": {
+      "size": 10962,
+      "sha256": "9805bf0d4722a0f6b3942a0eb60db31a268788215f846300ce1a41642d2da94f"
+    },
+    "requirements-cad.txt": {
+      "size": 112,
+      "sha256": "cc69f91bd17e8808460b44bb82632984cdc0c347f9b31f3e4f4c2f7ba3aa98d4"
+    },
+    "requirements-desktop.txt": {
+      "size": 112,
+      "sha256": "d27f3c6cd8ff2736029227b7b3cfd63e51c73789d93035b86388ee08fae3846e"
+    },
+    "requirements-geometry.txt": {
+      "size": 15,
+      "sha256": "a9da53f34af90c2cc5b9ee96f0ef865935582d869aba11fb0eeb105cb01d6e63"
+    },
+    "requirements-linux.txt": {
+      "size": 144,
+      "sha256": "ec8b5c3d9132d0e4003a49f337ad8570cc36a10f3da83961a51bf284fc78f9a8"
+    },
+    "requirements-ml.txt": {
+      "size": 213,
+      "sha256": "49a2dfefd0fa61ce61e925919d63e37189c8bed4e818ad54820b074e48314aad"
+    },
+    "requirements.txt": {
+      "size": 75,
+      "sha256": "a14fa4f71d494e172d8c40aefb56afbd7f876f468b4dd6f71d59328872568b2e"
+    },
+    "S4_Studio.ico": {
+      "size": 107786,
+      "sha256": "f43d2ae9c06f50f119884f37d5d66fcaf267910f381e58a526151f09f478e546"
+    },
+    "scan_storage.py": {
+      "size": 16572,
+      "sha256": "01a9d9127db5e45ddb05288da41005fa1d8d7924f92de39f9cd287474f42cb52"
+    },
+    "setup_linux.sh": {
+      "size": 383,
+      "sha256": "733f370fca4fdd2424aac5988b4f34b80a3199346e1346b515485aee473d8f2d"
+    },
+    "simulation_fields.py": {
+      "size": 5152,
+      "sha256": "32bc2c6c759c114799d3345752eb61924575d2e88cf3d7f97c32d6e692667a1f"
+    },
+    "spectral_phase.py": {
+      "size": 4625,
+      "sha256": "b22f8f2fe0569bb2997ae518f32e48352e6f4830244d39cb0d9e4fafd51aa3b5"
+    },
+    "SPECTRAL_PHASE_GUIDE.md": {
+      "size": 2271,
+      "sha256": "779640a79aafc28ddb7699130acf9842ce4f3c60463b7d0a1362b06dfb639ee1"
+    },
+    "structure_builder.py": {
+      "size": 36969,
+      "sha256": "cd7566920780acdbaeab120a32675398456aefcf8a9f85d07d7d239de871877f"
+    },
+    "structure_preview.py": {
+      "size": 20878,
+      "sha256": "ad61c89a49bd67e1b9159ebb14c2f6e1a13fe2b64bf0b493c1e721433ae8e6f0"
+    },
+    "structure_preview_ui.py": {
+      "size": 1677,
+      "sha256": "a495cf9445d0d87b5c195a59196979f38b0a0eac906fe8589864bbf3ee38f984"
+    },
+    "structure_sync.py": {
+      "size": 5111,
+      "sha256": "2ce91f264480ba548e745c9e31d2799804a5e30a2533caa61af23b720ff60a9d"
+    },
+    "studio_ui.py": {
+      "size": 22018,
+      "sha256": "4339d350c3cc25a4b6c8ce69eeec2e70f1f063c962fa8d05f6841fc18012ea73"
+    },
+    "TARGET_DESIGN_GUIDE.md": {
+      "size": 14203,
+      "sha256": "7e96dc4e111e95d532bf704e5a2979bf8a52c5cf50a1568de4fd9509d626eab9"
+    },
+    "target_optimizer.py": {
+      "size": 27176,
+      "sha256": "5557d34c94e2dcce317105f26409508b5800c0a187d9afa5c3007b097faaafef"
+    },
+    "target_ui.py": {
+      "size": 23108,
+      "sha256": "19c3637cf70683d292c36c0c75ac297e62125efaa6420b84685f6f05fed2a838"
+    },
+    "tests/__init__.py": {
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "tests/test_about_integration.py": {
+      "size": 2786,
+      "sha256": "7d590eeb622f37fb7c776a44f7d8185c4d6e87c542a3a96d81525a4100213ffb"
+    },
+    "tests/test_action_notifications.py": {
+      "size": 1931,
+      "sha256": "ce11bcbc7d8cde08e9f5b7c76391829758f7df928e84ca650bd3dfb9ccd01516"
+    },
+    "tests/test_adaptive_density.py": {
+      "size": 1340,
+      "sha256": "ee72492cdac75cf06715275b1a0328a3f2f7cc2474267c55180188098692d1e9"
+    },
+    "tests/test_addon_release_channel.py": {
+      "size": 3226,
+      "sha256": "fc5a67b19dc54550ff42eaf1891d83802f3fcc32cc112f541efffbcc1cfd733f"
+    },
+    "tests/test_addon_runtime.py": {
+      "size": 6456,
+      "sha256": "bf6454fb2108bf0d009dafa1073ea0f03dfea3a7c20c50499301ad9d6283b8fa"
+    },
+    "tests/test_ai_campaign.py": {
+      "size": 7676,
+      "sha256": "e3f569ec5150ff70f20de62389128b8b587c6c9ab6fd18b839bf9c5b81e11697"
+    },
+    "tests/test_ai_multi_hole.py": {
+      "size": 9495,
+      "sha256": "797e74e7991f7cea47c9c8b41ff8e4a003176d35bf965759a5ca69efd6b28b27"
+    },
+    "tests/test_airhole_field_objective.py": {
+      "size": 2223,
+      "sha256": "459da1e9eb64e92f9dc506af01d7105be0d958ff2689d269b17528f357d59a4c"
+    },
+    "tests/test_app_version.py": {
+      "size": 1801,
+      "sha256": "c426826399fa1fc868950c10b46927619444894203094e02f9498b63120d9c04"
+    },
+    "tests/test_appearance.py": {
+      "size": 2274,
+      "sha256": "09e7e84144203ca4e1c0e883ecbbfe6004bff0a25af50a31e55dd34a46ffc0fc"
+    },
+    "tests/test_application_restart.py": {
+      "size": 3551,
+      "sha256": "8c0970b08601b14cb42c5202f3564e83234546574066d24295085b23d5e482c6"
+    },
+    "tests/test_approved_ui_integration.py": {
+      "size": 7751,
+      "sha256": "85a70c928548a60977d6deb7f0622b7231299c41532f7a5c507a8a98ec077307"
+    },
+    "tests/test_backend.py": {
+      "size": 9036,
+      "sha256": "5600cfb9c4e82e770483993b5f872b8be618b2b176366e22752caf5163e99b2c"
+    },
+    "tests/test_bounds_editor.py": {
+      "size": 15248,
+      "sha256": "4e3161867d910c876363f7be95631dadc5704f36de6e2cf3c9960263c405fee8"
+    },
+    "tests/test_cad_export.py": {
+      "size": 3224,
+      "sha256": "9ea060ee1426cce844e3cc1f22c690ad190d9b5a2e50fa69b53f5828c06998e7"
+    },
+    "tests/test_carrier_index.py": {
+      "size": 11643,
+      "sha256": "fb2e98b1d5c1c9f3036b8eb6f4ffc2d856643fc7cb457a7b9c7cb46f25366203"
+    },
+    "tests/test_checkpoint_retry.py": {
+      "size": 1850,
+      "sha256": "2fb5bcfbcf8d80e8af203a9fba1196b6119f6b0cb68faaf25b95191ac771c486"
+    },
+    "tests/test_compute_speed.py": {
+      "size": 13569,
+      "sha256": "ee5ba8301d68179b1446e9563789185c747d404d0dd9c674964312428bcfbcd1"
+    },
+    "tests/test_comsol_carriers.py": {
+      "size": 5488,
+      "sha256": "de8d33bfb264acf8e266a3cb290f2198ccbde8bf71a8fe2c2e4038d22865cb94"
+    },
+    "tests/test_comsol_export.py": {
+      "size": 4003,
+      "sha256": "a61a28fe3794825653c5db6048f6a69f65b8b0feef69b7e1a5f0c44adf139b31"
+    },
+    "tests/test_comsol_results.py": {
+      "size": 4615,
+      "sha256": "84a1ba2a16fca96a7b670c95085583558a039ee1791424b4dc0b384dd0628b2e"
+    },
+    "tests/test_contour_learning.py": {
+      "size": 1814,
+      "sha256": "5b7caeb0806b1465b97feb4e2f214cf1b02bf458e9ce466f7a74017573ee1934"
+    },
+    "tests/test_contour_sweep.py": {
+      "size": 1560,
+      "sha256": "4387165d82182783624c6754b8eae9948da58b99dea010932fa54b3ff1bc7046"
+    },
+    "tests/test_crash_reporting.py": {
+      "size": 1516,
+      "sha256": "c40f2df87f447929c9168d343c1d2384520c7bdc3ddb1be023cef9fcffe36c28"
+    },
+    "tests/test_data_library.py": {
+      "size": 9138,
+      "sha256": "a5f2e6f0e9af2b0bdcc492fd6eae4054354f7454263c2980028d5d75b8e71571"
+    },
+    "tests/test_data_library_packaging.py": {
+      "size": 4013,
+      "sha256": "d4ab3d4e6ce7fd586be4c18fb730f9c7557adad900e90eaad1ae58886b916fbb"
+    },
+    "tests/test_design_b_controls.py": {
+      "size": 4618,
+      "sha256": "ba54b03557fd00881cb9ea3ea2a6e64ef39ddfb90275fe9fc783b6621d9b7140"
+    },
+    "tests/test_desktop_runtime.py": {
+      "size": 8846,
+      "sha256": "ad6054cd40ea1c73dd9f56331d385238f899e6ad414d0fec2df477feaab0f7ca"
+    },
+    "tests/test_fdtd.py": {
+      "size": 10588,
+      "sha256": "27540ac61d02309d5ae95bac3503953fafdcb43b76ec9cbd543377065be4d285"
+    },
+    "tests/test_field_ml.py": {
+      "size": 12592,
+      "sha256": "f7a3176b53a0c62fb9baeda658e1043cdb16a457359aa12afd7980a636188f7a"
+    },
+    "tests/test_field_target_integration.py": {
+      "size": 7534,
+      "sha256": "0980197989801ab598207be03f12190c3051d5b0b99e987bf5605460fab6ec72"
+    },
+    "tests/test_field_tracking.py": {
+      "size": 9322,
+      "sha256": "e9120151121d8d569e85186ca14b6809d5f2dbf25cafad9bc9a4f1b0fa1988f8"
+    },
+    "tests/test_field_tracking_ui.py": {
+      "size": 8086,
+      "sha256": "ef5236bad12f050efa8c1ad07ae5605a1c2bb7160c1f849cbac9d851c60b1467"
+    },
+    "tests/test_field_volume.py": {
+      "size": 7133,
+      "sha256": "598f827be22648b22505f24dcc1516ea5bf0a4eac9da7ef7f3e28f174da156f3"
+    },
+    "tests/test_fixed_readout.py": {
+      "size": 5170,
+      "sha256": "130e5fac58bcd107daca3c08a08910660847c1ebe1ab73d7369f36739d7ae136"
+    },
+    "tests/test_four_looks.py": {
+      "size": 5801,
+      "sha256": "764d03aa655627eaa789345cc63c76c627980d79d65b03a71ccc510837c50141"
+    },
+    "tests/test_geometry_apertures.py": {
+      "size": 2445,
+      "sha256": "d2a1fcb0ee367c5dab96b1d3a3fdc30d098aa1417ba01d0139ecac1df9acde11"
+    },
+    "tests/test_geometry_material_colors.py": {
+      "size": 9464,
+      "sha256": "509749d4b29320b78b1cf66cb90797e523725f598e8b92e231210239fe83e5e7"
+    },
+    "tests/test_geometry_material_opacity.py": {
+      "size": 4956,
+      "sha256": "35f9dfc8b2b135b8d2f79d1f90f5bf6063fb7b7df4ff44da7a7a7a2d7fb0ef05"
+    },
+    "tests/test_geometry_viewport_cache.py": {
+      "size": 7874,
+      "sha256": "1b90c95224b6e7183705b9270da70ebd3092bec5c01a6e70c5f6db97e8c059d8"
+    },
+    "tests/test_gpu_execution.py": {
+      "size": 8149,
+      "sha256": "f838383bf276bd0eaa3c109a661b15e327d6b5d26b1053374d83ee8ecb1a99a7"
+    },
+    "tests/test_help_capture_portability.py": {
+      "size": 1353,
+      "sha256": "5882d361690b4416e80edc5d7373dcea86e5f92bbeeb7e171aceda95b81f7dac"
+    },
+    "tests/test_index_shift.py": {
+      "size": 6724,
+      "sha256": "5ab754f277b704d592db8d44cb24d34d16ceeb729eb129c1cc550ebf6092b94e"
+    },
+    "tests/test_installer_chrome_smoke.py": {
+      "size": 3195,
+      "sha256": "5c7d3f61a408cdd7ac9f89ff3224bc5a8d086a0c21eed90184157793d01d1c14"
+    },
+    "tests/test_ioffe_parameters.py": {
+      "size": 3656,
+      "sha256": "672eed4d1ecdde55f0af46a6c1a4d5e283a7beac8bc239800f5b5a884f6cced1"
+    },
+    "tests/test_ioffe_ui.py": {
+      "size": 2232,
+      "sha256": "dfcce2b51c60fb86f82830f7d466205af1e1bde16b3429e678ac9f4a29182214"
+    },
+    "tests/test_laser_model.py": {
+      "size": 1278,
+      "sha256": "0ee631f127eeb8cb60f1fe2186a134a3c1394a3be6587030d925e010a66b4e9c"
+    },
+    "tests/test_laser_performance.py": {
+      "size": 2854,
+      "sha256": "067f88e5bbdb438fee1a9de0d9ab39d1bce7234c945d008248ddb8ccd85d922e"
+    },
+    "tests/test_laser_physics_integration.py": {
+      "size": 5747,
+      "sha256": "1a08f3f4d6a91fbd260a6cc84284701e5ae7571dacb1259768babace2ed43c78"
+    },
+    "tests/test_lattice_diagram.py": {
+      "size": 2864,
+      "sha256": "71e30ee104417d2e537c32ed3b065fbf47f5f8d8e32c43bfbe12918cd2214a91"
+    },
+    "tests/test_linked_hole.py": {
+      "size": 2425,
+      "sha256": "1d6f573a44d5708c561edc3ac9fa1602284ea09cbd67c960c98ee1c72855151e"
+    },
+    "tests/test_material_display_metadata.py": {
+      "size": 3628,
+      "sha256": "2a7ff88afab52f07d24a01004cd502b50a7e18989daa781a9238198b351962e9"
+    },
+    "tests/test_material_import.py": {
+      "size": 5494,
+      "sha256": "29430ac7ac43c547a64c0f66866c0997df6cda2944dbffbeda2c68d957bf3335"
+    },
+    "tests/test_material_inspector_metadata.py": {
+      "size": 15416,
+      "sha256": "950d41e89a1b45292ab217255b6bfb7f8359c155560f8bfae81d70d11b41211f"
+    },
+    "tests/test_material_interpolation.py": {
+      "size": 9097,
+      "sha256": "76cac8a7fc30398c62f9e16c322e4063f2cd5d71b4efb3266c127b1d7c2ac1b7"
+    },
+    "tests/test_material_policy_transactions.py": {
+      "size": 3215,
+      "sha256": "2a46475bad3afd65f5477e8e78ecddfb32c75d1f0e1c36851298e21de7785b2b"
+    },
+    "tests/test_material_preview_opacity.py": {
+      "size": 4875,
+      "sha256": "89aca154978502af6accd1eebbcada0ac373ebc101675a69a761f598ae0e949c"
+    },
+    "tests/test_material_provenance.py": {
+      "size": 6554,
+      "sha256": "274fc4dcfc34a1c3982bf241a2487aad7123c236b19620884d308113cab0db70"
+    },
+    "tests/test_material_search_details.py": {
+      "size": 2993,
+      "sha256": "51be0cae4409c685534c7985e239df4363dcd10e2fc7cae64a6ca4a90fb71b24"
+    },
+    "tests/test_meep_bootstrap.py": {
+      "size": 4144,
+      "sha256": "0a14655acab664508ba7a07eb741ebcf47075bf2ff87cfb010154dd9eef402e0"
+    },
+    "tests/test_meep_managed.py": {
+      "size": 8602,
+      "sha256": "103d002c588cd73d5ee08c672310e12745c5b8c8c02e606f57dcb97de5eb8e70"
+    },
+    "tests/test_ml_optimizer.py": {
+      "size": 10832,
+      "sha256": "d4bf2dc8370ab82bfaa2947cc9c8021326fe438c655dda9f9e0e1e56c1b9dab8"
+    },
+    "tests/test_native_field_volume.py": {
+      "size": 12599,
+      "sha256": "28459271a3d75e4f8ae854278805587e8064b1a9f1be06e7a1c924cb17b6d588"
+    },
+    "tests/test_native_figure.py": {
+      "size": 15818,
+      "sha256": "5674b81146324af1f5b41f94b7f325efba5bffef50c7ac3817c564a8201eaeb5"
+    },
+    "tests/test_native_material_saved_plots.py": {
+      "size": 6941,
+      "sha256": "4e801c39f20f64581cfb009f19790ce321543610bd59e070296a00c51eca773a"
+    },
+    "tests/test_native_pcsel_plots.py": {
+      "size": 3950,
+      "sha256": "6ceff043962d09608556097864def4b9130d4293eb546bec17c866b7fb4f60ec"
+    },
+    "tests/test_native_plot_review.py": {
+      "size": 7389,
+      "sha256": "e9e612f1c1b2e24c7fdbf4b6e95e5b9763b138049ba527ea558132787b7b675a"
+    },
+    "tests/test_native_scientific_callers.py": {
+      "size": 18425,
+      "sha256": "ad573fbaa0b76afc74b958012574952ad1863e1943c5aef246716e2b97faef3b"
+    },
+    "tests/test_optional_gradio.py": {
+      "size": 751,
+      "sha256": "2901141074cc214e04ed85f55842d8e2728d5503c303a04ad8263f88df56c562"
+    },
+    "tests/test_peak_optimizer.py": {
+      "size": 6425,
+      "sha256": "4fbdb15c23b61b36bfcb891f0a35c8ff4bf770352916ce22ae810df4d51568da"
+    },
+    "tests/test_platform_support.py": {
+      "size": 1189,
+      "sha256": "f2c38cfb2e122640ac07bc001deb5cfcd461a4efbbd4e66a067aaf9e79068e17"
+    },
+    "tests/test_plot_hover.py": {
+      "size": 1104,
+      "sha256": "d3578eeee1f23beb3e9cfd70250c899d63e8f597688a1ed3a3b0c5f524969c2a"
+    },
+    "tests/test_project_file_ui.py": {
+      "size": 5689,
+      "sha256": "0dd5cfe40df7e1b16fc76bdb8c812d5ff556495de2422e5df4d73ba4a4c8a620"
+    },
+    "tests/test_publication_plot.py": {
+      "size": 4743,
+      "sha256": "2c19322001e731a1af8498ff50f5213236daaf291d3631ee699bb71b8cceaa62"
+    },
+    "tests/test_qt_about.py": {
+      "size": 20236,
+      "sha256": "46482f77617c269b9ae74ee3eb2bd0f5935c70b66151ae22421fef7dd7f76709"
+    },
+    "tests/test_qt_addons.py": {
+      "size": 6622,
+      "sha256": "3e011743a35b97a904494e7742e3292034d5b0a660b8f12dbc40c0ddb393f2f8"
+    },
+    "tests/test_qt_ai_search.py": {
+      "size": 6072,
+      "sha256": "5846362dba0af98cadd820870b5ddb53f20e2c5f40992150904f3ec18fcb716e"
+    },
+    "tests/test_qt_app.py": {
+      "size": 12797,
+      "sha256": "206098b19eb1d48031607def0a427518a8f716cf243d8d4cd278f5e690bcf384"
+    },
+    "tests/test_qt_chrome.py": {
+      "size": 9996,
+      "sha256": "ab339de6e35205412e6d692a705937cc8e0188ef2e7dedee7c3397e4dad3dc62"
+    },
+    "tests/test_qt_compute.py": {
+      "size": 18606,
+      "sha256": "b07303bf81a05a2e1a5e17b44e6c3edacc301d0175d1f5bf9937fcb23c1112af"
+    },
+    "tests/test_qt_core.py": {
+      "size": 27461,
+      "sha256": "f672c2513612d6634e1f66d10bafc363d04f379e2215dda59ad6c65ecbf484c5"
+    },
+    "tests/test_qt_desktop_surfaces.py": {
+      "size": 2807,
+      "sha256": "297dc4002f52cecfca0365b08e72332a8e3f932353d9fc6b14e427bcd70bb95f"
+    },
+    "tests/test_qt_device_builder.py": {
+      "size": 3835,
+      "sha256": "f42cc938849097de3ca23cce3f499f569cf93f562282e5f3cda2e22267ffe5d9"
+    },
+    "tests/test_qt_export.py": {
+      "size": 1736,
+      "sha256": "90e9b7bcc63db1111f1edf711fcba4d9620adc55b3d6c1a44fc8d647b12fdc1d"
+    },
+    "tests/test_qt_fdtd.py": {
+      "size": 4538,
+      "sha256": "0160cfde23ad7ae1a9d1c75d95d97663390183db4ca58af61354ddcc5ef8c582"
+    },
+    "tests/test_qt_fields_reference.py": {
+      "size": 2550,
+      "sha256": "3d41ed5051c9f003cdf9b408e0378db07882bede7777bd63c6acc229b8bfe272"
+    },
+    "tests/test_qt_materials_library.py": {
+      "size": 9782,
+      "sha256": "1d6f19579897eb93b66579640efb4eee8f59dff91099e10245b874587759685a"
+    },
+    "tests/test_qt_native_spectrum.py": {
+      "size": 9896,
+      "sha256": "8eb7d251c2a83d2ee4b4620d4a96d250f1c5fa01da296ac417468fee73664a94"
+    },
+    "tests/test_qt_pcsel.py": {
+      "size": 8159,
+      "sha256": "87606e2dbe3c91ffe1f4c689278c98e87d2017f374f2198c7338b917e38a516a"
+    },
+    "tests/test_qt_square_lattice.py": {
+      "size": 3990,
+      "sha256": "0b9cc228731e53582aef129d95b9af341eb7a59fa55694e739c5618f3cdeecb8"
+    },
+    "tests/test_qt_structure.py": {
+      "size": 13650,
+      "sha256": "d321b007da0436a9a27dca1d8958915bdecfa94a8f316253aa9bdf4c49a47d05"
+    },
+    "tests/test_qt_structure_3d.py": {
+      "size": 3190,
+      "sha256": "c2b22882c78499f68d506212c6c024e831502e99a45995fea960d4bd9263c27d"
+    },
+    "tests/test_redesign_interactions.py": {
+      "size": 3214,
+      "sha256": "6a2321469c74330efa41cc33b26af035a299ab96542942969e007cfaac82be13"
+    },
+    "tests/test_reference_ai_saved.py": {
+      "size": 2967,
+      "sha256": "ded58c496abae1a2b342d6dadc58f3d4640275205c6e7e93090678a9984a2f33"
+    },
+    "tests/test_reference_help.py": {
+      "size": 14347,
+      "sha256": "b761cfab1f4d52530fd43930f3dc78cc761e75d90ef8259c35671f403445e8e2"
+    },
+    "tests/test_reference_index_shift.py": {
+      "size": 3453,
+      "sha256": "004db1c4c8fbd619f176c9c8df401ce2b8d42f2c79277e62b20ad759a3b327b1"
+    },
+    "tests/test_reference_materials.py": {
+      "size": 3420,
+      "sha256": "5581254ca55062e0f3b77c452154d4c1649455686669cb8e5b58c9085606daaf"
+    },
+    "tests/test_reference_structure.py": {
+      "size": 3612,
+      "sha256": "493abe105e14996c59c8dce47fbbffca174fd946cac5ec266c9d3e1dc67de6b4"
+    },
+    "tests/test_refractiveindex_online.py": {
+      "size": 2251,
+      "sha256": "2f151e830d13168cb66efb48db1ff5697e289261911617e04a76e555d937769c"
+    },
+    "tests/test_saved_work_ui.py": {
+      "size": 6004,
+      "sha256": "2a9b6eec4504706a3af5d90b897b6f37bc6f1436fdf8d838b77e62122656f097"
+    },
+    "tests/test_scan_scaling.py": {
+      "size": 11698,
+      "sha256": "47c65e35f03b92d2c580302ed575d34d59f0d94d1047909fffb92d7f91cee92b"
+    },
+    "tests/test_scan_scaling_ui.py": {
+      "size": 5308,
+      "sha256": "046c11856985151d76f7ab93cca11325c8e46b2d5501a7a2bccd8a132f4089a3"
+    },
+    "tests/test_settings_layout.py": {
+      "size": 4813,
+      "sha256": "ea50a9d57dad9183bbb9f9c2c28b856c6799ea88c1d219841c555436819a5b40"
+    },
+    "tests/test_simulation_fields.py": {
+      "size": 1346,
+      "sha256": "398504b9e11762eaecc37b8aa5e83cd1a4a6a812c7dadfe61cbc728c54180fff"
+    },
+    "tests/test_simulation_sample_peak.py": {
+      "size": 3023,
+      "sha256": "04c05b9d761d5c1f7b7f15549b3212e43c1c5f7cbd0227c80fcb6aa2b154a194"
+    },
+    "tests/test_spectral_features.py": {
+      "size": 4444,
+      "sha256": "359572f58a98123c28c7b75f15fc18581d7a9c7f2563ff9f263588a4cf0910ac"
+    },
+    "tests/test_startup_helpers.py": {
+      "size": 3536,
+      "sha256": "6f7e793ac06eaeef8a0ad87e74a821401dd8399ff957bbc5f1c0f6498eec81fc"
+    },
+    "tests/test_structure_builder.py": {
+      "size": 17479,
+      "sha256": "c859207ef9234185453873d1fde261d954e23076988733e1fee21d52d4f2a7ca"
+    },
+    "tests/test_structure_preview.py": {
+      "size": 8758,
+      "sha256": "59b405b4ae6739956a27e10a52d378d2dbf0af963bef964dafaf6402992eb9c7"
+    },
+    "tests/test_structure_sync.py": {
+      "size": 9272,
+      "sha256": "d363969c63b90f49a14230cc37b9e83e03539464779e2143e52f408a053c8ad3"
+    },
+    "tests/test_target_fields.py": {
+      "size": 6250,
+      "sha256": "558bf7873b698e216dcd6d0c3f7c1b333d09f98b3c662985535b600de774e671"
+    },
+    "tests/test_update_client.py": {
+      "size": 25865,
+      "sha256": "f79ef43506e750e61db7ae164b2a003249071caad92a8d0ee948d5f6d9c28355"
+    },
+    "tests/test_update_credentials.py": {
+      "size": 2037,
+      "sha256": "f83d8a6318c5aa69cbc3e1cc946efc8c26545eaeb6fbca94957d4bf6bdea205c"
+    },
+    "tests/test_update_install.py": {
+      "size": 14148,
+      "sha256": "048d48341c7a472a98aa99e11f0787da88d4352110d311ee81c06dde2147723e"
+    },
+    "tests/test_windows_custom_frame.py": {
+      "size": 1577,
+      "sha256": "ca2cc8a05ff07f0ed70b6a7beafa039e7fcfe4cb7f2e44135091188f1bec25a6"
+    },
+    "tests/test_windows_desktop_glass.py": {
+      "size": 7079,
+      "sha256": "4a7e74d668855fa51a622e4decb5d5c8b2fd9c7e214798409fd6c9870a793bb3"
+    },
+    "UI_GUIDE.md": {
+      "size": 12968,
+      "sha256": "b1c2795aa9409acd2557545f67f9ef1862fb636b5ea510e16eb2c5875c2a265a"
+    },
+    "update_client.py": {
+      "size": 19956,
+      "sha256": "f9a632350ec9e4b73385062fc3fc2b747a622cb6f9d35ce90afa403d15ceeaeb"
+    },
+    "update_credentials.py": {
+      "size": 6706,
+      "sha256": "542932fc7e85fa1a37c41e267bf441bc786bbafc8ae66891f5eb008978289c01"
+    },
+    "update_install.py": {
+      "size": 19693,
+      "sha256": "15d0ab24967ff2624735202b4a6c7f3fb2e717a148fbb2c6ee8c47d2a21fc8e1"
+    },
+    "UPDATES.md": {
+      "size": 6489,
+      "sha256": "3755dedbfd023efbd2f11134523711229b328fbf9bb8b01381509c1badaa1a5b"
+    },
+    "USER_GUIDE.html": {
+      "size": 60520,
+      "sha256": "225f6b52a9f857f9a8d62fd731da1f82d8cd23b00f420277b1de1c697d5af2d4"
+    }
+  },
+  "source_tree_sha256": "d5e220c7047b33948051181835594dd953c2262f3c121c87ea7b7f9bbf2b9c23"
+}

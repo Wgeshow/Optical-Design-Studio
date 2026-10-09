@@ -1,0 +1,256 @@
+{
+  "status": "complete",
+  "settings": {
+    "grid": 25,
+    "depth_samples": 3,
+    "contour_step": 0.1
+  },
+  "samples": [
+    {
+      "point_index": 0,
+      "wavelength_nm": 1515.0,
+      "angle_deg": 0.0,
+      "directory": "fields"
+    },
+    {
+      "point_index": 1,
+      "wavelength_nm": 1516.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000002"
+    },
+    {
+      "point_index": 2,
+      "wavelength_nm": 1517.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000003"
+    },
+    {
+      "point_index": 3,
+      "wavelength_nm": 1518.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000004"
+    },
+    {
+      "point_index": 4,
+      "wavelength_nm": 1519.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000005"
+    },
+    {
+      "point_index": 5,
+      "wavelength_nm": 1520.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000006"
+    },
+    {
+      "point_index": 6,
+      "wavelength_nm": 1521.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000007"
+    },
+    {
+      "point_index": 7,
+      "wavelength_nm": 1522.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000008"
+    },
+    {
+      "point_index": 8,
+      "wavelength_nm": 1523.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000009"
+    },
+    {
+      "point_index": 9,
+      "wavelength_nm": 1524.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000010"
+    },
+    {
+      "point_index": 10,
+      "wavelength_nm": 1525.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000011"
+    },
+    {
+      "point_index": 11,
+      "wavelength_nm": 1526.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000012"
+    },
+    {
+      "point_index": 12,
+      "wavelength_nm": 1527.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000013"
+    },
+    {
+      "point_index": 13,
+      "wavelength_nm": 1528.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000014"
+    },
+    {
+      "point_index": 14,
+      "wavelength_nm": 1529.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000015"
+    },
+    {
+      "point_index": 15,
+      "wavelength_nm": 1530.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000016"
+    },
+    {
+      "point_index": 16,
+      "wavelength_nm": 1531.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000017"
+    },
+    {
+      "point_index": 17,
+      "wavelength_nm": 1532.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000018"
+    },
+    {
+      "point_index": 18,
+      "wavelength_nm": 1533.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000019"
+    },
+    {
+      "point_index": 19,
+      "wavelength_nm": 1534.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000020"
+    },
+    {
+      "point_index": 20,
+      "wavelength_nm": 1535.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000021"
+    },
+    {
+      "point_index": 21,
+      "wavelength_nm": 1536.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000022"
+    },
+    {
+      "point_index": 22,
+      "wavelength_nm": 1537.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000023"
+    },
+    {
+      "point_index": 23,
+      "wavelength_nm": 1538.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000024"
+    },
+    {
+      "point_index": 24,
+      "wavelength_nm": 1539.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000025"
+    },
+    {
+      "point_index": 25,
+      "wavelength_nm": 1540.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000026"
+    },
+    {
+      "point_index": 26,
+      "wavelength_nm": 1541.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000027"
+    },
+    {
+      "point_index": 27,
+      "wavelength_nm": 1542.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000028"
+    },
+    {
+      "point_index": 28,
+      "wavelength_nm": 1543.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000029"
+    },
+    {
+      "point_index": 29,
+      "wavelength_nm": 1544.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000030"
+    },
+    {
+      "point_index": 30,
+      "wavelength_nm": 1545.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000031"
+    },
+    {
+      "point_index": 31,
+      "wavelength_nm": 1546.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000032"
+    },
+    {
+      "point_index": 32,
+      "wavelength_nm": 1547.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000033"
+    },
+    {
+      "point_index": 33,
+      "wavelength_nm": 1548.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000034"
+    },
+    {
+      "point_index": 34,
+      "wavelength_nm": 1549.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000035"
+    },
+    {
+      "point_index": 35,
+      "wavelength_nm": 1550.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000036"
+    },
+    {
+      "point_index": 36,
+      "wavelength_nm": 1551.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000037"
+    },
+    {
+      "point_index": 37,
+      "wavelength_nm": 1552.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000038"
+    },
+    {
+      "point_index": 38,
+      "wavelength_nm": 1553.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000039"
+    },
+    {
+      "point_index": 39,
+      "wavelength_nm": 1554.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000040"
+    },
+    {
+      "point_index": 40,
+      "wavelength_nm": 1555.0,
+      "angle_deg": 0.0,
+      "directory": "original-capture/fields/samples/000041"
+    }
+  ]
+}

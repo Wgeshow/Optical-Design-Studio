@@ -1,0 +1,76 @@
+{
+  "model": {
+    "materials": [
+      {
+        "name": "Air",
+        "model": "constant_nk",
+        "a": 1.0,
+        "b": 0.0
+      },
+      {
+        "name": "Silicon",
+        "model": "constant_nk",
+        "a": 3.48,
+        "b": 0.0
+      },
+      {
+        "name": "SiO2",
+        "model": "constant_nk",
+        "a": 1.45,
+        "b": 0.0
+      }
+    ],
+    "layers": [
+      {
+        "name": "Air",
+        "material": "Air",
+        "thickness": 0.0
+      },
+      {
+        "name": "Silicon",
+        "material": "Silicon",
+        "thickness": 0.22
+      },
+      {
+        "name": "SiO2",
+        "material": "SiO2",
+        "thickness": 0.0
+      }
+    ],
+    "patterns": [
+      {
+        "shape": "circle",
+        "layer": "Silicon",
+        "material": "Air",
+        "cx": 0.0,
+        "cy": 0.0,
+        "sx": 0.1,
+        "sy": 0.1,
+        "angle": 0.0
+      }
+    ],
+    "ax": 0.54,
+    "ay": 0.54,
+    "basis": 81,
+    "phi": 0.0,
+    "polarization": "p",
+    "mode": "Wavelength sweep",
+    "points": [
+      [
+        35,
+        1550.0,
+        0.0
+      ]
+    ],
+    "warnings": []
+  },
+  "wavelength_nm": 1550.0,
+  "settings": {
+    "grid": 25,
+    "depth_samples": 3,
+    "contour_step": 0.1,
+    "wavelength_nm": 1550.0,
+    "maps": true,
+    "track_contours": true
+  }
+}

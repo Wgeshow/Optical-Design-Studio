@@ -1,0 +1,238 @@
+{
+  "status": "passed",
+  "samples": 41,
+  "finite_RTA": true,
+  "all_field_samples_finite": true,
+  "E2_matches_saved_complex_field_components": true,
+  "physical_power_bounds": true,
+  "max_abs_R_plus_T_minus_1": 3.3306690738754696e-15,
+  "fields_per_wavelength": [
+    {
+      "wavelength_nm": 1515.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0486346658947616
+    },
+    {
+      "wavelength_nm": 1516.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0477681377784218
+    },
+    {
+      "wavelength_nm": 1517.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0469101659313933
+    },
+    {
+      "wavelength_nm": 1518.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0460601717179197
+    },
+    {
+      "wavelength_nm": 1519.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0452176028846951
+    },
+    {
+      "wavelength_nm": 1520.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0443819323282868
+    },
+    {
+      "wavelength_nm": 1521.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0435526569271913
+    },
+    {
+      "wavelength_nm": 1522.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0427292964341472
+    },
+    {
+      "wavelength_nm": 1523.0,
+      "points": 3125,
+      "max_E_amplitude": 1.041911392427112
+    },
+    {
+      "wavelength_nm": 1524.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0410985073129195
+    },
+    {
+      "wavelength_nm": 1525.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0402902233823972
+    },
+    {
+      "wavelength_nm": 1526.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0394861419136658
+    },
+    {
+      "wavelength_nm": 1527.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0386858823196852
+    },
+    {
+      "wavelength_nm": 1528.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0378890813397001
+    },
+    {
+      "wavelength_nm": 1529.0,
+      "points": 3125,
+      "max_E_amplitude": 1.037095392269978
+    },
+    {
+      "wavelength_nm": 1530.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0363044842328673
+    },
+    {
+      "wavelength_nm": 1531.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0355160414815452
+    },
+    {
+      "wavelength_nm": 1532.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0347297627391314
+    },
+    {
+      "wavelength_nm": 1533.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0339453605691804
+    },
+    {
+      "wavelength_nm": 1534.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0331625607768542
+    },
+    {
+      "wavelength_nm": 1535.0,
+      "points": 3125,
+      "max_E_amplitude": 1.032381101838687
+    },
+    {
+      "wavelength_nm": 1536.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0316007343593854
+    },
+    {
+      "wavelength_nm": 1537.0,
+      "points": 3125,
+      "max_E_amplitude": 1.030821220554158
+    },
+    {
+      "wavelength_nm": 1538.0,
+      "points": 3125,
+      "max_E_amplitude": 1.030042333755645
+    },
+    {
+      "wavelength_nm": 1539.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0292638579436224
+    },
+    {
+      "wavelength_nm": 1540.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0284855872963563
+    },
+    {
+      "wavelength_nm": 1541.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0277073257630611
+    },
+    {
+      "wavelength_nm": 1542.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0269288866554944
+    },
+    {
+      "wavelength_nm": 1543.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0261500922584275
+    },
+    {
+      "wavelength_nm": 1544.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0253707734573916
+    },
+    {
+      "wavelength_nm": 1545.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0245907693838678
+    },
+    {
+      "wavelength_nm": 1546.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0238099270752608
+    },
+    {
+      "wavelength_nm": 1547.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0230281011510662
+    },
+    {
+      "wavelength_nm": 1548.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0222451535026102
+    },
+    {
+      "wavelength_nm": 1549.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0214609529967513
+    },
+    {
+      "wavelength_nm": 1550.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0206753751925315
+    },
+    {
+      "wavelength_nm": 1551.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0198883020697795
+    },
+    {
+      "wavelength_nm": 1552.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0190996217701016
+    },
+    {
+      "wavelength_nm": 1553.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0183092283482555
+    },
+    {
+      "wavelength_nm": 1554.0,
+      "points": 3125,
+      "max_E_amplitude": 1.017517021534595
+    },
+    {
+      "wavelength_nm": 1555.0,
+      "points": 3125,
+      "max_E_amplitude": 1.0167229065077084
+    }
+  ],
+  "basis_comparisons": [
+    {
+      "requested_NumG": 49,
+      "max_absolute_R_T_difference_from_81": 7.797992007249621e-05,
+      "max_abs_R_plus_T_minus_1": 2.4424906541753444e-15,
+      "points": 41,
+      "directory": "basis-49"
+    },
+    {
+      "requested_NumG": 121,
+      "max_absolute_R_T_difference_from_81": 0.0007623848514692055,
+      "max_abs_R_plus_T_minus_1": 3.3306690738754696e-15,
+      "points": 41,
+      "directory": "basis-121"
+    }
+  ],
+  "spectrum_81_vs_121_tolerance": 0.002,
+  "notes": [
+    "R+T is the non-tautological energy check for this lossless model; A is calculated as 1-R-T.",
+    "Requested S4 basis truncations are solver basis settings; square lattice truncation can retain fewer terms.",
+    "This sampled, absolute R/T comparison does not establish a general convergence guarantee or measured-material prediction."
+  ]
+}

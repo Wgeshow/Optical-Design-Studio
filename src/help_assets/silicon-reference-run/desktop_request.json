@@ -1,0 +1,11 @@
+{
+  "kind": "simulation",
+  "options": {
+    "measure_phase": false,
+    "electric_fields": {
+      "grid": 25,
+      "depth_samples": 3,
+      "contour_step": 0.1
+    }
+  }
+}
