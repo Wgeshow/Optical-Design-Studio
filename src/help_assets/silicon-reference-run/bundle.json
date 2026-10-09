@@ -1,0 +1,503 @@
+{
+  "status": "complete",
+  "description": "Actual production S4 results; constant-index demonstration model, not measured-material validation.",
+  "original_provenance": "provenance.json",
+  "scientific_validation": "scientific-validation.json",
+  "displayed_spectrum": "results.csv",
+  "displayed_fields": "electric_fields.csv",
+  "field_sample_index": 35,
+  "displayed_wavelength_nm": 1550,
+  "all_wavelength_fields": "field-samples.json",
+  "files": [
+    {
+      "file": "provenance.json",
+      "source": "provenance.json",
+      "bytes": 52664,
+      "sha256": "22eb994f51848a25fde3359cc1d4c037380f30231867ecfc0dcb18e379453a97"
+    },
+    {
+      "file": "scientific-validation.json",
+      "source": "scientific-validation.json",
+      "bytes": 5881,
+      "sha256": "f315cb9c194d7899863c6f5d074fc92632f1e9fe1ef1b20edc1afd7adf3e11b6"
+    },
+    {
+      "file": "backend-events.json",
+      "source": "backend-events.json",
+      "bytes": 1046,
+      "sha256": "1cbc2ff64ec21f1850a9d4937a951eeac3136dc22f0e5636d037c54d6e964844"
+    },
+    {
+      "file": "run_and_capture.py",
+      "source": "run_and_capture.py",
+      "bytes": 15820,
+      "sha256": "5785bfe6a4a9c47ea2e8e92673b0f56360033afb638193b79e8def92c46a889e"
+    },
+    {
+      "file": "actual-spectrum-native.png",
+      "source": "actual-spectrum-native.png",
+      "bytes": 274143,
+      "sha256": "f2d25dac75366a355172703f8228a9e3c27565a7e5a4dff7c90fe541da2593ad"
+    },
+    {
+      "file": "actual-spectrum-plot.png",
+      "source": "actual-spectrum-plot.png",
+      "bytes": 27100,
+      "sha256": "d267c3b3987fe58a786855d6d5122b52dd81f5bda95a0e73584042ae55cc55d6"
+    },
+    {
+      "file": "actual-fields-native.png",
+      "source": "actual-fields-native.png",
+      "bytes": 270537,
+      "sha256": "37e29cb459f9be128746c984d7b6555cb915e4ad3079a89fa590096de2e847bd"
+    },
+    {
+      "file": "actual-fields-plot.png",
+      "source": "actual-fields-plot.png",
+      "bytes": 35369,
+      "sha256": "e5fb779517ffed768d1e07ab54fb787da053bb30d9555cfccbcae6c055e17c44"
+    },
+    {
+      "file": "actual-3d-fields-native.png",
+      "source": "actual-3d-fields-native.png",
+      "bytes": 448136,
+      "sha256": "5f35bee0da7fa764954eeeddd5688a5a231321e86ed5f0def37a84c6c2bbc7f4"
+    },
+    {
+      "file": "actual-3d-fields-plot.png",
+      "source": "actual-3d-fields-plot.png",
+      "bytes": 193855,
+      "sha256": "953acc389d91143cc579fe3e80bbe8c5823d8a16f8fdd18982d96f00aa0beb69"
+    },
+    {
+      "file": "actual-structure-native.png",
+      "source": "actual-structure-native.png",
+      "bytes": 203287,
+      "sha256": "cfe47378cc79786554605abbbb65e9f79c0794ec5a1a3be1c8db3584652606c6"
+    },
+    {
+      "file": "actual-unit-cell-native.png",
+      "source": "actual-unit-cell-native.png",
+      "bytes": 220931,
+      "sha256": "a0a29b15880e79ce3d8dd75c53fbbeb690d17820ec718eafcf9af07c133e6766"
+    },
+    {
+      "file": "actual-materials-native.png",
+      "source": "actual-materials-native.png",
+      "bytes": 268562,
+      "sha256": "2607a8411818b298edce9bf7c1707621bde0723f9b8d82968cab3adb72248ee3"
+    },
+    {
+      "file": "actual-electric-field-maps.png",
+      "source": "actual-electric-field-maps.png",
+      "bytes": 269372,
+      "sha256": "d02176927e5623eb248808ba668059e8e5fae13a9b55a47b32d6ecdaf3613f7e"
+    },
+    {
+      "file": "actual-spectrum-export.png",
+      "source": "actual-spectrum-export.png",
+      "bytes": 218549,
+      "sha256": "ef1efe7267f37ffbe7bdd9dddcbaae6f97abbc85134a8390727df0d4e5a8fa9a"
+    },
+    {
+      "file": "results.csv",
+      "source": "results.csv",
+      "bytes": 3326,
+      "sha256": "4bac651533cb450cc01673d38e9a2ecdbb207a89e002b15484e56c877b859f73"
+    },
+    {
+      "file": "project.json",
+      "source": "project.json",
+      "bytes": 2060,
+      "sha256": "07873a53c6e0465ba0a201ac166fcbf2d8103cdb8a56a30d3b8322ae705928c2"
+    },
+    {
+      "file": "job.json",
+      "source": "job.json",
+      "bytes": 4091,
+      "sha256": "b47dba1bc20c0ec86db145b895557212bbb0afce66637b0416ea9ab2e6c25c58"
+    },
+    {
+      "file": "diagnostics.json",
+      "source": "diagnostics.json",
+      "bytes": 769,
+      "sha256": "2108a6ca4f8e74ed1a1e23335c1ef093184ee1e8683591a34346bc3ddc8ab313"
+    },
+    {
+      "file": "desktop_request.json",
+      "source": "desktop_request.json",
+      "bytes": 185,
+      "sha256": "f2f53d15ad2a60cc15bd1d427dd8a0fdd80b633bdd479fdd7d26fae41959dba0"
+    },
+    {
+      "file": "backend_stderr.txt",
+      "source": "backend_stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "electric_fields.csv",
+      "source": "electric_fields.csv",
+      "bytes": 1255054,
+      "sha256": "78c9da7fbfaf0aa16c6ec4f0b2287fe15ba23ad6a92e908de688eee7cd52a18d"
+    },
+    {
+      "file": "field_model.json",
+      "source": "field_model.json",
+      "bytes": 1384,
+      "sha256": "33a38b573e3c4fee3bb2460763aaee1daa254c9827cf725ad442fe649142cc6a"
+    },
+    {
+      "file": "field_features.json",
+      "source": "field_features.json",
+      "bytes": 1060267,
+      "sha256": "a0b174caf523c17b346094b9f891297c8106bf3f678af9445ef8c2b5c9f482a8"
+    },
+    {
+      "file": "field_diagnostics.json",
+      "source": "field_diagnostics.json",
+      "bytes": 529,
+      "sha256": "d8a4f654c439f7f6f07dea87267a93433758e981e342e279caa9a390ae212d40"
+    },
+    {
+      "file": "airhole_field_metrics.json",
+      "source": "airhole_field_metrics.json",
+      "bytes": 9483,
+      "sha256": "d6db63dfb66bf8b166b81e9099b945f1490b49cacf6f9d7c269c5ecadca4d747"
+    },
+    {
+      "file": "field-samples-source.json",
+      "source": "field-samples-source.json",
+      "bytes": 6618,
+      "sha256": "e329b879a2535e43cb93d53721d98b61e3c2ee24045f4bd8ccaa782ad5e6feef"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000001.csv",
+      "source": "all-wavelength-fields/sample-000001.csv",
+      "bytes": 1257347,
+      "sha256": "a090a3da1db2a8ef2cd450a4c517ab33cbe52618865899129805f34655264ea3"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000002.csv",
+      "source": "all-wavelength-fields/sample-000002.csv",
+      "bytes": 1257847,
+      "sha256": "b1750f3ac06f76a714ff2dcab9182db2103bd9d19e22dd1c5acfebd46b507bc6"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000003.csv",
+      "source": "all-wavelength-fields/sample-000003.csv",
+      "bytes": 1257845,
+      "sha256": "b788262d6139f0192a92f81875029c87e60a452daa6f34d5951c38c33cabec81"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000004.csv",
+      "source": "all-wavelength-fields/sample-000004.csv",
+      "bytes": 1257609,
+      "sha256": "0a597a77ab6edf67e3645039498b403747ae07d6f550175820705a18073bb246"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000005.csv",
+      "source": "all-wavelength-fields/sample-000005.csv",
+      "bytes": 1257726,
+      "sha256": "61615c69ecf751438f131f0bcf46f07565985cbc1866925cbf5675824cc349c6"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000006.csv",
+      "source": "all-wavelength-fields/sample-000006.csv",
+      "bytes": 1257555,
+      "sha256": "1dcae03897174b37594012f089dd3424f9ca7d9d9060bc5d8ead9bdaa5f58066"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000007.csv",
+      "source": "all-wavelength-fields/sample-000007.csv",
+      "bytes": 1257679,
+      "sha256": "e435e9b25caf254525708d9af6677be9c0821782c4c4c1cfe189eebec63c7af4"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000008.csv",
+      "source": "all-wavelength-fields/sample-000008.csv",
+      "bytes": 1256687,
+      "sha256": "be8805ede21cea6adcb697a9fa3651769d91a9ab4dda5cad840e1299298ea5fc"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000009.csv",
+      "source": "all-wavelength-fields/sample-000009.csv",
+      "bytes": 1256933,
+      "sha256": "fa1add74f468ce8a0172d0a4df6e7dde7b702382c1bf0e32e15e7a220e83a082"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000010.csv",
+      "source": "all-wavelength-fields/sample-000010.csv",
+      "bytes": 1256426,
+      "sha256": "09483e4e5fda317daa4ad60d23bec30a44a7491e4e2edf73aaed038f76d209c6"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000011.csv",
+      "source": "all-wavelength-fields/sample-000011.csv",
+      "bytes": 1256725,
+      "sha256": "9b7c932f5b2846d487360d0c95a970ea046e900e92498727f1dfefb7d41ed74d"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000012.csv",
+      "source": "all-wavelength-fields/sample-000012.csv",
+      "bytes": 1257198,
+      "sha256": "8f9c076b35b50ffcdf3b08473fc32e2355bff528ee1295c0ed0ee709b81b5751"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000013.csv",
+      "source": "all-wavelength-fields/sample-000013.csv",
+      "bytes": 1256532,
+      "sha256": "d65cbfdd8369bd5f4aa7f76df1feba0b5a056da27c0289d7f1bce43765be1d67"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000014.csv",
+      "source": "all-wavelength-fields/sample-000014.csv",
+      "bytes": 1256680,
+      "sha256": "032ff1349e0c215dcd4ffceda3c19e81c1ccb240a9ca193d93e1813bf37ddda5"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000015.csv",
+      "source": "all-wavelength-fields/sample-000015.csv",
+      "bytes": 1256425,
+      "sha256": "632f35c57c309e5beb1a59ed9e28aa1c127438a4b88180edca6cebcfc0c53dca"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000016.csv",
+      "source": "all-wavelength-fields/sample-000016.csv",
+      "bytes": 1257308,
+      "sha256": "83deb30fc3b362d3e2fb17a63aa831b3083ac5b0520a95d7ca9bf9108897b2e9"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000017.csv",
+      "source": "all-wavelength-fields/sample-000017.csv",
+      "bytes": 1255363,
+      "sha256": "1d801056dc00324a7fd253890284e330aa5175ede3db85adedb702470ccb5fe7"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000018.csv",
+      "source": "all-wavelength-fields/sample-000018.csv",
+      "bytes": 1256415,
+      "sha256": "0390f55bcf9e5dc360f6d5a28924ad84986d9e9b533ae0683ea710e55cce57f7"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000019.csv",
+      "source": "all-wavelength-fields/sample-000019.csv",
+      "bytes": 1256642,
+      "sha256": "0390c4a88d504d3aa4dc348da71bb5af669b5a313d695d54b25610553e985452"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000020.csv",
+      "source": "all-wavelength-fields/sample-000020.csv",
+      "bytes": 1256523,
+      "sha256": "9b8779eb14b75d37a8497f4af0e40288a7ec5e2cb7677b730ab5e703b642f5bc"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000021.csv",
+      "source": "all-wavelength-fields/sample-000021.csv",
+      "bytes": 1256243,
+      "sha256": "db94b4595b8d985979bfa96c3e3483a71b3feee60787f8108ba232d1f09b107d"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000022.csv",
+      "source": "all-wavelength-fields/sample-000022.csv",
+      "bytes": 1255577,
+      "sha256": "a6eed79d2e6095f326ddcbb1c9a5d8900e73958d781d4a8b09be38011b366d16"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000023.csv",
+      "source": "all-wavelength-fields/sample-000023.csv",
+      "bytes": 1255412,
+      "sha256": "547ccac2b485a5a3fdc0ef62a32278dee537a61f3201e48ed21de9aa3804e1d9"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000024.csv",
+      "source": "all-wavelength-fields/sample-000024.csv",
+      "bytes": 1255855,
+      "sha256": "34193c6248a9a3fa98dd5d9ad1b1e0d525b1d7c9290b83163b9bcc758933dc1e"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000025.csv",
+      "source": "all-wavelength-fields/sample-000025.csv",
+      "bytes": 1256309,
+      "sha256": "a9861dde7bd4d4cc6c40c0adeb120061ee750886a3cfa97901c4eec93992b526"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000026.csv",
+      "source": "all-wavelength-fields/sample-000026.csv",
+      "bytes": 1256725,
+      "sha256": "840b48cc1bc884b15994bf3bd39b7a8e077534e16beacfe8ad974a23baf0b3d5"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000027.csv",
+      "source": "all-wavelength-fields/sample-000027.csv",
+      "bytes": 1255327,
+      "sha256": "85ac15f67e21be2a88461730847410f387f21746ab29a0f9912a156f771fa699"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000028.csv",
+      "source": "all-wavelength-fields/sample-000028.csv",
+      "bytes": 1255917,
+      "sha256": "bfb32556a395946f756ca281347a66d0ea568977c112c3a8a5bfa3a4348d67aa"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000029.csv",
+      "source": "all-wavelength-fields/sample-000029.csv",
+      "bytes": 1255721,
+      "sha256": "d7a720ede0b93186d3d24a25c156488f54edf069459178816a4d329978e5a65b"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000030.csv",
+      "source": "all-wavelength-fields/sample-000030.csv",
+      "bytes": 1255529,
+      "sha256": "5b5af79f37d9689a682d7957ffb15bfca315c6e0311dc8acff5091b391efd736"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000031.csv",
+      "source": "all-wavelength-fields/sample-000031.csv",
+      "bytes": 1255313,
+      "sha256": "b1d5cb9270a6f3aa34dcc5f6b63363362a2c99718f7a52a561856d9d2cc153c2"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000032.csv",
+      "source": "all-wavelength-fields/sample-000032.csv",
+      "bytes": 1255174,
+      "sha256": "5e41fbe0b6d319392fe32efa1c101ce39874aec4b7bedf5c8336714a3cc19063"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000033.csv",
+      "source": "all-wavelength-fields/sample-000033.csv",
+      "bytes": 1255795,
+      "sha256": "c4b5a071aad194bcb029bbd244b35705da5ae71d7737e07cf731d2d52743a98f"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000034.csv",
+      "source": "all-wavelength-fields/sample-000034.csv",
+      "bytes": 1256383,
+      "sha256": "2be2de4c53e20bdee7a0ec054e7611e85295039ff4da00bc581aaf87a9223a87"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000035.csv",
+      "source": "all-wavelength-fields/sample-000035.csv",
+      "bytes": 1256204,
+      "sha256": "dcd22347f1cfaa3b7ef37519e882e3237c7a89b84ee30abd23e0d97540151a0a"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000036.csv",
+      "source": "all-wavelength-fields/sample-000036.csv",
+      "bytes": 1255054,
+      "sha256": "78c9da7fbfaf0aa16c6ec4f0b2287fe15ba23ad6a92e908de688eee7cd52a18d"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000037.csv",
+      "source": "all-wavelength-fields/sample-000037.csv",
+      "bytes": 1255034,
+      "sha256": "8878176f4eacbe7841903472a8a351502a5eaeea44e23b13fe42eabbd2c7fb68"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000038.csv",
+      "source": "all-wavelength-fields/sample-000038.csv",
+      "bytes": 1254369,
+      "sha256": "eef3b295becf6c494e42feb45e013e596766d28f6b06ae42dd5dba8c0685af3e"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000039.csv",
+      "source": "all-wavelength-fields/sample-000039.csv",
+      "bytes": 1255154,
+      "sha256": "b7933d6f13afcbcf618d24eee20c519d0f3e968ea6fa2f375b532f4e38187238"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000040.csv",
+      "source": "all-wavelength-fields/sample-000040.csv",
+      "bytes": 1255191,
+      "sha256": "071a205215d830d4560a68c7ccb78460495c68a6435884fdceca97b3f57e923c"
+    },
+    {
+      "file": "all-wavelength-fields/sample-000041.csv",
+      "source": "all-wavelength-fields/sample-000041.csv",
+      "bytes": 1255351,
+      "sha256": "1ec1acd36b7f03e272c447736f2d45d7933723514ea67a66b8072e24a4eae73d"
+    },
+    {
+      "file": "field-samples.json",
+      "source": "field-samples.json",
+      "bytes": 6484,
+      "sha256": "f8763d6bcc48a999166087faf1f451797582eeb8408719a0f39f41cd29cb97b1"
+    },
+    {
+      "file": "basis-49/results.csv",
+      "source": "basis-49/results.csv",
+      "bytes": 3299,
+      "sha256": "5663bc41fd30e4ec44fda9715133468d108398aa654e6cee270907634b5fc4c2"
+    },
+    {
+      "file": "basis-49/project.json",
+      "source": "basis-49/project.json",
+      "bytes": 2259,
+      "sha256": "9301450b92f9bde29c684e0840bf3d1df52adcb48deff82cee5637f7905ab9c0"
+    },
+    {
+      "file": "basis-49/job.json",
+      "source": "basis-49/job.json",
+      "bytes": 3992,
+      "sha256": "f6c16fc3b89455a89832467786209b4835b774a4f9acda6c7b688f77a83980e2"
+    },
+    {
+      "file": "basis-49/diagnostics.json",
+      "source": "basis-49/diagnostics.json",
+      "bytes": 669,
+      "sha256": "4d8260a207b4dbe869c636d166c2a827507ca3ba81362181a833bc580b2b24a0"
+    },
+    {
+      "file": "basis-49/backend_stdout.jsonl",
+      "source": "basis-49/backend_stdout.jsonl",
+      "bytes": 1621,
+      "sha256": "826dcde17f67629714d24c1f577385a32580023e292767b6941c30b080575a99"
+    },
+    {
+      "file": "basis-49/backend_stderr.txt",
+      "source": "basis-49/backend_stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "basis-121/results.csv",
+      "source": "basis-121/results.csv",
+      "bytes": 3332,
+      "sha256": "03b64a315e768be10dfbb74e6435e388c6f737ee83236b8f6bedcdec34332818"
+    },
+    {
+      "file": "basis-121/project.json",
+      "source": "basis-121/project.json",
+      "bytes": 2260,
+      "sha256": "5bd7ce495199d72f584882cd9f2db1bed5b34730ce3eda027f03b30ff360a449"
+    },
+    {
+      "file": "basis-121/job.json",
+      "source": "basis-121/job.json",
+      "bytes": 3993,
+      "sha256": "66591b747310f1960734619895ff77678543336d733c06322b443def77553513"
+    },
+    {
+      "file": "basis-121/diagnostics.json",
+      "source": "basis-121/diagnostics.json",
+      "bytes": 683,
+      "sha256": "29f81e30915fa2f850a0496abb0ebf711e663eb31301e11430c7cc1da8375f28"
+    },
+    {
+      "file": "basis-121/backend_stdout.jsonl",
+      "source": "basis-121/backend_stdout.jsonl",
+      "bytes": 3442,
+      "sha256": "f5c78455c728a38b24d6a89062a41ba033de371035df01795efb87712cf577dd"
+    },
+    {
+      "file": "basis-121/backend_stderr.txt",
+      "source": "basis-121/backend_stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "public_release_copy": {
+    "metadata_paths_rebased": true,
+    "scientific_csv_bytes_unchanged": true
+  }
+}

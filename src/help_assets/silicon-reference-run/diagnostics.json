@@ -1,0 +1,36 @@
+{
+  "performance": {
+    "mode": "CPU only",
+    "workers": 1,
+    "threads": 1,
+    "gpu_device": 0,
+    "gpu_min_n": 1024,
+    "gpu_block": 256,
+    "chunk_size": 8,
+    "timeout_seconds": 3600,
+    "require_gpu": false,
+    "effective_workers": 1,
+    "effective_chunk": 8,
+    "gpu_workers": 0
+  },
+  "workers": [
+    {
+      "pid": 6592,
+      "gpu": false,
+      "module": "pcs_s4_runtime/S4.cp312-win_amd64.pyd"
+    }
+  ],
+  "cpu_gemm_calls": 164,
+  "gpu_gemm_calls": 0,
+  "gpu_failures": 0,
+  "statuses": {
+    "6592": "GPU not initialized (CPU is available)"
+  },
+  "elapsed_seconds": 1.6869999999180436,
+  "points": 41,
+  "warnings": [],
+  "electric_fields": {
+    "samples": 41,
+    "manifest": "field-samples.json"
+  }
+}

@@ -1,0 +1,203 @@
+[
+  {
+    "asset": "structure.png",
+    "source": "original-capture/structure.png",
+    "description": "Real Qt screenshot, resized only; example values are not current project results.",
+    "sha256": "5937bd811f20767f9ae551ef439f9ab0b3866fd99b1e933db693f308a2d7ac0f"
+  },
+  {
+    "asset": "materials.png",
+    "source": "original-capture/materials.png",
+    "description": "Real Qt screenshot, resized only; example values are not current project results.",
+    "sha256": "6fc9da37a17a9244ab1767ac551052cc0587167e469dca7518db3fe8a202d4f1"
+  },
+  {
+    "asset": "simulation-rcwa.png",
+    "source": "original-capture/simulation-rcwa.png",
+    "description": "Real Qt screenshot, resized only; example values are not current project results.",
+    "sha256": "a51e2fdea1f9f978b635e69180d48815d72457526dcbaa53252297ccb3188fdd"
+  },
+  {
+    "asset": "simulation-meep.png",
+    "source": "original-capture/simulation-meep.png",
+    "description": "Real Qt screenshot, resized only; example values are not current project results.",
+    "sha256": "6393322eaaa87bfcd33856eee230c3426eae1bfb598c6674da0221ec9d909d4d"
+  },
+  {
+    "asset": "simulation-index-shift.png",
+    "source": "original-capture/simulation-index-shift.png",
+    "description": "Real Qt screenshot, resized only; example values are not current project results.",
+    "sha256": "ead0a2d05c5847811058ced80612fe3523e5e8f5e3b1e2a6edb452e3105739de"
+  },
+  {
+    "asset": "simulation-fields.png",
+    "source": "original-capture/simulation-fields.png",
+    "description": "Real Qt screenshot, resized only; example values are not current project results.",
+    "sha256": "3356ed1d23419c73b21b1605092618e9d8c54d1f551854c7636965bdf3a90bbd"
+  },
+  {
+    "asset": "simulation-saved-results.png",
+    "source": "simulation-saved-results.png",
+    "description": "Current native Qt Saved results with the genuine 41-sample Silicon-on-SiO2 S4 tutorial. The storage label is shown as Tutorial data for public documentation; raw calculated CSV bytes are unchanged.",
+    "sha256": "0b8c524e7e9a5c408e0db94e80a483b2e1875448b5b7c16adf0678bc4835f35c",
+    "width": 1536,
+    "height": 1024
+  },
+  {
+    "asset": "simulation-sweep.png",
+    "source": "original-capture/simulation-sweep.png",
+    "description": "Real Qt screenshot, resized only; example values are not current project results.",
+    "sha256": "ab7a7aca5682f251b0f70eb88d839615f8d27707a9f4ca1f892ffbe1aff167ac"
+  },
+  {
+    "asset": "ai-search.png",
+    "source": "original-capture/ai-search.png",
+    "description": "Real Qt screenshot, resized only; example values are not current project results.",
+    "sha256": "a04e6c15c57fd56326ab31e225705e61f785c8b2b995c2a2983c48f188ffb5ad"
+  },
+  {
+    "asset": "settings.png",
+    "source": "original-capture/settings.png",
+    "description": "Real Qt screenshot, resized only; example values are not current project results.",
+    "sha256": "7309cd6fb5db76975ea2ca5cc5d8b23c65ef7f99cfaa831bfeda0b1cf9c109b5"
+  },
+  {
+    "asset": "structure-regions.png",
+    "source": "guide_images/structure-regions.png",
+    "description": "Real Qt screenshot, resized only; example values are not current project results.",
+    "sha256": "93c33b39246a44b8930c87ae95e5502405076c5eb9239c280accfbbf811d4340"
+  },
+  {
+    "asset": "structure-cross-section.png",
+    "source": "guide_images/structure-cross-section.png",
+    "description": "Real Qt screenshot, resized only; example values are not current project results.",
+    "sha256": "628f665c97d1d262e54a60e35f564892b75edd6568ce4a2f9375e75771966ba2"
+  },
+  {
+    "asset": "materials-import-csv.png",
+    "source": "materials-import-csv.png",
+    "description": "Current native Qt Import CSV controls. No CSV import or calculation is fabricated; the applied structure is the public Silicon tutorial.",
+    "sha256": "80b2b13506bfba9933a10fa9b3e298a41a17c51c0d8f7bff5ee666cb68ce27ad",
+    "width": 1536,
+    "height": 1024
+  },
+  {
+    "asset": "simulation-phase.png",
+    "source": "simulation-phase.png",
+    "description": "Current native Qt Phase controls with the genuine 41-sample tutorial spectrum loaded. The tutorial did not save specular spectral phase; the empty Phase view does not invent phase measurements from its electric fields.",
+    "sha256": "e0b6d804647222e778144b66f6267cfdacbf28692a66338b1b78b870ee698d6a",
+    "width": 1536,
+    "height": 1024
+  },
+  {
+    "asset": "field-playback.png",
+    "source": "guide_images/engine-electric-fields-3d-field-playback.png",
+    "description": "Real Qt screenshot, resized only; example values are not current project results.",
+    "sha256": "f85f35b5550c8de3d97425c7be933c7a716590abb03e3945c38d31759334f769"
+  },
+  {
+    "asset": "ai-search-training.png",
+    "source": "ai-search-training.png",
+    "description": "Current native Qt AI Training controls for the applied public Silicon structure. No campaign is trained and no prediction or validation results are fabricated.",
+    "sha256": "58231cd49dd8d68a6fb8966fb0f67eef26658712c2312f2a2ba992798fd83deb",
+    "width": 1536,
+    "height": 1024
+  },
+  {
+    "asset": "settings-performance.png",
+    "source": "settings-performance.png",
+    "description": "Current native Qt Performance controls for the public Silicon tutorial. No hardware diagnostic result is fabricated.",
+    "sha256": "4114bb6250170e8e1e3cdc20ed64a398c40984c791f829c4a7cd19651f85ab0d",
+    "width": 1536,
+    "height": 1024
+  },
+  {
+    "asset": "first-device.png",
+    "source": "GeometryViewport.set_model(air-hole-example.json, cells=3)",
+    "description": "Native Qt geometry renderer capture in glass_dark of the bundled constant-index tutorial. Exploded display is not to scale; no calculated spectrum or field values.",
+    "sha256": "1916d47ba7a81c9efba21c3e0d5d1b02f04d9eb49da5b1fec6ecd7a300663a8c"
+  },
+  {
+    "asset": "first-device-light.png",
+    "source": "GeometryViewport.set_model(air-hole-example.json, cells=3)",
+    "description": "Native Qt geometry renderer capture in glass_light of the bundled constant-index tutorial. Exploded display is not to scale; no calculated spectrum or field values.",
+    "sha256": "17543f76edebb36bc0d756880ef945a4dae5e115a313f9f3c6d5aa7b4a246a33"
+  },
+  {
+    "asset": "silicon-reference-run/actual-spectrum-native.png",
+    "source": "actual-spectrum-native.png",
+    "sha256": "f2d25dac75366a355172703f8228a9e3c27565a7e5a4dff7c90fe541da2593ad",
+    "provenance": "silicon-reference-run/provenance.json",
+    "description": "Actual production S4 calculation or its applied inputs, rendered by native Qt/Matplotlib; no invented curves or fields. Constant-index demonstration model."
+  },
+  {
+    "asset": "silicon-reference-run/actual-spectrum-plot.png",
+    "source": "actual-spectrum-plot.png",
+    "sha256": "d267c3b3987fe58a786855d6d5122b52dd81f5bda95a0e73584042ae55cc55d6",
+    "provenance": "silicon-reference-run/provenance.json",
+    "description": "Actual production S4 calculation or its applied inputs, rendered by native Qt/Matplotlib; no invented curves or fields. Constant-index demonstration model."
+  },
+  {
+    "asset": "silicon-reference-run/actual-fields-native.png",
+    "source": "actual-fields-native.png",
+    "sha256": "37e29cb459f9be128746c984d7b6555cb915e4ad3079a89fa590096de2e847bd",
+    "provenance": "silicon-reference-run/provenance.json",
+    "description": "Actual production S4 calculation or its applied inputs, rendered by native Qt/Matplotlib; no invented curves or fields. Constant-index demonstration model."
+  },
+  {
+    "asset": "silicon-reference-run/actual-fields-plot.png",
+    "source": "actual-fields-plot.png",
+    "sha256": "e5fb779517ffed768d1e07ab54fb787da053bb30d9555cfccbcae6c055e17c44",
+    "provenance": "silicon-reference-run/provenance.json",
+    "description": "Actual production S4 calculation or its applied inputs, rendered by native Qt/Matplotlib; no invented curves or fields. Constant-index demonstration model."
+  },
+  {
+    "asset": "silicon-reference-run/actual-3d-fields-native.png",
+    "source": "actual-3d-fields-native.png",
+    "sha256": "5f35bee0da7fa764954eeeddd5688a5a231321e86ed5f0def37a84c6c2bbc7f4",
+    "provenance": "silicon-reference-run/provenance.json",
+    "description": "Actual production S4 calculation or its applied inputs, rendered by native Qt/Matplotlib; no invented curves or fields. Constant-index demonstration model."
+  },
+  {
+    "asset": "silicon-reference-run/actual-3d-fields-plot.png",
+    "source": "actual-3d-fields-plot.png",
+    "sha256": "953acc389d91143cc579fe3e80bbe8c5823d8a16f8fdd18982d96f00aa0beb69",
+    "provenance": "silicon-reference-run/provenance.json",
+    "description": "Actual production S4 calculation or its applied inputs, rendered by native Qt/Matplotlib; no invented curves or fields. Constant-index demonstration model."
+  },
+  {
+    "asset": "silicon-reference-run/actual-structure-native.png",
+    "source": "actual-structure-native.png",
+    "sha256": "cfe47378cc79786554605abbbb65e9f79c0794ec5a1a3be1c8db3584652606c6",
+    "provenance": "silicon-reference-run/provenance.json",
+    "description": "Actual production S4 calculation or its applied inputs, rendered by native Qt/Matplotlib; no invented curves or fields. Constant-index demonstration model."
+  },
+  {
+    "asset": "silicon-reference-run/actual-unit-cell-native.png",
+    "source": "actual-unit-cell-native.png",
+    "sha256": "a0a29b15880e79ce3d8dd75c53fbbeb690d17820ec718eafcf9af07c133e6766",
+    "provenance": "silicon-reference-run/provenance.json",
+    "description": "Actual production S4 calculation or its applied inputs, rendered by native Qt/Matplotlib; no invented curves or fields. Constant-index demonstration model."
+  },
+  {
+    "asset": "silicon-reference-run/actual-materials-native.png",
+    "source": "actual-materials-native.png",
+    "sha256": "2607a8411818b298edce9bf7c1707621bde0723f9b8d82968cab3adb72248ee3",
+    "provenance": "silicon-reference-run/provenance.json",
+    "description": "Actual production S4 calculation or its applied inputs, rendered by native Qt/Matplotlib; no invented curves or fields. Constant-index demonstration model."
+  },
+  {
+    "asset": "silicon-reference-run/actual-electric-field-maps.png",
+    "source": "actual-electric-field-maps.png",
+    "sha256": "d02176927e5623eb248808ba668059e8e5fae13a9b55a47b32d6ecdaf3613f7e",
+    "provenance": "silicon-reference-run/provenance.json",
+    "description": "Actual production S4 calculation or its applied inputs, rendered by native Qt/Matplotlib; no invented curves or fields. Constant-index demonstration model."
+  },
+  {
+    "asset": "silicon-reference-run/actual-spectrum-export.png",
+    "source": "actual-spectrum-export.png",
+    "sha256": "ef1efe7267f37ffbe7bdd9dddcbaae6f97abbc85134a8390727df0d4e5a8fa9a",
+    "provenance": "silicon-reference-run/provenance.json",
+    "description": "Actual production S4 calculation or its applied inputs, rendered by native Qt/Matplotlib; no invented curves or fields. Constant-index demonstration model."
+  }
+]
