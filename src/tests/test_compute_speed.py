@@ -52,7 +52,7 @@ class ComputeSpeedTests(unittest.TestCase):
                 e,h=sampler.GetFieldsMany(xy,z)
                 for i,(x,y) in enumerate(xy):
                     np.testing.assert_allclose([e[i],h[i]],sim.GetFields(x,y,z),rtol=2e-10,atol=2e-12)
-            self.assertEqual(sampler.stats['method'],'validated_fourier_planes')
+            self.assertIn(sampler.stats['method'],('validated_fourier_planes','validated_native_coefficients'))
             self.assertLessEqual(len(sampler.cache),8)
             self.assertEqual(sampler.stats['point_calls'],3)
 
@@ -154,12 +154,12 @@ class ComputeSpeedTests(unittest.TestCase):
                 local=dict(model,points=[row[:3]])
                 reference=Path(d)/f'reference{ordinal}'
                 sample_fields(local,self.perf,dict(cfg,wavelength_nm=row[1],maps=True,track_contours=True,sampling_backend='point'),reference,module=self.module)
-                with (folder/'electric_fields.csv').open() as a,(reference/'electric_fields.csv').open() as b:
-                    for actual,original in zip(csv.DictReader(a),csv.DictReader(b),strict=True):
-                        self.assertEqual(actual['plane'],original['plane'])
-                        self.assertEqual(actual['material'],original['material'])
-                        keys=[key for key in actual if key not in ('plane','material','layer')]
-                        np.testing.assert_allclose([float(actual[k]) for k in keys],[float(original[k]) for k in keys],rtol=2e-10,atol=2e-12)
+                from field_storage import load_field_frame
+                for actual,original in zip(load_field_frame(folder).to_dict('records'),load_field_frame(reference).to_dict('records'),strict=True):
+                    self.assertEqual(actual['plane'],original['plane'])
+                    self.assertEqual(actual['material'],original['material'])
+                    keys=[key for key in actual if key not in ('plane','material','layer')]
+                    np.testing.assert_allclose([float(actual[k]) for k in keys],[float(original[k]) for k in keys],rtol=2e-10,atol=2e-12)
         self.assertEqual(mp.active_children(),[])
 
     def test_interrupted_parallel_fields_keep_all_completed_records_contiguous(self):

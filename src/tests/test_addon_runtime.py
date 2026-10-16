@@ -74,6 +74,59 @@ class AddonTests(unittest.TestCase):
         self.assertIsNone(ar._read_receipt('gpu', managed))
         self.assertTrue(candidate.exists())
 
+    def test_damaged_pending_receipts_keep_active_addon_and_are_quarantined(self):
+        managed = self.root/'managed'
+        archive, info = self.pack(content=b'active runtime')
+        active = ar.install_archive('gpu', archive, info, root=managed)
+        ar.validate_pending('gpu', lambda *_: True, root=managed)
+        old_receipt = (managed/'gpu.json').read_bytes()
+        valid = dict(schema=1, id='gpu', version=ar.APP_VERSION,
+                     sha256='a'*64, manifest_sha256='b'*64)
+        damaged = [b'{broken', b'[]', b'null', b'\xff', b'{}', b' '*16385,
+                   json.dumps(dict(valid, sha256=None)).encode(),
+                   json.dumps(dict(valid, previous={'id':'gpu', 'version':ar.APP_VERSION, 'sha256':1})).encode()]
+        for raw in damaged:
+            with self.subTest(raw=raw[:80]):
+                pending = managed/'gpu.pending.json'
+                pending.write_bytes(raw)
+                with patch('addon_runtime.probe_native_payload') as probe:
+                    result = ar.validate_pending('gpu', probe, root=managed)
+                    probe.assert_not_called()
+                self.assertEqual(result['status'], 'rejected')
+                self.assertEqual(Path(result['quarantined']).read_bytes(), raw)
+                self.assertFalse(pending.exists())
+                self.assertEqual((managed/'gpu.json').read_bytes(), old_receipt)
+                self.assertEqual(ar._read_receipt('gpu', managed), active)
+                self.assertEqual(ar.validate_pending('gpu', lambda *_: True, root=managed)['status'], 'not-pending')
+
+    def test_failed_quarantine_does_not_prevent_startup(self):
+        self.root.joinpath('gpu.pending.json').write_text('{broken')
+        with patch.object(Path, 'rename', side_effect=PermissionError('receipt locked')):
+            result = ar.validate_pending('gpu', lambda *_: self.fail('must not probe'), root=self.root)
+        self.assertEqual(result['status'], 'rejected')
+        self.assertIn('receipt locked', result['recovery_error'])
+        self.assertTrue(self.root.joinpath('gpu.pending.json').exists())
+
+    def test_desktop_startup_continues_after_damaged_receipt(self):
+        import desktop_runtime
+        self.root.joinpath('gpu.pending.json').write_text('{broken')
+        with patch.object(ar, 'addon_root', return_value=self.root), patch.object(desktop_runtime, '_probe_addon_child') as probe:
+            results = desktop_runtime.validate_startup_addons(self.root/'library')
+        self.assertEqual(results[0]['status'], 'rejected')
+        probe.assert_not_called()
+        self.assertEqual(ar.pending_addons(self.root), [])
+        desktop_runtime.startup_addon_results.clear()
+
+    def test_failed_rollback_does_not_mask_candidate_error(self):
+        archive, info = self.pack()
+        managed = self.root/'managed'
+        ar.install_archive('gpu', archive, info, root=managed)
+        with patch.object(ar, 'rollback_pending', side_effect=OSError('disk unavailable')):
+            result = ar.validate_pending('gpu', lambda *_: False, root=managed)
+        self.assertEqual(result['status'], 'recovery-failed')
+        self.assertIn('isolated native startup check', result['error'])
+        self.assertIn('disk unavailable', result['recovery_error'])
+
     def test_path_traversal_and_windows_paths(self):
         for name in ('../evil.dll', '/evil.dll', 'C:/evil.dll', 'a\\evil.dll', 'a/../evil.dll',
                      'NUL.dll', 'aux/file.dll', 'bad./file.dll', 'a//file.dll'):

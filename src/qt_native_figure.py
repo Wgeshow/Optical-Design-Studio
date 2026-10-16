@@ -7,6 +7,7 @@ a Qt vector path, with the original numeric arrays retained for inspection.
 import copy
 import html
 import inspect
+import math
 from pathlib import Path
 import re
 import sys
@@ -24,7 +25,7 @@ from matplotlib.collections import (QuadMesh, PathCollection, LineCollection,
                                     PolyCollection, PatchCollection)
 from matplotlib.contour import ContourSet
 from matplotlib.quiver import Quiver
-from matplotlib.ticker import ScalarFormatter, PercentFormatter
+from matplotlib.ticker import ScalarFormatter, PercentFormatter, FixedLocator, MultipleLocator, FixedFormatter
 
 _local = Path(__file__).resolve().parent/'plot_dependencies'
 if (_local/'pyqtgraph').is_dir() and str(_local) not in sys.path:
@@ -167,6 +168,29 @@ class SourceAxis(pg.AxisItem):
         self.norm = norm
         self.enableAutoSIPrefix(False)
 
+    def tickValues(self, minVal, maxVal, size):
+        source = self.source_axis
+        locator = source.get_major_locator() if source is not None else None
+        # Explicit source ticks carry scientific meaning (phase cycles,
+        # categorical coordinates, chosen reference values). Forward their
+        # positions as well as their formatter, rather than relabeling an
+        # unrelated set of automatically chosen native tick positions.
+        if self.norm is None and isinstance(locator, (FixedLocator, MultipleLocator)):
+            try:
+                bounds = sorted((minVal, maxVal))
+                actual = [10**value for value in bounds] if source.get_scale() == 'log' else bounds
+                ticks = np.asarray(locator.tick_values(*actual), dtype=float)
+                ticks = ticks[np.isfinite(ticks)]
+                if source.get_scale() == 'log':
+                    ticks = np.log10(ticks[ticks > 0])
+                tolerance = max(abs(bounds[1]-bounds[0]), abs(bounds[0]), abs(bounds[1]))*1e-12
+                ticks = ticks[(ticks >= bounds[0]-tolerance) & (ticks <= bounds[1]+tolerance)]
+                spacing = float(np.min(np.diff(ticks))) if len(ticks) > 1 else max(abs(bounds[1]-bounds[0]), 1.)
+                return [(spacing, ticks.tolist())]
+            except (ValueError, TypeError, OverflowError):
+                pass
+        return super().tickValues(minVal, maxVal, size)
+
     def tickStrings(self, values, scale, spacing):
         if self.norm is not None:
             return [f'{float(self.norm.inverse(value)):.4g}' for value in values]
@@ -180,6 +204,14 @@ class SourceAxis(pg.AxisItem):
         formatter = copy.copy(formatter)
         try:
             formatter.set_locs(actual)
+            if isinstance(formatter, FixedFormatter) and isinstance(source.get_major_locator(), FixedLocator):
+                locations = source.get_major_locator().locs
+                result = []
+                for value in actual:
+                    index = next((index for index, location in enumerate(locations)
+                                  if math.isclose(value, location, rel_tol=1e-12, abs_tol=0.)), None)
+                    result.append(plain_text(formatter(value, index)) if index is not None else '')
+                return result
             return [plain_text(formatter(value, index)) for index, value in enumerate(actual)]
         except (ValueError, TypeError, OverflowError):
             return [f'{value:.5g}' for value in actual]
@@ -326,7 +358,7 @@ class NativeFigureCanvas(QWidget):
 
     def _add(self, axis, item, artist, kind, **data):
         self.axis_views[axis].addItem(item)
-        if isinstance(item, pg.PlotDataItem) and self.isVisible():
+        if isinstance(item, pg.PlotDataItem):
             item.setClipToView(True)
             item.setDownsampling(auto=item.opts.get('symbol') is None, method='peak')
         item.setZValue(float(artist.get_zorder()))
@@ -345,7 +377,8 @@ class NativeFigureCanvas(QWidget):
         self._optimize_views(True)
 
     def hideEvent(self, event):
-        self._optimize_views(False)
+        # Hiding a tab does not detach its ViewBox. Preserve bounded rendering;
+        # set_figure disables it only during actual scene teardown.
         super().hideEvent(event)
 
     def _line(self, axis, artist):
@@ -531,6 +564,10 @@ class NativeFigureCanvas(QWidget):
         with np.errstate(divide='ignore', invalid='ignore'):
             x = np.log10(xlim) if axis.get_xscale() == 'log' else xlim
             y = np.log10(ylim) if axis.get_yscale() == 'log' else ylim
+        padding = getattr(axis, '_ods_native_y_padding', 0.)
+        if padding and axis.get_yscale() == 'linear':
+            margin = abs(y[1]-y[0])*padding
+            y = (y[0]-margin, y[1]+margin) if y[0] < y[1] else (y[0]+margin, y[1]-margin)
         view.invertX(xlim[1] < xlim[0])
         view.invertY(ylim[1] < ylim[0])
         view.setRange(xRange=sorted(x), yRange=sorted(y), padding=0)

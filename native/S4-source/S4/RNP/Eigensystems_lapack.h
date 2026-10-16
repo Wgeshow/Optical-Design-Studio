@@ -3,6 +3,9 @@
 
 #include <cstddef>
 #include <complex>
+#ifdef HAVE_S4_CUDA_EIGEN
+#include "../cuda_eigensolver.h"
+#endif
 
 //#define RNP_FORTRAN_NAME(LCASE,UCASE) LCASE ## _
 #ifndef RNP_FORTRAN_NAME
@@ -51,6 +54,8 @@ namespace RNP{
 // a       (input/output) dimension (lda,n)
 //         On entry, the N-by-N matrix A.
 //         On exit, A has been overwritten.
+//         The optional CUDA backend instead preserves A; S4 consumes only the
+//         resulting eigenvalues/eigenvectors after this call.
 //
 // lda     The leading dimension of the array A.  lda >= n.
 //
@@ -101,6 +106,12 @@ inline int Eigensystem(size_t n,
 		RNP_FORTRAN_NAME(zgeev,ZGEEV)(jobvl, jobvr, n, a, lda, eval, vl, ldvl, vr, ldvr, work_, -1, rwork_, &info);
 		return 0;
 	}
+
+#ifdef HAVE_S4_CUDA_EIGEN
+	// Workspace queries remain on CPU. An optional GPU solve stages its own
+	// inputs and commits outputs only on success; fallback retains this path.
+	if(S4CudaEigen::TryEigensystem(n,a,lda,eval,vl,ldvl,vr,ldvr)){ return 0; }
+#endif
 	
 	std::complex<double> *work = work_;
 	double *rwork = rwork_;

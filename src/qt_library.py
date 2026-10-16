@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
 )
 
 from data_library import read_json
+from field_storage import load_field_frame, export_field_csv
 from library_ui import saved_entry_choices, csv_choices, saved_design_choices
 from qt_common import PlotWidget, ActionStatusLabel
 from qt_surfaces import WorkspacePanel
@@ -90,9 +91,12 @@ class LibraryPage(QWidget):
         self._build_sharing()
         self.information_panel=WorkspacePanel()
         info=QVBoxLayout(self.information_panel)
-        heading=QLabel('Result information');heading.setObjectName('sectionTitle');info.addWidget(heading)
-        details_page=self.tabs.widget(1);self.tabs.removeTab(1)
-        info.addWidget(details_page,1);details_page.show()
+        heading=QLabel('Run information & project restore');heading.setObjectName('sectionTitle');info.addWidget(heading)
+        self.information_summary=QPlainTextEdit()
+        self.information_summary.setReadOnly(True)
+        self.information_summary.setPlaceholderText('Select a saved run to inspect its recorded inputs and output files.')
+        self.details.textChanged.connect(lambda:self.information_summary.setPlainText(self.details.toPlainText()))
+        info.addWidget(self.information_summary,1)
         info.addLayout(self.project_restore_layout)
         self.browser_splitter.addWidget(self.information_panel)
         self.browser_splitter.setSizes([390,620,390])
@@ -100,6 +104,11 @@ class LibraryPage(QWidget):
         self.status.setWordWrap(True)
         self.status.setTextFormat(Qt.TextFormat.PlainText)
         root.addWidget(self.status)
+        self.metadata_warning = QLabel()
+        self.metadata_warning.setWordWrap(True)
+        self.metadata_warning.setTextFormat(Qt.TextFormat.PlainText)
+        self.metadata_warning.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        root.addWidget(self.metadata_warning)
         self.query.textChanged.connect(self.filter_entries)
         self.kind.currentIndexChanged.connect(self.filter_entries)
         self.run_status.currentIndexChanged.connect(self.filter_entries)
@@ -116,6 +125,13 @@ class LibraryPage(QWidget):
         store.task_finished.connect(self.task_finished)
         store.task_failed.connect(self.task_failed)
         self.refresh()
+        self.tool_tabs={'results':[(self.tabs,0)],'notes':[(self.tabs,1)],'sharing':[(self.tabs,2)]}
+        from qt_tool_workspace import polish_tool_workspace
+        polish_tool_workspace(self)
+
+    def select_tool_tab(self,route):
+        from qt_tool_workspace import select_tool_tab
+        return select_tool_tab(self,route)
 
     def _build_results(self):
         page = QWidget()
@@ -213,6 +229,14 @@ class LibraryPage(QWidget):
         choices(self.run_status, [('All statuses', '')] + [(value, value) for value in sorted({item.get('status', '') for item in self._entries if item.get('status')})])
         self.kind.setMinimumContentsLength(8);self.run_status.setMinimumContentsLength(9)
         self.filter_entries()
+        diagnostics = list(self.store.library.diagnostics)
+        details = [f"{item['path']}: {item['message']}" for item in diagnostics]
+        message_lines = ['Library metadata needs attention. Valid entries remain available.', *details[:3]] if details else []
+        if len(details)>3:
+            message_lines.append(f'{len(details)-3} additional files; see the tooltip for details.')
+        self.metadata_warning.setText('\n'.join(message_lines))
+        self.metadata_warning.setToolTip('\n'.join(details))
+        self.metadata_warning.setVisible(bool(diagnostics))
         if message:
             self.status.setText(message)
 
@@ -259,7 +283,7 @@ class LibraryPage(QWidget):
             directory = self.store.library.directory(identifier)
             record = next((item for item in self._entries if item['id'] == identifier), {})
             files = [path.relative_to(directory).as_posix() for path in directory.rglob('*') if path.is_file() and not path.is_symlink()]
-            csvs = [name for name in files if name.lower().endswith('.csv')]
+            csvs = [name for name in files if name.lower().endswith('.csv') or Path(name).name == 'electric_fields.npz']
             preferred = next((name for name in ('target_results.csv', 'design_results.csv', 'results.csv', 'best_spectrum.csv') if name in csvs), csvs[0] if csvs else None)
             choices(self.csv, csv_choices(csvs), preferred)
             choices(self.design, saved_design_choices(directory))
@@ -286,10 +310,10 @@ class LibraryPage(QWidget):
         directory = self.store.library.directory(self.selection.currentData())
         filename = self.csv.currentData()
         if not filename:
-            raise ValueError('Select a saved result CSV.')
+            raise ValueError('Select a saved result.')
         path = (directory / filename).resolve()
-        if not path.is_relative_to(directory) or path.suffix.lower() != '.csv' or not path.is_file():
-            raise ValueError('Select a CSV inside this saved run.')
+        if not path.is_relative_to(directory) or not (path.suffix.lower() == '.csv' or path.name == 'electric_fields.npz') or not path.is_file():
+            raise ValueError('Select a data file inside this saved run.')
         return path
 
     def preview(self, *_):
@@ -301,7 +325,7 @@ class LibraryPage(QWidget):
             return
         try:
             path = self.result_path()
-            data = pd.read_csv(path)
+            data = load_field_frame(path.parent) if path.name == 'electric_fields.npz' else pd.read_csv(path)
             self._csv_path = path
             show_frame(self.table, data.head(5000))
             figure = self.plot.figure
@@ -378,9 +402,11 @@ class LibraryPage(QWidget):
     def save_csv(self):
         try:
             source = self.result_path()
-            path, _ = QFileDialog.getSaveFileName(self, 'Save complete result CSV', source.name, 'CSV files (*.csv)')
+            path, _ = QFileDialog.getSaveFileName(self, 'Save complete result CSV', source.with_suffix('.csv').name, 'CSV files (*.csv)')
             if path:
-                if Path(path).resolve() != source.resolve():
+                if source.name == 'electric_fields.npz':
+                    export_field_csv(source.parent, path)
+                elif Path(path).resolve() != source.resolve():
                     shutil.copy2(source, path)
                 self.status.setText('Saved complete result data: ' + path)
         except Exception as exc:

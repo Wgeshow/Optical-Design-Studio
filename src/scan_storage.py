@@ -70,6 +70,7 @@ class SpectrumResults(Sequence):
             self.connection.execute('CREATE TABLE results (id INTEGER PRIMARY KEY, wave REAL, theta REAL, r REAL, t REAL, a REAL, rp REAL, tp REAL)')
             self.connection.execute('CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT)')
             self.connection.execute('CREATE TABLE preview (id INTEGER PRIMARY KEY)')
+            self.connection.execute('CREATE TABLE failures (id INTEGER PRIMARY KEY, wave REAL, theta REAL, reason TEXT)')
             self.connection.commit()
         self._count = 0 if create else None
         self._mapped = False
@@ -120,6 +121,18 @@ class SpectrumResults(Sequence):
         if self.connection is not None:
             self.connection.commit();self._pending=0;self._last_commit=time.monotonic()
 
+    def add_failures(self, failures):
+        self.connection.executemany('INSERT INTO failures VALUES (?,?,?,?)',
+            ((f['point_index'],f['wavelength_nm'],f['angle_deg'],f['reason']) for f in failures))
+
+    def export_failures(self, path):
+        self.flush()
+        count=self.connection.execute('SELECT COUNT(*) FROM failures').fetchone()[0]
+        if not count:return
+        with Path(path).open('w',newline='',encoding='utf-8') as stream:
+            writer=csv.writer(stream);writer.writerow(('point_index','wavelength_nm','angle_deg','reason'))
+            writer.writerows(self.connection.execute('SELECT id,wave,theta,reason FROM failures ORDER BY id'))
+
     def __len__(self):
         if self._count is None:
             with closing(read_connection(self.path)) as connection:
@@ -158,29 +171,42 @@ class SpectrumResults(Sequence):
         self._finalize_positions()
         count = len(self)
         width = max(1, math.ceil(count / bins))
-        peaks, selected, bucket, group = {}, [], {}, -1
+        peaks, minima, selected, bucket, group = {}, {}, [], {}, -1
         with (Path(path).open('w', newline='', encoding='utf-8') if path is not None else nullcontext()) as stream:
             writer = csv.writer(stream) if stream is not None else None
             if writer is not None:writer.writerow(COLUMNS)
             for ordinal, row in enumerate(self):
                 i, wave, theta, r, t, a = row
-                if writer is not None:writer.writerow((wave, theta, r, t, a, r+t+a))
+                finite=all(value is not None and math.isfinite(value) for value in row[1:])
+                if writer is not None:writer.writerow((wave, theta, r, t, a, r+t+a if finite else None))
                 for column, key in enumerate(('R', 'T', 'A'), 3):
+                    if not finite:continue
                     if key not in peaks or row[column] > peaks[key][column]:
                         peaks[key] = row
+                    if key not in minima or row[column] < minima[key][column]:
+                        minima[key] = row
                 if ordinal // width != group:
                     selected.extend({value[0] for value in bucket.values()})
                     bucket, group = {'first': row}, ordinal // width
                 bucket['last'] = row
+                if not finite:
+                    # Preserve a gap and its neighbors even inside decimated
+                    # plot bins; never draw a finite line across missing data.
+                    selected.extend((row[0],))
+                    previous=self.connection.execute('SELECT MAX(id) FROM results WHERE id<?',(row[0],)).fetchone()[0]
+                    following=self.connection.execute('SELECT MIN(id) FROM results WHERE id>?',(row[0],)).fetchone()[0]
+                    selected.extend(i for i in (previous,following) if i is not None)
+                    continue
                 for column in range(3, 6):
                     for name, less in (('min', True), ('max', False)):
                         key = (column, name)
-                        if key not in bucket or (row[column] < bucket[key][column] if less else row[column] > bucket[key][column]):
+                        if key not in bucket or bucket[key][column] is None or (row[column] < bucket[key][column] if less else row[column] > bucket[key][column]):
                             bucket[key] = row
             selected.extend({value[0] for value in bucket.values()})
         self.connection.execute('DELETE FROM preview')
         self.connection.executemany('INSERT OR IGNORE INTO preview VALUES (?)', ((i,) for i in selected))
         self.connection.execute('INSERT OR REPLACE INTO metadata VALUES (?,?)', ('peaks', json.dumps(peaks)))
+        self.connection.execute('INSERT OR REPLACE INTO metadata VALUES (?,?)', ('minima', json.dumps(minima)))
         self.connection.execute('INSERT OR REPLACE INTO metadata VALUES (?,?)', ('count', str(count)))
         self.connection.commit()
 
@@ -193,13 +219,27 @@ class SpectrumResults(Sequence):
         with closing(read_connection(self.path)) as connection:
             data = connection.execute(query, () if preview else (limit,)).fetchall()
         frame = pd.DataFrame(data, columns=('point_index', *COLUMNS[:5]))
-        frame['R_plus_T_plus_A'] = frame[['R','T','A']].sum(axis=1)
+        frame['R_plus_T_plus_A'] = frame[['R','T','A']].sum(axis=1,min_count=3)
         return frame
 
     def peak(self, key):
         with closing(read_connection(self.path)) as connection:
             value = connection.execute("SELECT value FROM metadata WHERE key='peaks'").fetchone()
         return json.loads(value[0]).get(key) if value else None
+
+    def extremum(self, key, maximum=True):
+        """Exact finite extrema, including old indexes; ties use scan order."""
+        if key not in ('R', 'T', 'A'):raise ValueError('Choose R, T or A.')
+        self.flush()
+        column=key.lower();direction='DESC' if maximum else 'ASC'
+        with closing(read_connection(self.path)) as connection:
+            saved=connection.execute('SELECT value FROM metadata WHERE key=?',('peaks' if maximum else 'minima',)).fetchone()
+            value=json.loads(saved[0]).get(key) if saved else None
+            if value is not None and all(math.isfinite(item) for item in value[1:]):return value
+            # NaNs are NULL in SQLite; infinities are excluded explicitly.
+            finite=' AND '.join(f'{name} BETWEEN -1.7976931348623157e308 AND 1.7976931348623157e308' for name in ('wave','theta','r','t','a'))
+            row=connection.execute(f'SELECT id,wave,theta,r,t,a FROM results WHERE {finite} AND wave>0 ORDER BY {column} {direction},id ASC LIMIT 1').fetchone()
+        return list(row) if row is not None else None
 
     def _bound(self,value,axis,right=False):
         first,last=0,len(self)
@@ -233,7 +273,7 @@ class SpectrumResults(Sequence):
             query=f'SELECT {position},wave,theta,r,t,a FROM {source} WHERE {position}>=? AND {position}<? ORDER BY {position}'
             rows=connection.execute(query,(start,stop)).fetchall()
         frame=pd.DataFrame(rows,columns=('point_index',*COLUMNS[:5]))
-        frame['R_plus_T_plus_A']=frame[['R','T','A']].sum(axis=1)
+        frame['R_plus_T_plus_A']=frame[['R','T','A']].sum(axis=1,min_count=3)
         return frame
 
     def close(self):

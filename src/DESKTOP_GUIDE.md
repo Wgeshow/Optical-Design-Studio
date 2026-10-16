@@ -2,6 +2,14 @@
 
 The PyQt6 application uses one shared structure, the existing S4 solver and machine-learning backends, and the established saved-data format. Native controls, material selectors, scientific plots, and file dialogs operate in the desktop window. The 1.3.2 Windows x64 portable release includes its runtime; extract the complete ZIP and run Optical Design Studio.exe. Source setup is described below.
 
+## Choose a workspace
+
+Startup offers **Device Studio** and **Original Optical Studio**. These are interfaces in the same application, with the same applied project/settings and saved library. **Menu → Switch workspace…** changes the interface without discarding the project/settings or rerunning a calculation.
+
+Device Studio provides the editable finite device, separate Optical/Electrical/Coupled setup sections, electrical material library, shaded linked geometry and saved Results including Optical E/H and Specular phase. [DEVICE_STUDIO_GUIDE.md](DEVICE_STUDIO_GUIDE.md) describes all 20 setup sections, contacts/doping, independent PC areas, I–V/C–V scope, presets, validation and complete exports.
+
+Original Optical Studio retains the original optical layer/region tables, lattice, S4 scans, optical Fields, saved work, target/explore and AI tools. Original S4/manual Fields compile those applied tables. Active PC arrays use one PC-pitch cell with one air hole; designs without PC metadata keep their original lattice dimensions. Canonical polygon/contact-pad geometry and arbitrary Device Studio crop settings are not added automatically. Add explicit optical metal layers/regions in the original workflow when needed. The optical tutorial and original-control sections below document that interface.
+
 ## Start on Windows
 
 Use the same 64-bit Python 3.12 environment that runs this S4 code set. On the original workstation, the launchers select `anaconda3\envs\s4_updated\python.exe` when it is available.

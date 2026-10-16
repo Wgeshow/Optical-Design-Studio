@@ -17,6 +17,7 @@ import stat
 import sys
 import tempfile
 import time
+import uuid
 import zipfile
 
 from app_version import APP_VERSION
@@ -118,16 +119,21 @@ def activate(identifier):
 
 def _pending(identifier, root):
     path = root/(_id(identifier)+'.pending.json')
-    if _linked(path) or not path.is_file() or path.stat().st_size>16384:
+    if _linked(path):
+        raise ValueError('Pending add-on receipt must not be a link.')
+    if not path.is_file():
         return None
+    if path.stat().st_size>16384:
+        raise ValueError('Pending add-on receipt is too large.')
     value = json.loads(path.read_text(encoding='utf-8'))
-    if (value.get('schema')!=1 or value.get('id')!=identifier or value.get('version')!=APP_VERSION
-            or not re.fullmatch('[0-9a-f]{64}', value.get('sha256', ''))
-            or not re.fullmatch('[0-9a-f]{64}', value.get('manifest_sha256', ''))):
+    if (not isinstance(value, dict) or value.get('schema')!=1 or value.get('id')!=identifier or value.get('version')!=APP_VERSION
+            or not isinstance(value.get('sha256'), str) or not re.fullmatch('[0-9a-f]{64}', value['sha256'])
+            or not isinstance(value.get('manifest_sha256'), str) or not re.fullmatch('[0-9a-f]{64}', value['manifest_sha256'])):
         raise ValueError('Invalid pending add-on receipt.')
     previous = value.get('previous')
     if previous is not None and (not isinstance(previous, dict) or previous.get('id')!=identifier
-            or previous.get('version')!=APP_VERSION or not re.fullmatch('[0-9a-f]{64}', previous.get('sha256', ''))):
+            or previous.get('version')!=APP_VERSION or not isinstance(previous.get('sha256'), str)
+            or not re.fullmatch('[0-9a-f]{64}', previous['sha256'])):
         raise ValueError('Invalid previous add-on receipt.')
     return value
 
@@ -202,7 +208,21 @@ def validate_pending(identifier, probe, *, root=None):
     """
     from data_library import write_json
     root = Path(root) if root is not None else addon_root()
-    candidate = _pending(identifier, root)
+    _id(identifier)
+    try:
+        candidate = _pending(identifier, root)
+    except (OSError, ValueError, TypeError, RuntimeError) as exc:
+        # An unreadable candidate cannot authorize any activation or rollback.
+        # Preserve the active receipt and archive the raw candidate for repair.
+        result = dict(id=identifier, status='rejected', error=str(exc))
+        path = root/(identifier+'.pending.json')
+        archive = root/(identifier+'.pending.invalid-'+uuid.uuid4().hex+'.json')
+        try:
+            path.rename(archive)
+            result['quarantined'] = str(archive)
+        except OSError as recovery_error:
+            result['recovery_error'] = str(recovery_error)
+        return result
     if candidate is None:
         return dict(id=identifier, status='not-pending')
     try:
@@ -218,7 +238,12 @@ def validate_pending(identifier, probe, *, root=None):
         (root/(identifier+'.pending.json')).unlink()
         return dict(id=identifier, status='activated', directory=str(directory))
     except Exception as exc:
-        return rollback_pending(identifier, str(exc), root=root)
+        try:
+            return rollback_pending(identifier, str(exc), root=root)
+        except Exception as recovery_error:
+            # Recovery I/O must not prevent the desktop from opening either.
+            return dict(id=identifier, status='recovery-failed', error=str(exc),
+                        recovery_error=str(recovery_error))
 
 
 def probe_native_payload(identifier, directory):

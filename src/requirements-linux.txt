@@ -6,3 +6,4 @@ scikit-learn==1.7.2
 joblib==1.5.3
 threadpoolctl==3.6.0
 -r requirements-desktop.txt
+-r requirements-electrical.txt

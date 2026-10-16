@@ -111,6 +111,13 @@ class AddonsPage(QWidget):
         progress_row.addWidget(self.cancel_button)
         layout.addLayout(progress_row)
         self.status = ActionStatusLabel('')
+        from desktop_runtime import startup_addon_results
+        failures = [result for result in startup_addon_results if result.get('error')]
+        if failures:
+            self.status.setText('Add-on startup recovery: ' + '; '.join(
+                f"{runtime.ADDONS[result['id']][0]}: {result['error']}" for result in failures))
+            self.status.setToolTip('\n'.join(
+                str(result.get('quarantined') or result.get('recovery_error') or result['error']) for result in failures))
         self.setToolTip('Click Install to download a matching pack. Native components restart the app after installation; your session is saved first.')
         layout.addWidget(self.status)
         layout.addStretch()

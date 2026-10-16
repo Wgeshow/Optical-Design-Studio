@@ -5,10 +5,70 @@ from PyQt6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,
  QSpinBox,QPushButton,QGroupBox,QTabWidget,QComboBox,QPlainTextEdit,QScrollArea,QFileDialog,
  QTableWidget,QTableWidgetItem,QHeaderView,QFrame,QGridLayout,QSizePolicy)
 from PyQt6.QtCore import Qt, QSignalBlocker
+from PyQt6.QtGui import QColor, QPainter, QPen, QFont
 from qt_common import theme_manager, PlotWidget
 from pcsel_design import PCSELDesign
 from laser_model import LaserParameters,solve_laser
 from comsol_results import load_comsol_power_results,merge_comsol_power
+
+
+class LaserModelDiagram(QWidget):
+    """Input-model context; no unsolved spatial or transient data are displayed."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumSize(120, 240)
+        self.setAccessibleName('Lumped laser model: drive, carriers, photons, output light and temperature feedback')
+        theme_manager().changed.connect(self.update)
+
+    def paintEvent(self, event):
+        from qt_common import COLORS
+        from PyQt6.QtCore import QRectF, QPointF
+        c = COLORS[theme_manager().mode]
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.fillRect(self.rect(), QColor(c['panel']))
+        compact=self.width()<480
+        canvas_width,canvas_height=(300,360) if compact else (590,390)
+        scale = min(self.width()/canvas_width, self.height()/canvas_height)
+        painter.translate((self.width()-canvas_width*scale)/2, (self.height()-canvas_height*scale)/2)
+        painter.scale(scale, scale)
+        painter.setFont(QFont('Segoe UI', 12))
+        def arrow(x1, y1, x2, y2):
+            painter.setPen(QPen(QColor(c['muted']), 1.6))
+            painter.drawLine(QPointF(x1,y1),QPointF(x2,y2))
+            import math
+            angle=math.atan2(y2-y1,x2-x1)
+            for offset in (-.45,.45):
+                painter.drawLine(QPointF(x2,y2),QPointF(x2-8*math.cos(angle+offset),y2-8*math.sin(angle+offset)))
+        def box(x,y,w,h,text,color):
+            painter.setPen(QPen(QColor(color),1.8))
+            fill=QColor(color);fill.setAlpha(24);painter.setBrush(fill)
+            rect=QRectF(x,y,w,h);painter.drawRoundedRect(rect,9,9)
+            painter.setPen(QColor(c['text']));painter.drawText(rect,Qt.AlignmentFlag.AlignCenter,text)
+        if compact:
+            painter.setFont(QFont('Segoe UI',10))
+            arrow(72,80,72,130);arrow(125,160,175,160);arrow(228,190,228,245)
+            arrow(72,190,72,245);arrow(125,275,228,190)
+            box(20,20,105,60,'Drive current\nI (mA)','#3b82f6')
+            box(20,130,105,60,'Carriers\nN (cm⁻³)','#10a78a')
+            box(175,130,105,60,'Photons\nS','#6478db')
+            box(175,245,105,60,'Output light\nP (mW)','#9861c9')
+            box(20,245,105,60,'Temperature\nT (K)','#d59a32')
+            painter.setPen(QColor(c['muted']));painter.setFont(QFont('Segoe UI',9))
+            painter.drawText(QRectF(123,135,54,22),Qt.AlignmentFlag.AlignCenter,'Gain')
+            painter.drawText(QRectF(40,320,220,25),Qt.AlignmentFlag.AlignCenter,'Lumped thermal feedback')
+        else:
+            arrow(115,95,115,153);arrow(180,190,245,190);arrow(365,190,425,190)
+            arrow(115,226,115,290);arrow(175,325,305,325);arrow(305,325,305,226)
+            box(50,25,130,70,'Drive current\nI (mA)','#3b82f6')
+            box(45,153,135,74,'Carriers\nN (cm⁻³)','#10a78a')
+            box(245,153,120,74,'Photons\nS','#6478db')
+            box(425,153,125,74,'Output light\nP (mW)','#9861c9')
+            box(50,290,125,70,'Temperature\nT (K)','#d59a32')
+            painter.setPen(QColor(c['muted']));painter.setFont(QFont('Segoe UI',10))
+            painter.drawText(QRectF(175,160,75,25),Qt.AlignmentFlag.AlignCenter,'Gain')
+            painter.drawText(QRectF(181,335,170,25),Qt.AlignmentFlag.AlignCenter,'Thermal feedback')
+        painter.end()
 
 
 class _PCSELPlot(PlotWidget):
@@ -85,6 +145,77 @@ class PCSELPage(QWidget):
         self.status.setText('Configure inputs, then run the analytical laser model in Results.')
         self.report.setPlainText('No laser simulation has been run. Results and provenance will appear here.')
         self.retheme()
+        self._install_clean_workbench(root, optical, electrical, modulation, thermal, device)
+
+    def _install_clean_workbench(self, root, optical, electrical, modulation, thermal, device):
+        from qt_legacy_study_workbench import StudyWorkbench
+        from qt_reference_style import reference_icon
+        from qt_common import COLORS
+        rail = self.findChild(QFrame, 'setupRail')
+        old_area = rail.parentWidget().parentWidget()
+        if isinstance(old_area, QScrollArea):
+            old_area.takeWidget();old_area.hide()
+        root.removeWidget(self.tabs)
+        result_host=QWidget();result_layout=QVBoxLayout(result_host)
+        result_layout.setContentsMargins(0,0,0,0)
+        self.result_selector=QComboBox()
+        self.result_selector.setAccessibleName('Laser result view')
+        for name,index in [('Overview',6),('Optical mode',1),('Mode comparison',3),('Temperature',4),('Modulation',5),('Report and import',7)]:
+            self.result_selector.addItem(name,index)
+        self.result_selector.currentIndexChanged.connect(lambda _:self.tabs.setCurrentIndex(self.result_selector.currentData()))
+        result_layout.addWidget(self.result_selector);result_layout.addWidget(self.tabs,1)
+        self.tabs.tabBar().hide();self.tabs.setCurrentIndex(self.results_index)
+        self.workflow_footer.hide()
+        self.tabs.currentChanged.connect(lambda _:self.workflow_footer.hide())
+        self.workbench=StudyWorkbench(self.device_store,'Laser rate equations',
+            ['Device & mode','Gain & injection','Drive & calculate'],rail,result_host,
+            edit_geometry=self._edit_laser_structure,
+            preview_note='Independent editable laser geometry. Optical mode inputs are supplied; the calculation is a lumped rate-equation estimate.')
+        root.insertWidget(0,self.workbench,1)
+        self.workbench.input_tabs.setTabText(0,'Drive && geometry')
+        parameter_tabs={}
+        for name,page in [('Mode',optical),('Gain',electrical),('Thermal',thermal),('Modulation',modulation)]:
+            host=QWidget();layout=QVBoxLayout(host);layout.setContentsMargins(10,10,10,10)
+            for group in list(page.findChildren(QGroupBox)):
+                if isinstance(group.layout(),QFormLayout):layout.addWidget(group)
+            layout.addStretch()
+            parameter_tabs[name]=self.workbench.add_parameter_tab(host,name)
+        self.workbench.add_parameter_tab(device,'Device assignments')
+        self.parameter_selector=QComboBox()
+        self.parameter_selector.setAccessibleName('Laser parameter group')
+        for index in range(self.workbench.input_tabs.count()):
+            self.parameter_selector.addItem(self.workbench.input_tabs.tabText(index).replace('&&','&'),index)
+        self.parameter_selector.currentIndexChanged.connect(self.workbench.input_tabs.setCurrentIndex)
+        self.workbench.input_tabs.currentChanged.connect(self.parameter_selector.setCurrentIndex)
+        self.workbench.input_tabs.tabBar().hide()
+        self.workbench.properties.layout().insertWidget(0,self.parameter_selector)
+        self.workbench.set_step_targets([
+            lambda:self.workbench.input_tabs.setCurrentIndex(parameter_tabs['Mode']),
+            lambda:self.workbench.input_tabs.setCurrentIndex(parameter_tabs['Gain']),
+            lambda:self.workbench.input_tabs.setCurrentIndex(0)])
+        structure=self.workbench.views.widget(0)
+        self.workbench.views.removeTab(0)
+        self.model_views=QTabWidget();self.model_views.setDocumentMode(True)
+        self.model_views.addTab(LaserModelDiagram(),'Model flow')
+        self.model_views.addTab(structure,'3D structure')
+        self.workbench.views.insertTab(0,self.model_views,'Model')
+        self.workbench.views.setCurrentIndex(0)
+        self.workbench.objects.currentItemChanged.connect(lambda *_:self.model_views.setCurrentIndex(1))
+        self.workbench.apply_theme()
+        self.workbench.select_step(0)
+        for index in range(self.tabs.count()):
+            self.tabs.setTabIcon(index,reference_icon('results',COLORS[theme_manager().mode]['muted']))
+
+    def _edit_laser_structure(self):
+        from PyQt6.QtWidgets import QDialog, QDialogButtonBox
+        from qt_device_builder import DeviceBuilderPage
+        dialog=QDialog(self);dialog.setWindowTitle('Edit laser structure and materials');dialog.resize(1180,800)
+        layout=QVBoxLayout(dialog);editor=DeviceBuilderPage(self.device_store,laser=True)
+        layout.addWidget(editor,1)
+        buttons=QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(dialog.reject);layout.addWidget(buttons)
+        dialog.exec()
+        self.sync_device_geometry()
 
     @staticmethod
     def wrap_page(page):
@@ -312,8 +443,11 @@ class PCSELPage(QWidget):
 
     def thermal_tab(self):
         layout=QVBoxLayout(); box=QGroupBox('Thermal feedback'); form=QFormLayout(box); layout.addWidget(box)
-        self.ambient_temperature=self.spin(300,4,1000,5,' K',1); self.thermal_resistance=self.spin(18,.001,1e5,1,' K/W',2); self.series_voltage=self.spin(1.8,.001,100,.1,' V',2); self.thermal_shift=self.spin(.07,-100,100,.01,' nm/K',3)
-        for label,w in [('Ambient temperature',self.ambient_temperature),('Thermal resistance',self.thermal_resistance),('Operating voltage',self.series_voltage),('Wavelength coefficient',self.thermal_shift)]: form.addRow(label,w)
+        self.ambient_temperature=self.spin(300,4,1000,5,' K',1); self.thermal_resistance=self.spin(18,0,1e5,1,' K/W',2); self.series_voltage=self.spin(1.8,.001,100,.1,' V',2); self.thermal_shift=self.spin(.07,0,100,.01,' nm/K',3)
+        defaults=LaserParameters()
+        self.transparency_temperature=self.spin(defaults.transparency_temperature_coefficient_k,0,1,.0001,' K⁻¹',5)
+        self.gain_temperature=self.spin(defaults.differential_gain_temperature_coefficient_k,0,1,.0001,' K⁻¹',5)
+        for label,w in [('Ambient temperature',self.ambient_temperature),('Thermal resistance',self.thermal_resistance),('Operating voltage',self.series_voltage),('Wavelength coefficient',self.thermal_shift),('Transparency temperature coefficient',self.transparency_temperature),('Differential gain temperature coefficient',self.gain_temperature)]: form.addRow(label,w)
         self.thermal_summary=QLabel(); self.thermal_summary.setObjectName('muted'); layout.addWidget(self.thermal_summary); self.thermal_canvas=self.canvas(layout,'Temperature and wavelength drift'); return self.scroll(layout)
 
     def mode_tab(self):
@@ -337,7 +471,7 @@ class PCSELPage(QWidget):
                            self.gain_thickness.value(),self.wavelength.value(),
                            patterned_layer_thickness_um=float(selected.iloc[0].Thickness_um)).validate()
     def laser_parameters(self):
-        return LaserParameters(wavelength_nm=self.wavelength.value(),group_index=self.group_index.value(),confinement=self.confinement.value(),quality_factor=self.quality_factor.value(),transparency_density_cm3=self.transparency_density.value()*1e18,differential_gain_cm2=self.differential_gain.value()*1e-16,active_volume_um3=self.active_volume.value(),recombination_a_s=self.recombination_a.value()*1e8,recombination_b_cm3_s=self.recombination_b.value()*1e-10,recombination_c_cm6_s=self.recombination_c.value()*1e-29,injection_efficiency=self.injection_efficiency.value(),differential_efficiency=self.differential_efficiency.value(),internal_loss_cm=self.internal_loss.value(),spontaneous_emission_factor=self.spontaneous_beta.value()*1e-4,gain_compression_cm3=self.gain_compression.value()*1e-17,ambient_temperature_k=self.ambient_temperature.value(),thermal_resistance_k_w=self.thermal_resistance.value(),drive_voltage_v=self.series_voltage.value(),wavelength_shift_nm_k=max(0,self.thermal_shift.value()))
+        return LaserParameters(wavelength_nm=self.wavelength.value(),group_index=self.group_index.value(),confinement=self.confinement.value(),quality_factor=self.quality_factor.value(),transparency_density_cm3=self.transparency_density.value()*1e18,differential_gain_cm2=self.differential_gain.value()*1e-16,active_volume_um3=self.active_volume.value(),recombination_a_s=self.recombination_a.value()*1e8,recombination_b_cm3_s=self.recombination_b.value()*1e-10,recombination_c_cm6_s=self.recombination_c.value()*1e-29,injection_efficiency=self.injection_efficiency.value(),differential_efficiency=self.differential_efficiency.value(),internal_loss_cm=self.internal_loss.value(),spontaneous_emission_factor=self.spontaneous_beta.value()*1e-4,gain_compression_cm3=self.gain_compression.value()*1e-17,ambient_temperature_k=self.ambient_temperature.value(),thermal_resistance_k_w=self.thermal_resistance.value(),drive_voltage_v=self.series_voltage.value(),wavelength_shift_nm_k=self.thermal_shift.value(),transparency_temperature_coefficient_k=self.transparency_temperature.value(),differential_gain_temperature_coefficient_k=self.gain_temperature.value())
 
     def run_simulation(self):
         try:
@@ -357,6 +491,8 @@ class PCSELPage(QWidget):
         if getattr(self,'_comsol_imported',None) is not None:
             self.last_result=merge_comsol_power(r,self._comsol_imported);self._render_comsol()
         self.retheme()
+        if hasattr(self,'workbench'):
+            self.workbench.show_results();self.tabs.setCurrentIndex(self.results_index)
         return self.last_result
 
     @staticmethod

@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import time
 import traceback
+from functools import lru_cache
 
 from data_library import write_json
 from gpu_status import gpu_requested, acceleration_warnings
@@ -33,7 +34,108 @@ def material_at(model, layer, x, y):
     return material
 
 
-def sample_fields(model, perf, cfg, directory, module=None, simulation=None, solved=False):
+@lru_cache(maxsize=2)
+def _sampling_layout(signature):
+    """Reuse coordinates and material labels across wavelengths, never fields."""
+    import numpy as np
+    from field_storage import PLANE_NAMES
+    model, cfg = json.loads(signature)
+    count, depths = cfg.get('grid', 8), cfg.get('depth_samples', 3)
+    xs = np.asarray([model['ax']*((i+.5)/count-.5) for i in range(count)])
+    ys = np.asarray([model['ay']*((i+.5)/count-.5) for i in range(count)])
+    layers, start = [], 0.
+    for layer in model['layers'][1:-1]:
+        if layer['thickness'] > 0:
+            layers.append((layer, start, start+layer['thickness']))
+        start += layer['thickness']
+    if not layers:
+        raise ValueError('Field sampling requires a finite-thickness layer')
+    chosen = cfg.get('layer') or next((p['layer'] for p in model['patterns']), layers[0][0]['name'])
+    if chosen not in {l['name'] for l, _, _ in layers}:
+        raise ValueError('Select a finite-thickness layer for the XY field map')
+    layer_names = [l['name'] for l, _, _ in layers]
+    material_names = model['materials']
+    material_ids = {name: i for i, name in enumerate(material_names)}
+    instructions, coords, planes, labels, materials = [], [], [], [], []
+    masks, offset = {}, 0
+
+    def append(plane, layer, z, output_ys):
+        nonlocal offset
+        x, y = np.meshgrid(xs, output_ys, indexing='ij')
+        x, y = x.ravel(), y.ravel()
+        key = (layer['name'], plane == 'xz')
+        if key not in masks:
+            ids = np.full(len(x), material_ids[layer['material']], dtype=np.int32)
+            for region in model['patterns']:
+                if region['layer'] != layer['name']:
+                    continue
+                angle = math.radians(region['angle'])
+                mask = np.zeros(len(x), dtype=bool)
+                for ix in (-1, 0, 1):
+                    for iy in (-1, 0, 1):
+                        dx, dy = x+ix*model['ax']-region['cx'], y+iy*model['ay']-region['cy']
+                        u, v = dx*math.cos(angle)+dy*math.sin(angle), -dx*math.sin(angle)+dy*math.cos(angle)
+                        if region['shape'] == 'circle':
+                            mask |= u*u+v*v < region['sx']**2
+                        elif region['shape'] == 'ellipse':
+                            mask |= (u/region['sx'])**2+(v/region['sy'])**2 < 1
+                        else:
+                            mask |= (np.abs(u) < region['sx']/2) & (np.abs(v) < region['sy']/2)
+                ids[mask] = material_ids[region['material']]
+            masks[key] = ids
+        coords.append(np.column_stack((x, y, np.full(len(x), z))))
+        planes.append(np.full(len(x), PLANE_NAMES.index(plane), dtype=np.int32))
+        labels.append(np.full(len(x), layer_names.index(layer['name']), dtype=np.int32))
+        materials.append(masks[key])
+        instructions.append((offset, offset+len(x), plane, float(z)))
+        offset += len(x)
+
+    for layer, start, stop in layers:
+        for fraction in ((k+.5)/depths for k in range(depths)):
+            append('volume_samples', layer, start+(stop-start)*fraction, ys)
+    if cfg.get('maps', False):
+        layer, start, stop = next(t for t in layers if t[0]['name'] == chosen)
+        append('xy', layer, (start+stop)/2, ys)
+    if cfg.get('track_contours', True):
+        for layer, start, stop in layers:
+            for j in range(count):
+                append('xz', layer, start+(stop-start)*(j+.5)/count, np.asarray([0.]))
+    arrays = dict(xyz=np.concatenate(coords), plane=np.concatenate(planes),
+                  layer=np.concatenate(labels), material=np.concatenate(materials),
+                  layer_names=np.asarray(layer_names), material_names=np.asarray(material_names))
+    for value in arrays.values():
+        value.flags.writeable = False
+    return arrays, instructions, xs, ys
+
+
+def _sample_field_arrays(sampler, model, cfg):
+    import numpy as np
+    geometry = {key: model[key] for key in ('ax', 'ay', 'layers', 'patterns')}
+    geometry['materials'] = [m['name'] for m in model['materials']]
+    settings = {key: cfg[key] for key in ('grid', 'depth_samples', 'layer', 'maps', 'track_contours') if key in cfg}
+    layout, instructions, xs, ys = _sampling_layout(json.dumps((geometry, settings), sort_keys=True))
+    arrays = dict(layout)
+    arrays['E'] = np.empty((len(layout['xyz']), 3), dtype=np.complex128)
+    arrays['H'] = np.empty_like(arrays['E'])
+    for offset in range(0, len(instructions), 8):
+        batch = instructions[offset:offset+8]
+        if hasattr(sampler, 'prepare_planes'):
+            sampler.prepare_planes([item[3] for item in batch])
+        if hasattr(sampler, 'prepare_grid'):
+            sampler.prepare_grid(xs, ys, [item[3] for item in batch if item[2] != 'xz'])
+        for first, last, plane, z in batch:
+            if plane == 'xz':
+                e, h = sampler.GetFieldsMany(np.column_stack((xs, np.zeros(len(xs)))), z)
+            else:
+                e, h = sampler.grid(xs, ys, z)
+            arrays['E'][first:last] = np.asarray(e).reshape(-1, 3)
+            arrays['H'][first:last] = np.asarray(h).reshape(-1, 3)
+    if not np.isfinite(arrays['E']).all() or not np.isfinite(arrays['H']).all():
+        raise ValueError('Nonfinite S4 electromagnetic field')
+    return arrays
+
+
+def sample_fields(model, perf, cfg, directory, module=None, simulation=None, solved=False, field_gpu=None):
     from backend import load_runtime, build_simulation
     from field_tracking import enrich_fields
     perf = performance(perf, 1, os.cpu_count() or 1)
@@ -41,79 +143,45 @@ def sample_fields(model, perf, cfg, directory, module=None, simulation=None, sol
     before = module.AccelerationInfo()
     started = time.monotonic()
     wavelength = cfg['wavelength_nm']
+    reused_spectrum_solution = solved
     simulation = simulation or build_simulation(module, model, wavelength)
     if not solved:
         simulation.SetFrequency(1000/wavelength)
         s, p = ((1., 0.) if model['polarization'] == 's' else (0., -1.) if model['polarization'] == 'p' else (2**-.5, -2**-.5))
         simulation.SetExcitationPlanewave(IncidenceAngles=(model['points'][0][2], model['phi']), sAmplitude=complex(s), pAmplitude=complex(p), Order=0)
+        if perf.get('solver_backend') == 'eigenfree-gpu':
+            from gpu_solver_runtime import load_cupy
+            from eigenfree_scan import FieldView
+            from s4_eigenfree_gpu import solve_batch
+            cp = load_cupy()
+            payload = simulation.GetEigenfreeOperators()
+            with cp.cuda.Device(perf['gpu_device']):
+                solution = solve_batch([payload], backend='cupy', symmetry=perf['eigenfree_symmetry'])
+            simulation = FieldView(solution, 0, payload)
+            solved = True
+            field_gpu = False
+        else:
+            from cutoff_solver import cutoff_candidate, solve_cutoff
+            if cutoff_candidate(model, wavelength, model['points'][0][2], simulation.GetBasisSet()):
+                simulation, _, cutoff_diagnostics = solve_cutoff(simulation, perf)
+                solved = True
     from field_sampling import FourierFieldSampler
-    sampler = FourierFieldSampler(simulation, model, wavelength, enabled=cfg.get('sampling_backend') != 'point')
+    sampler = FourierFieldSampler(simulation, model, wavelength, enabled=cfg.get('sampling_backend') != 'point',
+                                  threads=perf['threads'], gpu=gpu_requested(perf) if field_gpu is None else field_gpu,
+                                  gpu_device=perf['gpu_device'])
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     write_json(directory/'field_model.json', dict(model=model, wavelength_nm=wavelength, settings=cfg))
-    headers = ['plane','layer','x_um','y_um','z_um','Ex_real','Ex_imag','Ey_real','Ey_imag','Ez_real','Ez_imag','E2','material',
-               'Hx_real','Hx_imag','Hy_real','Hy_imag','Hz_real','Hz_imag','Sx','Sy','Sz']
-    layers, z = [], 0.
-    for layer in model['layers'][1:-1]:
-        if layer['thickness'] > 0:
-            layers.append((layer,z,z+layer['thickness']))
-        z += layer['thickness']
-    if not layers:
-        raise ValueError('Field sampling requires a finite-thickness layer')
-    chosen = cfg.get('layer') or next((p['layer'] for p in model['patterns']), layers[0][0]['name'])
-    if chosen not in {l['name'] for l,_,_ in layers}:
-        raise ValueError('Select a finite-thickness layer for the XY field map')
-    count = cfg.get('grid', 8)
-    xs = [model['ax']*((i+.5)/count-.5) for i in range(count)]
-    ys = [model['ay']*((i+.5)/count-.5) for i in range(count)]
-    material_cache = {}
-    with (directory/'electric_fields.csv').open('w', newline='', encoding='utf-8') as stream:
-        writer = csv.writer(stream)
-        writer.writerow(headers)
-
-        def point(plane, layer, x, y, z, fields):
-            electric, magnetic = fields
-            electric = [complex(v) for v in electric]
-            magnetic = [complex(v) for v in magnetic]
-            e2 = sum(abs(v)**2 for v in electric)  # incident electric amplitude squared is one
-            if not math.isfinite(e2) or not all(math.isfinite(v.real) and math.isfinite(v.imag) for v in magnetic):
-                raise ValueError('Nonfinite S4 electromagnetic field')
-            # Time-averaged Poynting convention in S4 normalized units.
-            flux = [.5*(electric[(i+1)%3]*magnetic[(i+2)%3].conjugate()
-                         - electric[(i+2)%3]*magnetic[(i+1)%3].conjugate()).real for i in range(3)]
-            key = (layer['name'], x, y)
-            if key not in material_cache:
-                material_cache[key] = material_at(model,layer,x,y)
-            material = material_cache[key]
-            writer.writerow([plane, layer['name'],x,y,z,*[v for e in electric for v in (e.real,e.imag)],e2,material,
-                             *[v for h in magnetic for v in (h.real,h.imag)],*flux])
-
-        for layer, start, stop in layers:
-            depths = cfg.get('depth_samples', 3)
-            for fraction in ((k+.5)/depths for k in range(depths)):
-                z = start+(stop-start)*fraction
-                electric, magnetic = sampler.grid(xs, ys, z)
-                for i, x in enumerate(xs):
-                    for j, y in enumerate(ys):
-                        point('volume_samples',layer,x,y,z,(electric[i,j],magnetic[i,j]))
-                stream.flush()
-        if cfg.get('maps', False):
-            layer,start,stop = next(t for t in layers if t[0]['name']==chosen)
-            z = (start+stop)/2
-            electric, magnetic = sampler.grid(xs, ys, z)
-            for i, x in enumerate(xs):
-                for j, y in enumerate(ys):
-                    point('xy',layer,x,y,z,(electric[i,j],magnetic[i,j]))
-                stream.flush()
-        if cfg.get('track_contours', True):
-            for layer,start,stop in layers:
-                # Separate rows per layer preserve very thin films in the section.
-                for j in range(count):
-                    z = start+(stop-start)*(j+.5)/count
-                    electric, magnetic = sampler.GetFieldsMany([(x, 0.) for x in xs], z)
-                    for i, x in enumerate(xs):
-                        point('xz',layer,x,0.,z,(electric[i],magnetic[i]))
-                    stream.flush()
+    from field_storage import write_field_arrays, field_frame
+    arrays = _sample_field_arrays(sampler, model, cfg)
+    storage_format = cfg.get("storage_format", "array")
+    if storage_format == "array":
+        write_field_arrays(directory, arrays)
+    elif storage_format == "csv":
+        field_frame(arrays).to_csv(directory/"electric_fields.csv", index=False)
+        (directory/"electric_fields.npz").unlink(missing_ok=True)
+    else:
+        raise ValueError("Field storage format must be array or csv")
     # Geometry-following XZ/XY metrics and sidewall depth profiles enrich learning.
     from airhole_field_objective import aligned_hole, evaluate as evaluate_airhole, DEFAULTS as AIRHOLE_DEFAULTS
     try:
@@ -124,24 +192,32 @@ def sample_fields(model, perf, cfg, directory, module=None, simulation=None, sol
         write_json(directory/'airhole_field_metrics.json', evaluate_airhole(sampler, model, cfg.get('airhole_settings')))
     after = module.AccelerationInfo()
     diagnostics = dict(performance=perf, elapsed_seconds=time.monotonic()-started, sampling=sampler.stats,
-                       reused_spectrum_solution=solved,
+                       reused_spectrum_solution=reused_spectrum_solution,
                        statuses={str(os.getpid()): after['status']},
                        **{key: int(after[key])-int(before[key])
                           for key in ('cpu_gemm_calls', 'gpu_gemm_calls', 'gpu_failures')})
+    diagnostics['native_gpu_gemm_calls'] = diagnostics['gpu_gemm_calls']
+    if perf.get('solver_backend') == 'eigenfree-gpu':
+        diagnostics.update(solver_backend='eigenfree-gpu',gpu_solved_points=1,eigendecompositions=0)
+    if getattr(getattr(simulation, 'solution', None), 'regular_ports', False):
+        diagnostics['exact_cutoff_solution'] = dict(simulation.solution.diagnostics)
+    diagnostics['field_gpu_gemm_calls'] = sampler.stats['gpu_grid_batches']
+    diagnostics['gpu_gemm_calls'] += diagnostics['field_gpu_gemm_calls']
+    diagnostics['gpu_failures'] += sampler.stats['gpu_failures']
     # A shared spectrum solve accounts for its GPU products upstream. Sampling
     # cached fields need not launch another GPU GEMM; still report any failure.
-    diagnostics['warnings'] = ([] if solved and not diagnostics['gpu_failures']
+    diagnostics['warnings'] = ([] if (solved or diagnostics['field_gpu_gemm_calls']) and not diagnostics['gpu_failures']
                                else acceleration_warnings(diagnostics, perf))
     write_json(directory/'field_diagnostics.json', diagnostics)
     if perf['require_gpu'] and not solved and (not diagnostics['gpu_gemm_calls'] or diagnostics['gpu_failures']):
         raise RuntimeError('GPU work was required for fields, but it did not complete successfully. '+
                            ' '.join(diagnostics['warnings']))
-    features = enrich_fields(directory)
+    features = enrich_fields(directory, arrays=arrays, save=False)
     diagnostics['total_elapsed_seconds'] = time.monotonic()-started
     diagnostics['descriptor_seconds'] = diagnostics['total_elapsed_seconds']-diagnostics['elapsed_seconds']
     write_json(directory/'field_diagnostics.json', diagnostics)
     features['acceleration'] = diagnostics
-    write_json(directory/'field_features.json', features)
+    write_json(directory/'field_features.json', features, compact=True)
     return features
 
 
@@ -226,10 +302,10 @@ class FieldSession:
 def validate_field_settings(cfg):
     count = cfg.get('grid',8)
     depths = cfg.get('depth_samples',3)
-    if not isinstance(depths,int) or isinstance(depths,bool) or not 3 <= depths <= 40:
-        raise ValueError('3D depths per layer must be an integer between 3 and 40')
-    if not isinstance(count,int) or not 3 <= count <= 80:
-        raise ValueError('Field grid must be an integer between 3 and 80')
+    if not isinstance(depths,int) or isinstance(depths,bool) or depths < 3:
+        raise ValueError('3D depths per layer must be an integer of at least 3')
+    if not isinstance(count,int) or isinstance(count,bool) or count < 3:
+        raise ValueError('Field grid must be an integer of at least 3')
     if not math.isfinite(cfg['wavelength_nm']) or cfg['wavelength_nm'] <= 0:
         raise ValueError('Field wavelength must be positive')
 

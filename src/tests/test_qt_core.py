@@ -309,7 +309,19 @@ class QtCoreTests(unittest.TestCase):
         prepared, spec = prepare_job('simulation', project, {}, self.library)
         from scan_storage import ScanPoints
         self.assertIsInstance(spec['model']['points'], ScanPoints)
-        self.assertEqual(dict(spec['model'], points=list(spec['model']['points'])), expected)
+        # The editable-device bridge adds provenance and periodic-domain
+        # warnings; compare the original physical contract independently.
+        actual = dict(spec['model'], points=list(spec['model']['points']))
+        for key, value in expected.items():
+            if key == 'layers':
+                self.assertEqual([{name: layer[name] for name in original}
+                                  for layer, original in zip(actual[key], value)], value)
+            elif key == 'warnings':
+                self.assertTrue(set(value).issubset(actual[key]))
+            else:
+                self.assertEqual(actual[key], value, key)
+        self.assertEqual(actual['geometry_source'], 'device')
+        self.assertTrue(actual['layers'][1]['device_layer_id'])
         self.assertEqual(spec['performance'], performance(project['performance'], 3, os.cpu_count() or 1))
         project['layers'][1]['Thickness_um'] = 9
         project['settings']['ax_um'] = 9
@@ -369,8 +381,13 @@ class QtCoreTests(unittest.TestCase):
         self.assertEqual(spec['model']['points'], [[0, 1567., 0.]])
         self.assertEqual(spec['search']['layer'], 'Device')
         self.assertEqual(spec['search']['grid'], 7)
-        with self.assertRaises(ValueError):
-            prepare_job('fields', project, {'grid': 81}, self.library)
+        # Field grids are no longer capped at80. Keep the actual lower bound
+        # and integer contract without restoring that obsolete limit.
+        _, large = prepare_job('fields', project, {'grid': 81}, self.library)
+        self.assertEqual(large['search']['grid'], 81)
+        for grid in (2, 3.5):
+            with self.subTest(grid=grid), self.assertRaises(ValueError):
+                prepare_job('fields', project, {'grid': grid}, self.library)
 
     def test_worker_cancel_before_launch_never_creates_or_starts_native_job(self):
         started = time.monotonic()

@@ -147,7 +147,7 @@ class NativeComputationTests(unittest.TestCase):
         page.controls['wl_step_nm'].setValue(1)
         with patch.object(self.store, 'start_run') as start:
             page.run()
-        start.assert_called_once_with('simulation', {'measure_phase': False,'electric_fields':{'grid':25,'depth_samples':3,'contour_step':.1}})
+        start.assert_called_once_with('simulation', {'measure_phase': False})
         self.assertEqual(self.store.settings['wl_start_nm'], 1500)
         path = Path(self.temp.name) / 'results.csv'
         pd.DataFrame([[1500, 0, .1, .2, .7], [1501, 0, .001, .001, .998]],
@@ -157,6 +157,31 @@ class NativeComputationTests(unittest.TestCase):
         self.assertIn('99.8%', page.peak_summary.text())
         self.assertIn('GPU matrix products: 8', page.metrics.text())
         self.assertEqual(len(page.plot.figure.axes[0].lines), 3)
+
+    def test_phase_toggle_survives_run_refresh_edits_and_project_roundtrip(self):
+        page = self.widget(SimulationPage)
+        page.measure_phase.setChecked(True)
+        self.assertTrue(self.store.search_state['simulation']['measure_phase'])
+        page.controls['wl_start_nm'].setValue(1116.4)
+        page.controls['wl_stop_nm'].setValue(1116.6)
+        page.controls['wl_step_nm'].setValue(.1)
+        page.save_settings()
+        self.assertTrue(page.measure_phase.isChecked())
+        with patch.object(self.store,'start_run') as start:page.run()
+        start.assert_called_once_with('simulation',{'measure_phase':True})
+        self.assertTrue(page.measure_phase.isChecked())
+        project=self.store.portable_project()
+        self.store.load_project(project)
+        self.assertTrue(page.measure_phase.isChecked())
+        for backend in ('native','eigenfree-gpu'):
+            self.store.performance['solver_backend']=backend
+            _,spec=prepare_job('simulation',self.store.portable_project(),{'measure_phase':True},self.store.library)
+            self.assertTrue(spec['model']['measure_phase'])
+            self.assertEqual(spec['performance']['solver_backend'],backend)
+        page.measure_phase.setChecked(False)
+        self.assertFalse(self.store.search_state['simulation']['measure_phase'])
+        with patch.object(self.store,'start_run') as start:page.run()
+        start.assert_called_once_with('simulation',{'measure_phase':False})
 
     def test_target_contract_has_tolerance_hole_shapes_and_field_learning(self):
         page = self.widget(OptimizePage)
@@ -334,8 +359,10 @@ class NativeComputationTests(unittest.TestCase):
         page.directory=directory
         with patch('qt_compute.field_figure',side_effect=lambda *args,**kwargs:Figure()) as render,patch.object(page.plot,'export_figure'):
             page.show_result(dict(output=str(directory/'results.csv'),info={}))
-            self.assertEqual(page.result_tabs.currentWidget(),page.generated_fields)
+            self.assertEqual(page.result_tabs.currentWidget(),page.plot)
+            render.assert_not_called()
             self.assertEqual(page.field_sample.count(),2)
+            page.show();page.result_tabs.setCurrentWidget(page.generated_fields);APP.processEvents()
             page.field_sample.setCurrentIndex(1)
             page.field_component.setCurrentIndex(3)
             self.assertEqual(render.call_args.args[0],str(directory/'fields/sample2'))

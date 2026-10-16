@@ -101,6 +101,13 @@ class NativeGPUFieldsTests(unittest.TestCase):
         from field_solver import execute_fields
         from field_tracking import feature_vector
         model=field_model()
+        # Avoid symmetry-tied contour maxima and identically zero components:
+        # CPU/GPU roundoff can choose different tied pixels on the same field.
+        model['points'] = [[0, 1550., 17.]]
+        model['phi'] = 23.
+        model['polarization'] = 's+p'
+        model['patterns'][0].update(shape='ellipse', sx=.12, sy=.075,
+                                    angle=17., cx=.03, cy=-.04)
         cfg=dict(wavelength_nm=1550.,grid=3,maps=True)
         with tempfile.TemporaryDirectory() as directory:
             cpu=execute_fields(model,dict(DEFAULT_PERFORMANCE),cfg,Path(directory)/'cpu')
@@ -112,8 +119,8 @@ class NativeGPUFieldsTests(unittest.TestCase):
             for key in first:
                 self.assertAlmostEqual(first[key],second[key],delta=1e-7,msg=key)
             def fields(name):
-                with (Path(directory)/name/'electric_fields.csv').open(newline='') as stream:
-                    return list(csv.DictReader(stream))
+                from field_storage import load_field_frame
+                return load_field_frame(Path(directory)/name).to_dict('records')
             for a,b in zip(fields('cpu'),fields('gpu')):
                 for component in ('Ex','Ey','Ez','Hx','Hy','Hz'):
                     for part in ('real','imag'):

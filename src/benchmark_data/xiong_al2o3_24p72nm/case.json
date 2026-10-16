@@ -1,0 +1,1335 @@
+{
+  "id": "xiong_al2o3_24p72nm",
+  "label": "xiong al2o3 24p72nm",
+  "family": "Dielectric capacitance",
+  "kind": "electrical",
+  "project": {
+    "device": {
+      "schema_version": 1,
+      "name": "xiong_al2o3_24p72nm",
+      "width_um": 80.0,
+      "depth_um": 80.0,
+      "temperature_K": 298.0,
+      "mesh": {
+        "nx": 8,
+        "ny": 8,
+        "nz_per_layer": 8,
+        "max_nodes": 300000
+      },
+      "layers": [
+        {
+          "id": "film",
+          "name": "Al2O3 dielectric",
+          "material_id": "paper_al2o3",
+          "thickness_um": 0.02472,
+          "donor_cm3": 0.0,
+          "acceptor_cm3": 0.0,
+          "enabled": true
+        }
+      ],
+      "shapes": [],
+      "doping_regions": [],
+      "contacts": [
+        {
+          "layer_id": "film",
+          "boundary": "potential",
+          "voltage_V": 0.0,
+          "bias_scale": 0.0,
+          "cx_um": 0.0,
+          "cy_um": 0.0,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "id": "top",
+          "name": "Top ideal electrode",
+          "surface": "top",
+          "shape": "rectangle",
+          "size_x_um": 80.0,
+          "size_y_um": 80.0,
+          "optical_material_name": "Al",
+          "optical_thickness_um": 0.1
+        },
+        {
+          "layer_id": "film",
+          "boundary": "potential",
+          "voltage_V": 0.0,
+          "bias_scale": 0.0,
+          "cx_um": 0.0,
+          "cy_um": 0.0,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "id": "bottom",
+          "name": "Grounded ideal back electrode",
+          "surface": "bottom",
+          "shape": "rectangle",
+          "size_x_um": 80.0,
+          "size_y_um": 80.0,
+          "optical_material_name": "",
+          "optical_thickness_um": 0.0
+        }
+      ]
+    },
+    "electrical_materials": [
+      {
+        "id": "gaas",
+        "name": "GaAs",
+        "kind": "semiconductor",
+        "temperature_K": 300.0,
+        "model": "gaas_reference",
+        "color": "#ef7595",
+        "optical_material_name": "GaAs",
+        "aliases": [
+          "Gallium arsenide"
+        ],
+        "properties": {
+          "epsilon_r": 12.9,
+          "bandgap_eV": 1.424,
+          "affinity_eV": 4.07,
+          "electron_mass_ratio": 0.063,
+          "hole_mass_ratio": 0.51,
+          "electron_dos_mass_ratio": 0.063,
+          "hole_dos_mass_ratio": 0.51,
+          "Nc_cm3": 3.953218625373507e+17,
+          "Nv_cm3": 9.105321246392134e+18,
+          "intrinsic_cm3": 2075149.9917685564,
+          "electron_mobility_cm2_Vs": 8500.0,
+          "hole_mobility_cm2_Vs": 400.0
+        },
+        "sources": [
+          {
+            "title": "Ioffe NSM: AlGaAs basic parameters (GaAs x=0 limit)",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/basic.html",
+            "properties": [
+              "epsilon_r",
+              "affinity_eV",
+              "electron_mass_ratio",
+              "hole_mass_ratio"
+            ],
+            "note": "",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Ioffe NSM: AlGaAs band structure (GaAs x=0 limit)",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/bandstr.html",
+            "properties": [
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3",
+              "intrinsic_cm3"
+            ],
+            "note": "DOS and ni are calculated from the reference model.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "TYDEX: GaAs electronic properties",
+            "url": "https://www.tydexoptics.com/materials1/for_transmission_optics/gaas/",
+            "properties": [
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs"
+            ],
+            "note": "Low-field bulk reference; not a mobility fit for heavily doped material.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "300 K bulk reference. Masses follow the Ioffe x=0 alloy limit. Mobility is constant unless edited. No recombination, high-field transport or impurity-scattering model is implied.",
+        "property_overrides": []
+      },
+      {
+        "id": "ito",
+        "name": "ITO",
+        "kind": "conductor",
+        "temperature_K": 300.0,
+        "model": "constant",
+        "color": "#67c9e5",
+        "optical_material_name": "ITO",
+        "aliases": [
+          "Indium tin oxide"
+        ],
+        "properties": {
+          "epsilon_r": 9.0,
+          "bandgap_eV": 3.5,
+          "affinity_eV": 4.5,
+          "electron_mass_ratio": 0.35,
+          "hole_mass_ratio": 1.0,
+          "electron_dos_mass_ratio": 0.35,
+          "hole_dos_mass_ratio": 1.0,
+          "Nc_cm3": 5.176569810212164e+18,
+          "Nv_cm3": 2.5e+19,
+          "electron_mobility_cm2_Vs": 30.0,
+          "hole_mobility_cm2_Vs": 0.0,
+          "bulk_electron_cm3": 8e+20,
+          "bulk_hole_cm3": 0.0,
+          "intrinsic_cm3": 4.5423956659835214e-11
+        },
+        "sources": [
+          {
+            "title": "Khusayfan & El-Nahass (2013): structure and electro-optical characteristics of ITO",
+            "url": "https://doi.org/10.1155/2013/408182",
+            "properties": [
+              "electron_mass_ratio"
+            ],
+            "note": "The paper uses assumed mass 0.35 m0 and reports process-dependent carrier density and mobility. Its measured optical band gap is not used as a universal electronic gap.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Editable ITO device-study assumptions",
+            "url": "",
+            "properties": [
+              "epsilon_r",
+              "bandgap_eV",
+              "affinity_eV",
+              "electron_mass_ratio",
+              "hole_mass_ratio",
+              "electron_dos_mass_ratio",
+              "hole_dos_mass_ratio",
+              "Nc_cm3",
+              "Nv_cm3",
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs",
+              "bulk_electron_cm3",
+              "bulk_hole_cm3",
+              "intrinsic_cm3"
+            ],
+            "note": "All preset values are model assumptions, not measurements of your film: n=8e20 cm−3, μn=30 cm²/(V·s), static εr=9, m*=0.35 m0, χ=4.5 eV, electronic gap=3.5 eV. Hole/DOS values are closure assumptions; degenerate ITO requires Fermi statistics.",
+            "kind": "assumption",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Transparent conductor with degenerate electrons. Carrier density, mobility, static permittivity, mass and affinity depend on film growth; replace these assumptions with measured values. Static εr is not optical ε∞. The fixed mass approximation does not model nonparabolicity. Temperature is held constant in this preset.",
+        "property_overrides": []
+      },
+      {
+        "id": "algaas",
+        "name": "AlGaAs",
+        "kind": "semiconductor",
+        "temperature_K": 300.0,
+        "al_fraction": 0.5,
+        "model": "algaas_reference",
+        "color": "#9c8cef",
+        "optical_material_name": "AlGaAs",
+        "aliases": [
+          "Aluminium gallium arsenide"
+        ],
+        "properties": {
+          "epsilon_r": 11.48,
+          "bandgap_eV": 1.9982499999999999,
+          "affinity_eV": 3.5700000000000003,
+          "electron_mass_ratio": 0.26,
+          "hole_mass_ratio": 0.635,
+          "electron_dos_mass_ratio": 0.78,
+          "hole_dos_mass_ratio": 0.635,
+          "Nc_cm3": 1.7221933689339302e+19,
+          "Nv_cm3": 1.26502933513417e+19,
+          "intrinsic_cm3": 242.3985345457434,
+          "electron_mobility_cm2_Vs": 1000.0,
+          "hole_mobility_cm2_Vs": 100.0
+        },
+        "sources": [
+          {
+            "title": "Ioffe NSM: AlGaAs basic parameters",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/basic.html",
+            "properties": [
+              "epsilon_r",
+              "affinity_eV",
+              "electron_mass_ratio",
+              "hole_mass_ratio",
+              "electron_dos_mass_ratio"
+            ],
+            "note": "",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Ioffe NSM: AlGaAs band structure",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/bandstr.html",
+            "properties": [
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3",
+              "intrinsic_cm3"
+            ],
+            "note": "Piecewise 300 K fit. Indirect branch above x=0.45 uses DOS mass 0.85−0.14x and conductivity mass 0.26 m0.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Editable transport assumptions",
+            "url": "",
+            "properties": [
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs"
+            ],
+            "note": "1000 / 100 cm²/(V·s) are starting estimates, not measured mobility for a particular alloy or doping.",
+            "kind": "assumption",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Editable alloy fraction x∈[0,1]. The approximate direct/indirect transition is represented at x=0.45; Ioffe also reports a 0.41–0.45 crossover region. Mobility values are explicit assumptions. Temperature gaps use Varshni corrections and DOS scales as T^1.5; validity outside the 300 K reference must be assessed for the device.",
+        "property_overrides": []
+      },
+      {
+        "id": "silicon",
+        "name": "Silicon",
+        "kind": "semiconductor",
+        "temperature_K": 300.0,
+        "model": "silicon_reference",
+        "color": "#70cfa7",
+        "optical_material_name": "Si",
+        "aliases": [
+          "Si",
+          "Crystalline silicon"
+        ],
+        "properties": {
+          "epsilon_r": 11.7,
+          "bandgap_eV": 1.124,
+          "affinity_eV": 4.05,
+          "electron_mass_ratio": 0.26,
+          "hole_mass_ratio": 0.39,
+          "electron_dos_mass_ratio": 1.08,
+          "hole_dos_mass_ratio": 0.81,
+          "Nc_cm3": 2.82e+19,
+          "Nv_cm3": 1.83e+19,
+          "intrinsic_cm3": 8225562977.908778,
+          "electron_mobility_cm2_Vs": 1400.0,
+          "hole_mobility_cm2_Vs": 470.0
+        },
+        "sources": [
+          {
+            "title": "University of Colorado ECEE: silicon material parameters",
+            "url": "https://www.colorado.edu/ecee/sites/default/files/attached-files/sd_constants_sheet.pdf",
+            "properties": [
+              "epsilon_r",
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3",
+              "electron_mass_ratio",
+              "hole_mass_ratio",
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs"
+            ],
+            "note": "300 K parameter sheet. ni is recalculated consistently from Eg/Nc/Nv rather than mixing independent rounded ni values.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Ioffe NSM: silicon reference",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/Si/basic.html",
+            "properties": [
+              "affinity_eV"
+            ],
+            "note": "Conventional electron-affinity estimate 4.05 eV. Surface/interface processing can change the effective band alignment.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Silicon temperature model",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/Si/bandstr.html",
+            "properties": [
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3"
+            ],
+            "note": "Varshni α=4.73e−4 eV/K, β=636 K; DOS T^1.5 scaling. Static permittivity and mobility are held constant.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Crystalline silicon, 300 K low-field reference. Electron/hole conductivity masses are distinct from DOS masses. Mobility is not a fit to high doping or field; edit to match your sample.",
+        "property_overrides": []
+      },
+      {
+        "id": "air",
+        "name": "Air / void",
+        "kind": "dielectric",
+        "temperature_K": 300.0,
+        "model": "constant",
+        "color": "#cbd5df",
+        "optical_material_name": "Air",
+        "aliases": [
+          "Air",
+          "Void"
+        ],
+        "properties": {
+          "epsilon_r": 1.0,
+          "conductivity_S_m": 0.0
+        },
+        "sources": [
+          {
+            "title": "Ideal void model",
+            "url": "",
+            "properties": [
+              "epsilon_r",
+              "conductivity_S_m"
+            ],
+            "note": "Vacuum-permittivity, zero-conductivity approximation.",
+            "kind": "assumption",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Ideal dielectric void. No mobile carriers or optical material data are inferred from this record.",
+        "property_overrides": []
+      },
+      {
+        "id": "paper_al2o3",
+        "name": "Al2O3 unfitted static model",
+        "kind": "dielectric",
+        "model": "constant",
+        "temperature_K": 298.0,
+        "properties": {
+          "epsilon_r": 9.0,
+          "conductivity_S_m": 0.0
+        },
+        "notes": "Reported area and measured dielectric thickness. Epsilon=9 is an unfitted bulk assumption from the independent Yu paper. AC dispersion, traps, leakage and breakdown are unsupported.",
+        "sources": [
+          {
+            "title": "Geometry and measured values",
+            "url": "https://doi.org/10.3390/molecules27123951",
+            "kind": "primary paper"
+          },
+          {
+            "title": "Unfitted permittivity assumption",
+            "url": "https://doi.org/10.1016/j.sse.2021.108167",
+            "kind": "primary paper"
+          }
+        ]
+      }
+    ],
+    "materials": [
+      {
+        "Name": "Air",
+        "Model": "constant_nk",
+        "A": 1.0,
+        "B": 0.0,
+        "DataFile": "",
+        "WavelengthUnit": "nm"
+      }
+    ],
+    "layers": [
+      {
+        "Name": "Incident",
+        "Thickness_um": 0.0,
+        "Material": "Air"
+      },
+      {
+        "Name": "Al2O3 dielectric",
+        "Thickness_um": 0.02472,
+        "Material": "Air"
+      },
+      {
+        "Name": "Exit",
+        "Thickness_um": 0.0,
+        "Material": "Air"
+      }
+    ],
+    "patterns": [],
+    "settings": {
+      "ax_um": 80.0,
+      "ay_um": 80.0,
+      "NumG": 9,
+      "mode": "Wavelength sweep",
+      "wl_start_nm": 1550.0,
+      "wl_stop_nm": 1550.0,
+      "wl_step_nm": 1.0,
+      "theta_deg": 0.0,
+      "phi_deg": 0.0,
+      "polarization": "s"
+    },
+    "performance": {
+      "mode": "CPU only",
+      "workers": 1,
+      "threads": 1,
+      "gpu_device": 0,
+      "gpu_min_n": 1024,
+      "gpu_block": 256,
+      "chunk_size": 8,
+      "timeout_seconds": 3600,
+      "require_gpu": false,
+      "solver_backend": "native",
+      "mirror_symmetry": true,
+      "eigenfree_symmetry": true,
+      "eigenfree_batch_size": 32
+    },
+    "desktop_search": {
+      "electrical": {
+        "model": "custom_device",
+        "device": {
+          "schema_version": 1,
+          "name": "xiong_al2o3_24p72nm",
+          "width_um": 80.0,
+          "depth_um": 80.0,
+          "temperature_K": 298.0,
+          "mesh": {
+            "nx": 8,
+            "ny": 8,
+            "nz_per_layer": 8,
+            "max_nodes": 300000
+          },
+          "layers": [
+            {
+              "id": "film",
+              "name": "Al2O3 dielectric",
+              "material_id": "paper_al2o3",
+              "thickness_um": 0.02472,
+              "donor_cm3": 0.0,
+              "acceptor_cm3": 0.0,
+              "enabled": true
+            }
+          ],
+          "shapes": [],
+          "doping_regions": [],
+          "contacts": [
+            {
+              "layer_id": "film",
+              "boundary": "potential",
+              "voltage_V": 0.0,
+              "bias_scale": 0.0,
+              "cx_um": 0.0,
+              "cy_um": 0.0,
+              "angle_deg": 0.0,
+              "vertices": [],
+              "enabled": true,
+              "id": "top",
+              "name": "Top ideal electrode",
+              "surface": "top",
+              "shape": "rectangle",
+              "size_x_um": 80.0,
+              "size_y_um": 80.0,
+              "optical_material_name": "Al",
+              "optical_thickness_um": 0.1
+            },
+            {
+              "layer_id": "film",
+              "boundary": "potential",
+              "voltage_V": 0.0,
+              "bias_scale": 0.0,
+              "cx_um": 0.0,
+              "cy_um": 0.0,
+              "angle_deg": 0.0,
+              "vertices": [],
+              "enabled": true,
+              "id": "bottom",
+              "name": "Grounded ideal back electrode",
+              "surface": "bottom",
+              "shape": "rectangle",
+              "size_x_um": 80.0,
+              "size_y_um": 80.0,
+              "optical_material_name": "",
+              "optical_thickness_um": 0.0
+            }
+          ]
+        },
+        "material_library": [
+          {
+            "id": "gaas",
+            "name": "GaAs",
+            "kind": "semiconductor",
+            "temperature_K": 300.0,
+            "model": "gaas_reference",
+            "color": "#ef7595",
+            "optical_material_name": "GaAs",
+            "aliases": [
+              "Gallium arsenide"
+            ],
+            "properties": {
+              "epsilon_r": 12.9,
+              "bandgap_eV": 1.424,
+              "affinity_eV": 4.07,
+              "electron_mass_ratio": 0.063,
+              "hole_mass_ratio": 0.51,
+              "electron_dos_mass_ratio": 0.063,
+              "hole_dos_mass_ratio": 0.51,
+              "Nc_cm3": 3.953218625373507e+17,
+              "Nv_cm3": 9.105321246392134e+18,
+              "intrinsic_cm3": 2075149.9917685564,
+              "electron_mobility_cm2_Vs": 8500.0,
+              "hole_mobility_cm2_Vs": 400.0
+            },
+            "sources": [
+              {
+                "title": "Ioffe NSM: AlGaAs basic parameters (GaAs x=0 limit)",
+                "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/basic.html",
+                "properties": [
+                  "epsilon_r",
+                  "affinity_eV",
+                  "electron_mass_ratio",
+                  "hole_mass_ratio"
+                ],
+                "note": "",
+                "kind": "reference",
+                "reference_temperature_K": 300.0
+              },
+              {
+                "title": "Ioffe NSM: AlGaAs band structure (GaAs x=0 limit)",
+                "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/bandstr.html",
+                "properties": [
+                  "bandgap_eV",
+                  "Nc_cm3",
+                  "Nv_cm3",
+                  "intrinsic_cm3"
+                ],
+                "note": "DOS and ni are calculated from the reference model.",
+                "kind": "reference",
+                "reference_temperature_K": 300.0
+              },
+              {
+                "title": "TYDEX: GaAs electronic properties",
+                "url": "https://www.tydexoptics.com/materials1/for_transmission_optics/gaas/",
+                "properties": [
+                  "electron_mobility_cm2_Vs",
+                  "hole_mobility_cm2_Vs"
+                ],
+                "note": "Low-field bulk reference; not a mobility fit for heavily doped material.",
+                "kind": "reference",
+                "reference_temperature_K": 300.0
+              }
+            ],
+            "notes": "300 K bulk reference. Masses follow the Ioffe x=0 alloy limit. Mobility is constant unless edited. No recombination, high-field transport or impurity-scattering model is implied.",
+            "property_overrides": []
+          },
+          {
+            "id": "ito",
+            "name": "ITO",
+            "kind": "conductor",
+            "temperature_K": 300.0,
+            "model": "constant",
+            "color": "#67c9e5",
+            "optical_material_name": "ITO",
+            "aliases": [
+              "Indium tin oxide"
+            ],
+            "properties": {
+              "epsilon_r": 9.0,
+              "bandgap_eV": 3.5,
+              "affinity_eV": 4.5,
+              "electron_mass_ratio": 0.35,
+              "hole_mass_ratio": 1.0,
+              "electron_dos_mass_ratio": 0.35,
+              "hole_dos_mass_ratio": 1.0,
+              "Nc_cm3": 5.176569810212164e+18,
+              "Nv_cm3": 2.5e+19,
+              "electron_mobility_cm2_Vs": 30.0,
+              "hole_mobility_cm2_Vs": 0.0,
+              "bulk_electron_cm3": 8e+20,
+              "bulk_hole_cm3": 0.0,
+              "intrinsic_cm3": 4.5423956659835214e-11
+            },
+            "sources": [
+              {
+                "title": "Khusayfan & El-Nahass (2013): structure and electro-optical characteristics of ITO",
+                "url": "https://doi.org/10.1155/2013/408182",
+                "properties": [
+                  "electron_mass_ratio"
+                ],
+                "note": "The paper uses assumed mass 0.35 m0 and reports process-dependent carrier density and mobility. Its measured optical band gap is not used as a universal electronic gap.",
+                "kind": "reference",
+                "reference_temperature_K": 300.0
+              },
+              {
+                "title": "Editable ITO device-study assumptions",
+                "url": "",
+                "properties": [
+                  "epsilon_r",
+                  "bandgap_eV",
+                  "affinity_eV",
+                  "electron_mass_ratio",
+                  "hole_mass_ratio",
+                  "electron_dos_mass_ratio",
+                  "hole_dos_mass_ratio",
+                  "Nc_cm3",
+                  "Nv_cm3",
+                  "electron_mobility_cm2_Vs",
+                  "hole_mobility_cm2_Vs",
+                  "bulk_electron_cm3",
+                  "bulk_hole_cm3",
+                  "intrinsic_cm3"
+                ],
+                "note": "All preset values are model assumptions, not measurements of your film: n=8e20 cm−3, μn=30 cm²/(V·s), static εr=9, m*=0.35 m0, χ=4.5 eV, electronic gap=3.5 eV. Hole/DOS values are closure assumptions; degenerate ITO requires Fermi statistics.",
+                "kind": "assumption",
+                "reference_temperature_K": 300.0
+              }
+            ],
+            "notes": "Transparent conductor with degenerate electrons. Carrier density, mobility, static permittivity, mass and affinity depend on film growth; replace these assumptions with measured values. Static εr is not optical ε∞. The fixed mass approximation does not model nonparabolicity. Temperature is held constant in this preset.",
+            "property_overrides": []
+          },
+          {
+            "id": "algaas",
+            "name": "AlGaAs",
+            "kind": "semiconductor",
+            "temperature_K": 300.0,
+            "al_fraction": 0.5,
+            "model": "algaas_reference",
+            "color": "#9c8cef",
+            "optical_material_name": "AlGaAs",
+            "aliases": [
+              "Aluminium gallium arsenide"
+            ],
+            "properties": {
+              "epsilon_r": 11.48,
+              "bandgap_eV": 1.9982499999999999,
+              "affinity_eV": 3.5700000000000003,
+              "electron_mass_ratio": 0.26,
+              "hole_mass_ratio": 0.635,
+              "electron_dos_mass_ratio": 0.78,
+              "hole_dos_mass_ratio": 0.635,
+              "Nc_cm3": 1.7221933689339302e+19,
+              "Nv_cm3": 1.26502933513417e+19,
+              "intrinsic_cm3": 242.3985345457434,
+              "electron_mobility_cm2_Vs": 1000.0,
+              "hole_mobility_cm2_Vs": 100.0
+            },
+            "sources": [
+              {
+                "title": "Ioffe NSM: AlGaAs basic parameters",
+                "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/basic.html",
+                "properties": [
+                  "epsilon_r",
+                  "affinity_eV",
+                  "electron_mass_ratio",
+                  "hole_mass_ratio",
+                  "electron_dos_mass_ratio"
+                ],
+                "note": "",
+                "kind": "reference",
+                "reference_temperature_K": 300.0
+              },
+              {
+                "title": "Ioffe NSM: AlGaAs band structure",
+                "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/bandstr.html",
+                "properties": [
+                  "bandgap_eV",
+                  "Nc_cm3",
+                  "Nv_cm3",
+                  "intrinsic_cm3"
+                ],
+                "note": "Piecewise 300 K fit. Indirect branch above x=0.45 uses DOS mass 0.85−0.14x and conductivity mass 0.26 m0.",
+                "kind": "reference",
+                "reference_temperature_K": 300.0
+              },
+              {
+                "title": "Editable transport assumptions",
+                "url": "",
+                "properties": [
+                  "electron_mobility_cm2_Vs",
+                  "hole_mobility_cm2_Vs"
+                ],
+                "note": "1000 / 100 cm²/(V·s) are starting estimates, not measured mobility for a particular alloy or doping.",
+                "kind": "assumption",
+                "reference_temperature_K": 300.0
+              }
+            ],
+            "notes": "Editable alloy fraction x∈[0,1]. The approximate direct/indirect transition is represented at x=0.45; Ioffe also reports a 0.41–0.45 crossover region. Mobility values are explicit assumptions. Temperature gaps use Varshni corrections and DOS scales as T^1.5; validity outside the 300 K reference must be assessed for the device.",
+            "property_overrides": []
+          },
+          {
+            "id": "silicon",
+            "name": "Silicon",
+            "kind": "semiconductor",
+            "temperature_K": 300.0,
+            "model": "silicon_reference",
+            "color": "#70cfa7",
+            "optical_material_name": "Si",
+            "aliases": [
+              "Si",
+              "Crystalline silicon"
+            ],
+            "properties": {
+              "epsilon_r": 11.7,
+              "bandgap_eV": 1.124,
+              "affinity_eV": 4.05,
+              "electron_mass_ratio": 0.26,
+              "hole_mass_ratio": 0.39,
+              "electron_dos_mass_ratio": 1.08,
+              "hole_dos_mass_ratio": 0.81,
+              "Nc_cm3": 2.82e+19,
+              "Nv_cm3": 1.83e+19,
+              "intrinsic_cm3": 8225562977.908778,
+              "electron_mobility_cm2_Vs": 1400.0,
+              "hole_mobility_cm2_Vs": 470.0
+            },
+            "sources": [
+              {
+                "title": "University of Colorado ECEE: silicon material parameters",
+                "url": "https://www.colorado.edu/ecee/sites/default/files/attached-files/sd_constants_sheet.pdf",
+                "properties": [
+                  "epsilon_r",
+                  "bandgap_eV",
+                  "Nc_cm3",
+                  "Nv_cm3",
+                  "electron_mass_ratio",
+                  "hole_mass_ratio",
+                  "electron_mobility_cm2_Vs",
+                  "hole_mobility_cm2_Vs"
+                ],
+                "note": "300 K parameter sheet. ni is recalculated consistently from Eg/Nc/Nv rather than mixing independent rounded ni values.",
+                "kind": "reference",
+                "reference_temperature_K": 300.0
+              },
+              {
+                "title": "Ioffe NSM: silicon reference",
+                "url": "https://www.ioffe.ru/SVA/NSM/Semicond/Si/basic.html",
+                "properties": [
+                  "affinity_eV"
+                ],
+                "note": "Conventional electron-affinity estimate 4.05 eV. Surface/interface processing can change the effective band alignment.",
+                "kind": "reference",
+                "reference_temperature_K": 300.0
+              },
+              {
+                "title": "Silicon temperature model",
+                "url": "https://www.ioffe.ru/SVA/NSM/Semicond/Si/bandstr.html",
+                "properties": [
+                  "bandgap_eV",
+                  "Nc_cm3",
+                  "Nv_cm3"
+                ],
+                "note": "Varshni α=4.73e−4 eV/K, β=636 K; DOS T^1.5 scaling. Static permittivity and mobility are held constant.",
+                "kind": "reference",
+                "reference_temperature_K": 300.0
+              }
+            ],
+            "notes": "Crystalline silicon, 300 K low-field reference. Electron/hole conductivity masses are distinct from DOS masses. Mobility is not a fit to high doping or field; edit to match your sample.",
+            "property_overrides": []
+          },
+          {
+            "id": "air",
+            "name": "Air / void",
+            "kind": "dielectric",
+            "temperature_K": 300.0,
+            "model": "constant",
+            "color": "#cbd5df",
+            "optical_material_name": "Air",
+            "aliases": [
+              "Air",
+              "Void"
+            ],
+            "properties": {
+              "epsilon_r": 1.0,
+              "conductivity_S_m": 0.0
+            },
+            "sources": [
+              {
+                "title": "Ideal void model",
+                "url": "",
+                "properties": [
+                  "epsilon_r",
+                  "conductivity_S_m"
+                ],
+                "note": "Vacuum-permittivity, zero-conductivity approximation.",
+                "kind": "assumption",
+                "reference_temperature_K": 300.0
+              }
+            ],
+            "notes": "Ideal dielectric void. No mobile carriers or optical material data are inferred from this record.",
+            "property_overrides": []
+          },
+          {
+            "id": "paper_al2o3",
+            "name": "Al2O3 unfitted static model",
+            "kind": "dielectric",
+            "model": "constant",
+            "temperature_K": 298.0,
+            "properties": {
+              "epsilon_r": 9.0,
+              "conductivity_S_m": 0.0
+            },
+            "notes": "Reported area and measured dielectric thickness. Epsilon=9 is an unfitted bulk assumption from the independent Yu paper. AC dispersion, traps, leakage and breakdown are unsupported.",
+            "sources": [
+              {
+                "title": "Geometry and measured values",
+                "url": "https://doi.org/10.3390/molecules27123951",
+                "kind": "primary paper"
+              },
+              {
+                "title": "Unfitted permittivity assumption",
+                "url": "https://doi.org/10.1016/j.sse.2021.108167",
+                "kind": "primary paper"
+              }
+            ]
+          }
+        ],
+        "biases_V": [
+          -0.01,
+          0.0,
+          0.01
+        ],
+        "charge_model": "dielectric",
+        "swept_contact_id": "top",
+        "optical_enabled": false,
+        "terminal_studies": {
+          "iv_enabled": true,
+          "cv_enabled": true,
+          "measured_iv_path": "",
+          "measured_cv_path": ""
+        }
+      }
+    },
+    "literature_validation": {
+      "id": "xiong_al2o3_24p72nm",
+      "paper": "https://doi.org/10.3390/molecules27123951",
+      "material": "Al2O3",
+      "epsilon": 9.0,
+      "thickness_um": 0.02472,
+      "width_um": 80.0,
+      "reported_density_fF_um2": 7.89,
+      "reported_current": {
+        "bias_V": 12.0,
+        "density_A_cm2": 1.4e-10
+      },
+      "notes": "Reported area and measured dielectric thickness. Epsilon=9 is an unfitted bulk assumption from the independent Yu paper. AC dispersion, traps, leakage and breakdown are unsupported."
+    }
+  },
+  "options": {
+    "model": "custom_device",
+    "device": {
+      "schema_version": 1,
+      "name": "xiong_al2o3_24p72nm",
+      "width_um": 80.0,
+      "depth_um": 80.0,
+      "temperature_K": 298.0,
+      "mesh": {
+        "nx": 8,
+        "ny": 8,
+        "nz_per_layer": 8,
+        "max_nodes": 300000
+      },
+      "layers": [
+        {
+          "id": "film",
+          "name": "Al2O3 dielectric",
+          "material_id": "paper_al2o3",
+          "thickness_um": 0.02472,
+          "donor_cm3": 0.0,
+          "acceptor_cm3": 0.0,
+          "enabled": true
+        }
+      ],
+      "shapes": [],
+      "doping_regions": [],
+      "contacts": [
+        {
+          "layer_id": "film",
+          "boundary": "potential",
+          "voltage_V": 0.0,
+          "bias_scale": 0.0,
+          "cx_um": 0.0,
+          "cy_um": 0.0,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "id": "top",
+          "name": "Top ideal electrode",
+          "surface": "top",
+          "shape": "rectangle",
+          "size_x_um": 80.0,
+          "size_y_um": 80.0,
+          "optical_material_name": "Al",
+          "optical_thickness_um": 0.1
+        },
+        {
+          "layer_id": "film",
+          "boundary": "potential",
+          "voltage_V": 0.0,
+          "bias_scale": 0.0,
+          "cx_um": 0.0,
+          "cy_um": 0.0,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "id": "bottom",
+          "name": "Grounded ideal back electrode",
+          "surface": "bottom",
+          "shape": "rectangle",
+          "size_x_um": 80.0,
+          "size_y_um": 80.0,
+          "optical_material_name": "",
+          "optical_thickness_um": 0.0
+        }
+      ]
+    },
+    "material_library": [
+      {
+        "id": "gaas",
+        "name": "GaAs",
+        "kind": "semiconductor",
+        "temperature_K": 300.0,
+        "model": "gaas_reference",
+        "color": "#ef7595",
+        "optical_material_name": "GaAs",
+        "aliases": [
+          "Gallium arsenide"
+        ],
+        "properties": {
+          "epsilon_r": 12.9,
+          "bandgap_eV": 1.424,
+          "affinity_eV": 4.07,
+          "electron_mass_ratio": 0.063,
+          "hole_mass_ratio": 0.51,
+          "electron_dos_mass_ratio": 0.063,
+          "hole_dos_mass_ratio": 0.51,
+          "Nc_cm3": 3.953218625373507e+17,
+          "Nv_cm3": 9.105321246392134e+18,
+          "intrinsic_cm3": 2075149.9917685564,
+          "electron_mobility_cm2_Vs": 8500.0,
+          "hole_mobility_cm2_Vs": 400.0
+        },
+        "sources": [
+          {
+            "title": "Ioffe NSM: AlGaAs basic parameters (GaAs x=0 limit)",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/basic.html",
+            "properties": [
+              "epsilon_r",
+              "affinity_eV",
+              "electron_mass_ratio",
+              "hole_mass_ratio"
+            ],
+            "note": "",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Ioffe NSM: AlGaAs band structure (GaAs x=0 limit)",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/bandstr.html",
+            "properties": [
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3",
+              "intrinsic_cm3"
+            ],
+            "note": "DOS and ni are calculated from the reference model.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "TYDEX: GaAs electronic properties",
+            "url": "https://www.tydexoptics.com/materials1/for_transmission_optics/gaas/",
+            "properties": [
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs"
+            ],
+            "note": "Low-field bulk reference; not a mobility fit for heavily doped material.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "300 K bulk reference. Masses follow the Ioffe x=0 alloy limit. Mobility is constant unless edited. No recombination, high-field transport or impurity-scattering model is implied.",
+        "property_overrides": []
+      },
+      {
+        "id": "ito",
+        "name": "ITO",
+        "kind": "conductor",
+        "temperature_K": 300.0,
+        "model": "constant",
+        "color": "#67c9e5",
+        "optical_material_name": "ITO",
+        "aliases": [
+          "Indium tin oxide"
+        ],
+        "properties": {
+          "epsilon_r": 9.0,
+          "bandgap_eV": 3.5,
+          "affinity_eV": 4.5,
+          "electron_mass_ratio": 0.35,
+          "hole_mass_ratio": 1.0,
+          "electron_dos_mass_ratio": 0.35,
+          "hole_dos_mass_ratio": 1.0,
+          "Nc_cm3": 5.176569810212164e+18,
+          "Nv_cm3": 2.5e+19,
+          "electron_mobility_cm2_Vs": 30.0,
+          "hole_mobility_cm2_Vs": 0.0,
+          "bulk_electron_cm3": 8e+20,
+          "bulk_hole_cm3": 0.0,
+          "intrinsic_cm3": 4.5423956659835214e-11
+        },
+        "sources": [
+          {
+            "title": "Khusayfan & El-Nahass (2013): structure and electro-optical characteristics of ITO",
+            "url": "https://doi.org/10.1155/2013/408182",
+            "properties": [
+              "electron_mass_ratio"
+            ],
+            "note": "The paper uses assumed mass 0.35 m0 and reports process-dependent carrier density and mobility. Its measured optical band gap is not used as a universal electronic gap.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Editable ITO device-study assumptions",
+            "url": "",
+            "properties": [
+              "epsilon_r",
+              "bandgap_eV",
+              "affinity_eV",
+              "electron_mass_ratio",
+              "hole_mass_ratio",
+              "electron_dos_mass_ratio",
+              "hole_dos_mass_ratio",
+              "Nc_cm3",
+              "Nv_cm3",
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs",
+              "bulk_electron_cm3",
+              "bulk_hole_cm3",
+              "intrinsic_cm3"
+            ],
+            "note": "All preset values are model assumptions, not measurements of your film: n=8e20 cm−3, μn=30 cm²/(V·s), static εr=9, m*=0.35 m0, χ=4.5 eV, electronic gap=3.5 eV. Hole/DOS values are closure assumptions; degenerate ITO requires Fermi statistics.",
+            "kind": "assumption",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Transparent conductor with degenerate electrons. Carrier density, mobility, static permittivity, mass and affinity depend on film growth; replace these assumptions with measured values. Static εr is not optical ε∞. The fixed mass approximation does not model nonparabolicity. Temperature is held constant in this preset.",
+        "property_overrides": []
+      },
+      {
+        "id": "algaas",
+        "name": "AlGaAs",
+        "kind": "semiconductor",
+        "temperature_K": 300.0,
+        "al_fraction": 0.5,
+        "model": "algaas_reference",
+        "color": "#9c8cef",
+        "optical_material_name": "AlGaAs",
+        "aliases": [
+          "Aluminium gallium arsenide"
+        ],
+        "properties": {
+          "epsilon_r": 11.48,
+          "bandgap_eV": 1.9982499999999999,
+          "affinity_eV": 3.5700000000000003,
+          "electron_mass_ratio": 0.26,
+          "hole_mass_ratio": 0.635,
+          "electron_dos_mass_ratio": 0.78,
+          "hole_dos_mass_ratio": 0.635,
+          "Nc_cm3": 1.7221933689339302e+19,
+          "Nv_cm3": 1.26502933513417e+19,
+          "intrinsic_cm3": 242.3985345457434,
+          "electron_mobility_cm2_Vs": 1000.0,
+          "hole_mobility_cm2_Vs": 100.0
+        },
+        "sources": [
+          {
+            "title": "Ioffe NSM: AlGaAs basic parameters",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/basic.html",
+            "properties": [
+              "epsilon_r",
+              "affinity_eV",
+              "electron_mass_ratio",
+              "hole_mass_ratio",
+              "electron_dos_mass_ratio"
+            ],
+            "note": "",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Ioffe NSM: AlGaAs band structure",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/bandstr.html",
+            "properties": [
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3",
+              "intrinsic_cm3"
+            ],
+            "note": "Piecewise 300 K fit. Indirect branch above x=0.45 uses DOS mass 0.85−0.14x and conductivity mass 0.26 m0.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Editable transport assumptions",
+            "url": "",
+            "properties": [
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs"
+            ],
+            "note": "1000 / 100 cm²/(V·s) are starting estimates, not measured mobility for a particular alloy or doping.",
+            "kind": "assumption",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Editable alloy fraction x∈[0,1]. The approximate direct/indirect transition is represented at x=0.45; Ioffe also reports a 0.41–0.45 crossover region. Mobility values are explicit assumptions. Temperature gaps use Varshni corrections and DOS scales as T^1.5; validity outside the 300 K reference must be assessed for the device.",
+        "property_overrides": []
+      },
+      {
+        "id": "silicon",
+        "name": "Silicon",
+        "kind": "semiconductor",
+        "temperature_K": 300.0,
+        "model": "silicon_reference",
+        "color": "#70cfa7",
+        "optical_material_name": "Si",
+        "aliases": [
+          "Si",
+          "Crystalline silicon"
+        ],
+        "properties": {
+          "epsilon_r": 11.7,
+          "bandgap_eV": 1.124,
+          "affinity_eV": 4.05,
+          "electron_mass_ratio": 0.26,
+          "hole_mass_ratio": 0.39,
+          "electron_dos_mass_ratio": 1.08,
+          "hole_dos_mass_ratio": 0.81,
+          "Nc_cm3": 2.82e+19,
+          "Nv_cm3": 1.83e+19,
+          "intrinsic_cm3": 8225562977.908778,
+          "electron_mobility_cm2_Vs": 1400.0,
+          "hole_mobility_cm2_Vs": 470.0
+        },
+        "sources": [
+          {
+            "title": "University of Colorado ECEE: silicon material parameters",
+            "url": "https://www.colorado.edu/ecee/sites/default/files/attached-files/sd_constants_sheet.pdf",
+            "properties": [
+              "epsilon_r",
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3",
+              "electron_mass_ratio",
+              "hole_mass_ratio",
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs"
+            ],
+            "note": "300 K parameter sheet. ni is recalculated consistently from Eg/Nc/Nv rather than mixing independent rounded ni values.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Ioffe NSM: silicon reference",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/Si/basic.html",
+            "properties": [
+              "affinity_eV"
+            ],
+            "note": "Conventional electron-affinity estimate 4.05 eV. Surface/interface processing can change the effective band alignment.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Silicon temperature model",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/Si/bandstr.html",
+            "properties": [
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3"
+            ],
+            "note": "Varshni α=4.73e−4 eV/K, β=636 K; DOS T^1.5 scaling. Static permittivity and mobility are held constant.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Crystalline silicon, 300 K low-field reference. Electron/hole conductivity masses are distinct from DOS masses. Mobility is not a fit to high doping or field; edit to match your sample.",
+        "property_overrides": []
+      },
+      {
+        "id": "air",
+        "name": "Air / void",
+        "kind": "dielectric",
+        "temperature_K": 300.0,
+        "model": "constant",
+        "color": "#cbd5df",
+        "optical_material_name": "Air",
+        "aliases": [
+          "Air",
+          "Void"
+        ],
+        "properties": {
+          "epsilon_r": 1.0,
+          "conductivity_S_m": 0.0
+        },
+        "sources": [
+          {
+            "title": "Ideal void model",
+            "url": "",
+            "properties": [
+              "epsilon_r",
+              "conductivity_S_m"
+            ],
+            "note": "Vacuum-permittivity, zero-conductivity approximation.",
+            "kind": "assumption",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Ideal dielectric void. No mobile carriers or optical material data are inferred from this record.",
+        "property_overrides": []
+      },
+      {
+        "id": "paper_al2o3",
+        "name": "Al2O3 unfitted static model",
+        "kind": "dielectric",
+        "model": "constant",
+        "temperature_K": 298.0,
+        "properties": {
+          "epsilon_r": 9.0,
+          "conductivity_S_m": 0.0
+        },
+        "notes": "Reported area and measured dielectric thickness. Epsilon=9 is an unfitted bulk assumption from the independent Yu paper. AC dispersion, traps, leakage and breakdown are unsupported.",
+        "sources": [
+          {
+            "title": "Geometry and measured values",
+            "url": "https://doi.org/10.3390/molecules27123951",
+            "kind": "primary paper"
+          },
+          {
+            "title": "Unfitted permittivity assumption",
+            "url": "https://doi.org/10.1016/j.sse.2021.108167",
+            "kind": "primary paper"
+          }
+        ]
+      }
+    ],
+    "biases_V": [
+      -0.01,
+      0.0,
+      0.01
+    ],
+    "charge_model": "dielectric",
+    "swept_contact_id": "top",
+    "optical_enabled": false,
+    "terminal_studies": {
+      "iv_enabled": true,
+      "cv_enabled": true,
+      "measured_iv_path": "",
+      "measured_cv_path": ""
+    }
+  },
+  "source": {
+    "url": "https://doi.org/10.3390/molecules27123951",
+    "reference_kind": "published_scalar",
+    "parameters": {
+      "id": "xiong_al2o3_24p72nm",
+      "paper": "https://doi.org/10.3390/molecules27123951",
+      "material": "Al2O3",
+      "epsilon": 9.0,
+      "thickness_um": 0.02472,
+      "width_um": 80.0,
+      "reported_density_fF_um2": 7.89,
+      "reported_current": {
+        "bias_V": 12.0,
+        "density_A_cm2": 1.4e-10
+      },
+      "notes": "Reported area and measured dielectric thickness. Epsilon=9 is an unfitted bulk assumption from the independent Yu paper. AC dispersion, traps, leakage and breakdown are unsupported."
+    }
+  },
+  "limitations": [
+    "Reported area and measured dielectric thickness. Epsilon=9 is an unfitted bulk assumption from the independent Yu paper. AC dispersion, traps, leakage and breakdown are unsupported.",
+    "Static electrostatics does not model leakage, AC dispersion or breakdown; completed solve is not experimental reproduction."
+  ],
+  "comparisons": [
+    {
+      "id": "zero_bias_capacitance",
+      "label": "Near-zero capacitance",
+      "type": "scalar_csv",
+      "actual_file": "electrical_cv.csv",
+      "actual_column": "capacitance_F",
+      "where": {
+        "bias_V": 0
+      },
+      "factor": 1000000000000000.0,
+      "reference_value": 50496.0,
+      "units": "fF"
+    }
+  ]
+}

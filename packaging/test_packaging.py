@@ -64,7 +64,7 @@ class PackagingInputsTests(unittest.TestCase):
         self.assertIn('qt_native_figure', hidden)
         self.assertIn('qt_native_field_volume', hidden)
         self.assertIn('qt_windows_glass', hidden)
-        for module in ('scan_storage', 'field_sampling', 'simulation_fields', 'contour_sweep'):
+        for module in ('scan_storage', 'field_sampling', 'field_reconstruction', 'field_storage', 'direct_npz', 'simulation_fields', 'contour_sweep'):
             self.assertIn(module, hidden)
             self.assertIn(module, stage.REQUIRED_MODULES)
         self.assertIn('matplotlib.backends.backend_agg', hidden)
@@ -92,7 +92,7 @@ class PackagingInputsTests(unittest.TestCase):
         import package_release
         import verify_release
         import test_release_source
-        for module in ('scan_storage', 'field_sampling', 'simulation_fields', 'contour_sweep'):
+        for module in ('scan_storage', 'field_sampling', 'field_reconstruction', 'field_storage', 'direct_npz', 'simulation_fields', 'contour_sweep'):
             self.assertIn(module, package_release.REQUIRED_FROZEN_MODULES)
             self.assertIn(module, verify_release.GUI_MODULES)
             self.assertIn(module, verify_release.BACKEND_MODULES)

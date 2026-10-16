@@ -1,0 +1,136 @@
+{
+  "version": "1.4.0-alpha.1",
+  "build_date": "2026-10-15",
+  "signed": false,
+  "source_tests_run": 237,
+  "source_tests_skipped": 0,
+  "source_tests_passed": 237,
+  "source_tree_sha256": "018648cc41e149ecb7b50951eecc5f180970f718811219cc53fd419df309a4ab",
+  "frozen_verification": "partial",
+  "native_startup_verification": "not_run",
+  "packaged_checks": {
+    "bundled_library": true,
+    "desktop_pages_and_themes": true,
+    "simulation_launcher_and_model_screens": true
+  },
+  "live_rendering": "Native Qt/PyQtGraph 2D and typed Qt 3D; Agg publication exports",
+  "public_help_example": {
+    "spectrum_samples": 41,
+    "csv_bytes_preserved": true,
+    "csv_files": 45,
+    "metadata_paths_rebased": true
+  },
+  "python_installation_required": false,
+  "public_payload": "Application, dependency runtime, public Silicon tutorial, guides, licenses and corresponding source. Empty user library.",
+  "archive_integrity": "pending",
+  "published": false,
+  "release_channel": "highly_experimental",
+  "validation_scope": "Partial compiled verification; remaining compiled and native startup checks stopped at the explicit user request to package and ship.",
+  "packaged_self_tests_passed": false,
+  "package_gate_tests": 20,
+  "compiled_startup_choices_verified": 27,
+  "compiled_model_jobs_completed": 12,
+  "edited_band_jobs_completed": 2,
+  "compiled_model_jobs": [
+    {
+      "name": "jamois_airholes_2003",
+      "engine": "photonic_bands",
+      "passed": true,
+      "status": "complete"
+    },
+    {
+      "name": "sesame_1d_heterojunction",
+      "engine": "sesame_transport",
+      "passed": true,
+      "status": "complete"
+    },
+    {
+      "name": "legume_hexagonal_airholes",
+      "engine": "photonic_bands",
+      "passed": true,
+      "status": "complete"
+    },
+    {
+      "name": "conformal_homogeneous_hole",
+      "engine": "pcsel_transport",
+      "passed": true,
+      "status": "complete"
+    },
+    {
+      "name": "prescribed_heat",
+      "engine": "thermal",
+      "passed": true,
+      "status": "complete"
+    },
+    {
+      "name": "finite_contact",
+      "engine": "advanced_transport",
+      "passed": true,
+      "status": "complete"
+    },
+    {
+      "name": "representative_cell",
+      "engine": "pcsel_unitcell_transport",
+      "passed": true,
+      "status": "complete"
+    },
+    {
+      "name": "high_field_optics",
+      "engine": "high_field_optics",
+      "passed": true,
+      "status": "complete"
+    },
+    {
+      "name": "pcsel_finite_paper",
+      "engine": "pcsel",
+      "passed": true,
+      "status": "unconverged"
+    },
+    {
+      "name": "pcsel_gme",
+      "engine": "pcsel",
+      "passed": true,
+      "status": "complete"
+    },
+    {
+      "name": "pcsel_rcwa_poles",
+      "engine": "pcsel",
+      "passed": true,
+      "status": "complete"
+    },
+    {
+      "name": "existing_optical_s4",
+      "engine": "simulation",
+      "passed": true,
+      "status": null
+    }
+  ],
+  "edited_band_jobs": [
+    {
+      "name": "edited_simple_cubic_3d",
+      "solver": "mpb",
+      "dimension": 3,
+      "passed": true,
+      "status": "complete",
+      "frequency_values": 32,
+      "convergence_claim": false
+    },
+    {
+      "name": "legume_2d_roundtrip",
+      "solver": "legume",
+      "dimension": 2,
+      "passed": true,
+      "status": "complete",
+      "frequency_values": 320,
+      "convergence_claim": false
+    }
+  ],
+  "unfinished_checks": "Remaining compiled self-tests and the real Windows native startup matrix were not completed.",
+  "limitations": [
+    "Highly Experimental prerelease.",
+    "The finite PCSEL paper case executed but remains unconverged.",
+    "Execution success does not establish physical convergence or agreement with every paper."
+  ],
+  "executable_sha256": "3b46f8b52d0a57178be29e393dedc8239b36d6b0fc84eac8c5a452fa9eb45c24",
+  "backend_executable_sha256": "15adfa8de26c10f53b31303e4197ff6acace798468b73a0978f6a3f322b822b6"
+}

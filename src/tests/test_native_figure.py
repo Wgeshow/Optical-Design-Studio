@@ -5,13 +5,14 @@ import unittest
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 import numpy as np
 from PyQt6.QtCore import Qt, QPoint, QPointF
+from PyQt6.QtGui import QImage, QPainter
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication
 from matplotlib.figure import Figure
 from matplotlib.colors import LogNorm
 from matplotlib.patches import Rectangle
 from matplotlib.artist import Artist
-from matplotlib.ticker import PercentFormatter
+from matplotlib.ticker import PercentFormatter, FixedLocator, FixedFormatter
 from qt_common import PlotWidget, theme_manager
 from qt_native_figure import NativeFigureCanvas
 
@@ -36,6 +37,65 @@ class NativeFigureTests(unittest.TestCase):
             APP.processEvents()
         self.assertEqual(self.plot.canvas.unsupported_artists, [])
         return self.plot.canvas
+
+    def painted_axis_labels(self, axis):
+        image=QImage(1000,800,QImage.Format.Format_ARGB32)
+        image.fill(Qt.GlobalColor.transparent)
+        painter=QPainter(image)
+        try:
+            if axis.style.get('tickFont'):painter.setFont(axis.style['tickFont'])
+            specs=axis.generateDrawSpecs(painter)
+            return [text for _,_,text in specs[2]] if specs else []
+        finally:painter.end()
+
+    def test_native_phase_cycle_ticks_and_wrapped_endpoints_render_in_all_units(self):
+        import math
+        import pandas as pd
+        from spectral_phase import phase_figure
+        frame=pd.DataFrame(dict(wavelength_nm=np.arange(17)+1000,angle_deg=0,
+            reflection_phase_deg=(np.arange(17)*45+180)%360-180,
+            transmission_phase_deg=(np.arange(17)*45+180)%360-180))
+        self.plot.toolbar.hide()
+        for height in (328,430):
+          self.plot.resize(900,height)
+          for unit,cycle in [('radians',2*math.pi),('pi',2.),('degrees',360.)]:
+            for mode in ('positive','signed','unwrapped'):
+                with self.subTest(height=height,unit=unit,mode=mode):
+                    figure=phase_figure(frame,mode,unit)
+                    expected_arrays=[np.asarray(line.get_ydata()).copy() for axis in figure.axes for line in axis.lines]
+                    canvas=self.draw(figure)
+                    self.assertFalse(canvas.grab().isNull())
+                    for row,(source,native) in enumerate((axis,canvas.plots[axis].getAxis('left')) for axis in figure.axes):
+                        lower,upper=native.range
+                        values=native.tickValues(lower,upper,150)[0][1]
+                        labels=native.tickStrings(values,1,1)
+                        if row==0 and mode!='unwrapped':
+                            expected=np.linspace(0,cycle,5) if mode=='positive' else np.linspace(-cycle/2,cycle/2,5)
+                            np.testing.assert_allclose(values,expected)
+                            if unit=='radians':
+                                expected_labels=['0','π/2','π','3π/2','2π'] if mode=='positive' else ['−π','−π/2','0','π/2','π']
+                                self.assertEqual(labels,expected_labels)
+                            painted=self.painted_axis_labels(native)
+                            self.assertIn(labels[0],painted)
+                            self.assertIn(labels[-1],painted)
+                            if height==328:self.assertLess(canvas.axis_views[source].height(),85)
+                        else:
+                            self.assertTrue(values)
+                            np.testing.assert_allclose(np.asarray(values)/cycle,np.round(np.asarray(values)/cycle),atol=1e-10)
+                            if unit=='radians':self.assertTrue(all(label=='0' or label.rstrip('π').lstrip('−-').isdigit() for label in labels),labels)
+                    records=[record for record in canvas.data_records if record['kind']=='line']
+                    for expected,record in zip(expected_arrays,records):np.testing.assert_array_equal(record['raw_y'],expected)
+
+    def test_explicit_fixed_labels_keep_coordinate_identity_after_native_zoom(self):
+        figure=Figure();source=figure.subplots();source.plot([0,1],[0,1])
+        source.yaxis.set_major_locator(FixedLocator([0,.25,.75,1]))
+        source.yaxis.set_major_formatter(FixedFormatter(['zero','quarter','three-quarter','one']))
+        canvas=self.draw(figure);view=canvas.axis_views[source]
+        view.setYRange(.2,1,padding=0);APP.processEvents()
+        native=canvas.plots[source].getAxis('left')
+        values=native.tickValues(*native.range,150)[0][1]
+        self.assertEqual(values,[.25,.75,1.])
+        self.assertEqual(native.tickStrings(values,1,.25),['quarter','three-quarter','one'])
 
     def test_full_line_arrays_fraction_formatter_and_host_size_are_independent_of_paper(self):
         figure = Figure(figsize=(2, 9))

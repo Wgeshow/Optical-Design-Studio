@@ -1,0 +1,1293 @@
+{
+  "schema_version": 1,
+  "version": "2026.10.14.1",
+  "cases": [
+    {
+      "id": "fan_pc_r05",
+      "version": "1.0.0",
+      "label": "fan pc r05",
+      "family": "Optical spectra",
+      "kind": "simulation",
+      "engine": null,
+      "study": null,
+      "source": {
+        "title": "Analysis of guided resonances in photonic crystal slabs",
+        "doi": "10.1103/PhysRevB.65.235112",
+        "url": "https://web.stanford.edu/group/fan/publication/Fan_PRB_65_235112_2002.pdf",
+        "figure": "Fig.12",
+        "reference_kind": "digitized_primary_paper",
+        "calibration": {
+          "id": "fan_r05",
+          "paper": "Fan 2002",
+          "figure": "12",
+          "panel": "05",
+          "source_url": "https://web.stanford.edu/group/fan/publication/Fan_PRB_65_235112_2002.pdf",
+          "pdf_page_zero_based": 6,
+          "render_size_px": [
+            1800,
+            2300
+          ],
+          "crop_box_px": [
+            1000,
+            135,
+            1575,
+            1410
+          ],
+          "axis_corners_crop_px": [
+            [
+              126,
+              285
+            ],
+            [
+              539,
+              282
+            ],
+            [
+              123,
+              45
+            ]
+          ],
+          "x_range": [
+            0.25,
+            0.6
+          ],
+          "y_range": [
+            0,
+            1
+          ],
+          "pixel_uncertainty": 2,
+          "selection": "RGB mean <130; manual text masks; interior only; vertical/multiple clusters ambiguous",
+          "excluded_text_boxes_crop_px": [
+            [
+              314,
+              50,
+              440,
+              96
+            ],
+            [
+              149,
+              198,
+              216,
+              249
+            ]
+          ],
+          "source_pdf": "fan2002.pdf",
+          "source_raster": "fan-fig12-crop.png",
+          "observations": 357,
+          "source_pdf_sha256": "d29baecce5516a830385dd644a895a24b329ed7fb9d39e2cfd76b1fbfe5d459e",
+          "source_raster_sha256": "0689256348672026ce5cb63ed97d9a93694cbd56de4665fdebb97d4d4f721416",
+          "csv_sha256": "e04252369d09071dc66be6a0c219da2e17d2777874efc34aaeb40656cd996945",
+          "x_units": "normalized_frequency_a_over_wavelength",
+          "y_units": "power_transmission"
+        }
+      },
+      "limitations": [
+        "Primary-paper raster digitization; no original author numeric curve. No fitting or synthetic missing points.",
+        "Fourier-basis and wavelength convergence must be measured separately from paper agreement.",
+        "Small-hole high-Q mismatch remains; raster strokes cannot establish linewidth or Q agreement."
+      ],
+      "case_file": "fan_pc_r05/case.json",
+      "files": {
+        "fan_pc_r05/case.json": "e316ec6531eb9b4df3f3f827bfcd74b11488bf289c06a6c6d15f4ebf5d9eaa92",
+        "fan_pc_r05/reference.csv": "e04252369d09071dc66be6a0c219da2e17d2777874efc34aaeb40656cd996945"
+      }
+    },
+    {
+      "id": "fan_pc_r10",
+      "version": "1.0.0",
+      "label": "fan pc r10",
+      "family": "Optical spectra",
+      "kind": "simulation",
+      "engine": null,
+      "study": null,
+      "source": {
+        "title": "Analysis of guided resonances in photonic crystal slabs",
+        "doi": "10.1103/PhysRevB.65.235112",
+        "url": "https://web.stanford.edu/group/fan/publication/Fan_PRB_65_235112_2002.pdf",
+        "figure": "Fig.12",
+        "reference_kind": "digitized_primary_paper",
+        "calibration": {
+          "id": "fan_r10",
+          "paper": "Fan 2002",
+          "figure": "12",
+          "panel": "10",
+          "source_url": "https://web.stanford.edu/group/fan/publication/Fan_PRB_65_235112_2002.pdf",
+          "pdf_page_zero_based": 6,
+          "render_size_px": [
+            1800,
+            2300
+          ],
+          "crop_box_px": [
+            1000,
+            135,
+            1575,
+            1410
+          ],
+          "axis_corners_crop_px": [
+            [
+              132,
+              582
+            ],
+            [
+              545,
+              580
+            ],
+            [
+              130,
+              341
+            ]
+          ],
+          "x_range": [
+            0.25,
+            0.6
+          ],
+          "y_range": [
+            0,
+            1
+          ],
+          "pixel_uncertainty": 2,
+          "selection": "RGB mean <130; manual text masks; interior only; vertical/multiple clusters ambiguous",
+          "excluded_text_boxes_crop_px": [
+            [
+              315,
+              351,
+              444,
+              389
+            ],
+            [
+              150,
+              505,
+              216,
+              540
+            ]
+          ],
+          "source_pdf": "fan2002.pdf",
+          "source_raster": "fan-fig12-crop.png",
+          "observations": 355,
+          "source_pdf_sha256": "d29baecce5516a830385dd644a895a24b329ed7fb9d39e2cfd76b1fbfe5d459e",
+          "source_raster_sha256": "0689256348672026ce5cb63ed97d9a93694cbd56de4665fdebb97d4d4f721416",
+          "csv_sha256": "2b0e1333c7a862c924b8dd4a76bb97000e8f82ade4803fa332777d106393fae1",
+          "x_units": "normalized_frequency_a_over_wavelength",
+          "y_units": "power_transmission"
+        }
+      },
+      "limitations": [
+        "Primary-paper raster digitization; no original author numeric curve. No fitting or synthetic missing points.",
+        "Fourier-basis and wavelength convergence must be measured separately from paper agreement.",
+        "Small-hole high-Q mismatch remains; raster strokes cannot establish linewidth or Q agreement."
+      ],
+      "case_file": "fan_pc_r10/case.json",
+      "files": {
+        "fan_pc_r10/case.json": "c66b819d8e76bc067e210a06d25660e5f9435719f6e51b4f29091e392573461b",
+        "fan_pc_r10/reference.csv": "2b0e1333c7a862c924b8dd4a76bb97000e8f82ade4803fa332777d106393fae1"
+      }
+    },
+    {
+      "id": "fan_pc_r15",
+      "version": "1.0.0",
+      "label": "fan pc r15",
+      "family": "Optical spectra",
+      "kind": "simulation",
+      "engine": null,
+      "study": null,
+      "source": {
+        "title": "Analysis of guided resonances in photonic crystal slabs",
+        "doi": "10.1103/PhysRevB.65.235112",
+        "url": "https://web.stanford.edu/group/fan/publication/Fan_PRB_65_235112_2002.pdf",
+        "figure": "Fig.12",
+        "reference_kind": "digitized_primary_paper",
+        "calibration": {
+          "id": "fan_r15",
+          "paper": "Fan 2002",
+          "figure": "12",
+          "panel": "15",
+          "source_url": "https://web.stanford.edu/group/fan/publication/Fan_PRB_65_235112_2002.pdf",
+          "pdf_page_zero_based": 6,
+          "render_size_px": [
+            1800,
+            2300
+          ],
+          "crop_box_px": [
+            1000,
+            135,
+            1575,
+            1410
+          ],
+          "axis_corners_crop_px": [
+            [
+              134,
+              882
+            ],
+            [
+              547,
+              879
+            ],
+            [
+              133,
+              640
+            ]
+          ],
+          "x_range": [
+            0.25,
+            0.6
+          ],
+          "y_range": [
+            0,
+            1
+          ],
+          "pixel_uncertainty": 2,
+          "selection": "RGB mean <130; manual text masks; interior only; vertical/multiple clusters ambiguous",
+          "excluded_text_boxes_crop_px": [
+            [
+              322,
+              665,
+              446,
+              707
+            ],
+            [
+              150,
+              797,
+              221,
+              851
+            ]
+          ],
+          "source_pdf": "fan2002.pdf",
+          "source_raster": "fan-fig12-crop.png",
+          "observations": 358,
+          "source_pdf_sha256": "d29baecce5516a830385dd644a895a24b329ed7fb9d39e2cfd76b1fbfe5d459e",
+          "source_raster_sha256": "0689256348672026ce5cb63ed97d9a93694cbd56de4665fdebb97d4d4f721416",
+          "csv_sha256": "a3d66affeddbfacf011f992b77062e2624b15681e51721e1fe5b83972f7d230e",
+          "x_units": "normalized_frequency_a_over_wavelength",
+          "y_units": "power_transmission"
+        }
+      },
+      "limitations": [
+        "Primary-paper raster digitization; no original author numeric curve. No fitting or synthetic missing points.",
+        "Fourier-basis and wavelength convergence must be measured separately from paper agreement.",
+        "Small-hole high-Q mismatch remains; raster strokes cannot establish linewidth or Q agreement."
+      ],
+      "case_file": "fan_pc_r15/case.json",
+      "files": {
+        "fan_pc_r15/case.json": "c7ad7e29d21365f6eba2aea1c33fe99bf03832af2fb0cf782e7d3266319084f5",
+        "fan_pc_r15/reference.csv": "a3d66affeddbfacf011f992b77062e2624b15681e51721e1fe5b83972f7d230e"
+      }
+    },
+    {
+      "id": "fan_pc_r20",
+      "version": "1.0.0",
+      "label": "fan pc r20",
+      "family": "Optical spectra",
+      "kind": "simulation",
+      "engine": null,
+      "study": null,
+      "source": {
+        "title": "Analysis of guided resonances in photonic crystal slabs",
+        "doi": "10.1103/PhysRevB.65.235112",
+        "url": "https://web.stanford.edu/group/fan/publication/Fan_PRB_65_235112_2002.pdf",
+        "figure": "Fig.12",
+        "reference_kind": "digitized_primary_paper",
+        "calibration": {
+          "id": "fan_r20",
+          "paper": "Fan 2002",
+          "figure": "12",
+          "panel": "20",
+          "source_url": "https://web.stanford.edu/group/fan/publication/Fan_PRB_65_235112_2002.pdf",
+          "pdf_page_zero_based": 6,
+          "render_size_px": [
+            1800,
+            2300
+          ],
+          "crop_box_px": [
+            1000,
+            135,
+            1575,
+            1410
+          ],
+          "axis_corners_crop_px": [
+            [
+              138,
+              1184
+            ],
+            [
+              551,
+              1181
+            ],
+            [
+              137,
+              943
+            ]
+          ],
+          "x_range": [
+            0.25,
+            0.6
+          ],
+          "y_range": [
+            0,
+            1
+          ],
+          "pixel_uncertainty": 2,
+          "selection": "RGB mean <130; manual text masks; interior only; vertical/multiple clusters ambiguous",
+          "excluded_text_boxes_crop_px": [
+            [
+              331,
+              963,
+              451,
+              1001
+            ],
+            [
+              151,
+              1100,
+              224,
+              1150
+            ]
+          ],
+          "source_pdf": "fan2002.pdf",
+          "source_raster": "fan-fig12-crop.png",
+          "observations": 356,
+          "source_pdf_sha256": "d29baecce5516a830385dd644a895a24b329ed7fb9d39e2cfd76b1fbfe5d459e",
+          "source_raster_sha256": "0689256348672026ce5cb63ed97d9a93694cbd56de4665fdebb97d4d4f721416",
+          "csv_sha256": "fc5c8ad00731a2dedae8f6873c560fb969e468db655d15f5112ee42b3784cf97",
+          "x_units": "normalized_frequency_a_over_wavelength",
+          "y_units": "power_transmission"
+        }
+      },
+      "limitations": [
+        "Primary-paper raster digitization; no original author numeric curve. No fitting or synthetic missing points.",
+        "Fourier-basis and wavelength convergence must be measured separately from paper agreement.",
+        "Small-hole high-Q mismatch remains; raster strokes cannot establish linewidth or Q agreement."
+      ],
+      "case_file": "fan_pc_r20/case.json",
+      "files": {
+        "fan_pc_r20/case.json": "3491b3ac701ea0e143e2cf23b7e9f95eb5c790138d448a40f09ba656db2fe1db",
+        "fan_pc_r20/reference.csv": "fc5c8ad00731a2dedae8f6873c560fb969e468db655d15f5112ee42b3784cf97"
+      }
+    },
+    {
+      "id": "winn_ten_film",
+      "version": "1.0.0",
+      "label": "winn ten film",
+      "family": "Optical spectra",
+      "kind": "simulation",
+      "engine": null,
+      "study": null,
+      "source": {
+        "title": "Omnidirectional reflection from a one-dimensional photonic crystal",
+        "doi": "10.1364/OL.23.001573",
+        "url": "https://pbg-rle.mit.edu/Documents/Omnidirectional_Reflection_from_a_One-Dimensional_Photonic_Crystal_OCT_1998.pdf",
+        "figure": "Fig.3",
+        "reference_kind": "digitized_primary_paper",
+        "calibration": {
+          "id": "winn_normal",
+          "paper": "Winn 1998",
+          "figure": "3 upper panel, normal incidence",
+          "source_url": "https://pbg-rle.mit.edu/Documents/Omnidirectional_Reflection_from_a_One-Dimensional_Photonic_Crystal_OCT_1998.pdf",
+          "pdf_page_zero_based": 1,
+          "render_size_px": [
+            3600,
+            4600
+          ],
+          "crop_box_px": [
+            2200,
+            2800,
+            3050,
+            3950
+          ],
+          "axis_corners_crop_px": [
+            [
+              97,
+              334
+            ],
+            [
+              793,
+              334
+            ],
+            [
+              97,
+              118
+            ]
+          ],
+          "x_range": [
+            0,
+            0.5
+          ],
+          "y_range": [
+            -40,
+            0
+          ],
+          "pixel_uncertainty": 5,
+          "selection": "RGB mean<110; remove grid +/-2px and angle label; interior only",
+          "grid_x_crop_px": [
+            237,
+            375,
+            514,
+            654
+          ],
+          "grid_y_crop_px": [
+            172,
+            225,
+            279
+          ],
+          "excluded_text_boxes_crop_px": [
+            [
+              431,
+              245,
+              782,
+              316
+            ]
+          ],
+          "source_pdf": "winn1998.pdf",
+          "source_raster": "winn1998-digitization-crop.png",
+          "observations": 637,
+          "source_pdf_sha256": "683c989e735c56608bcfc26be8cbb629ad5442bc509ae64fc916aaa205e9882a",
+          "source_raster_sha256": "2c04c89e11c82909fab1abcfedbcf1520f8ca14bcb1c30d3681a0c73ca5ef9cd",
+          "csv_sha256": "7de13cceb8d48a5d2828bb556a88eb6128edd4f556f11e99e0557bfab0e71d96",
+          "x_units": "normalized_frequency_a_over_wavelength",
+          "y_units": "transmission_dB_10log10T"
+        }
+      },
+      "limitations": [
+        "Primary-paper raster digitization; no original author numeric curve. No fitting or synthetic missing points.",
+        "Fourier-basis and wavelength convergence must be measured separately from paper agreement.",
+        "Finite ten-film transmission; not an infinite-crystal band-gap proof. Reference overlaps only part of the default spectral range."
+      ],
+      "case_file": "winn_ten_film/case.json",
+      "files": {
+        "winn_ten_film/case.json": "1acd5a15c8678f39b3c7a6c8c75bd23a506adca3d7ed09bb1066592a5e20527e",
+        "winn_ten_film/reference.csv": "7de13cceb8d48a5d2828bb556a88eb6128edd4f556f11e99e0557bfab0e71d96"
+      }
+    },
+    {
+      "id": "liu_grating_d050",
+      "version": "1.0.0",
+      "label": "liu grating d050",
+      "family": "Optical spectra",
+      "kind": "simulation",
+      "engine": null,
+      "study": null,
+      "source": {
+        "title": "Optimally designed narrowband guided-mode resonance reflectance filters for mid-infrared spectroscopy",
+        "doi": "10.1364/OE.19.024182",
+        "url": "https://nano.ece.illinois.edu/files/2017/11/109.pdf",
+        "figure": "Fig.2(a,e)",
+        "reference_kind": "digitized_primary_paper",
+        "calibration": {
+          "id": "liu_d050",
+          "paper": "Liu 2011",
+          "figure": "2(a) inset",
+          "source_url": "https://nano.ece.illinois.edu/files/2017/11/109.pdf",
+          "pdf_page_zero_based": 5,
+          "render_size_px": [
+            3600,
+            4600
+          ],
+          "crop_box_px": [
+            650,
+            600,
+            1500,
+            1150
+          ],
+          "axis_corners_crop_px": [
+            [
+              474,
+              454
+            ],
+            [
+              743,
+              454
+            ],
+            [
+              474,
+              240
+            ]
+          ],
+          "x_range": [
+            2750,
+            2500
+          ],
+          "y_range": [
+            0,
+            1
+          ],
+          "pixel_uncertainty": 2,
+          "selection": "green channel exceeds others by30, intensity>70; interior only",
+          "source_pdf": "liu2011.pdf",
+          "source_raster": "liu2011-digitization-crop.png",
+          "observations": 255,
+          "source_pdf_sha256": "af8cedb7295c7136f94066911ff63aecb8c5be6e66b7af6645204f2fdea11d3d",
+          "source_raster_sha256": "66048958ebf131dc010dece7ba55196a3750210419f6ef1c152272e317ff3d23",
+          "csv_sha256": "ab7f6e6959affd01271940c420842189faf6dae7ad35ebacb86f1386c0821c02",
+          "x_units": "wavenumber_cm^-1",
+          "y_units": "power_reflectance"
+        }
+      },
+      "limitations": [
+        "Primary-paper raster digitization; no original author numeric curve. No fitting or synthetic missing points.",
+        "Fourier-basis and wavelength convergence must be measured separately from paper agreement."
+      ],
+      "case_file": "liu_grating_d050/case.json",
+      "files": {
+        "liu_grating_d050/case.json": "806c795cc8624ebab798cbfd383cf9f8afa995bc43764cb83212fb18a2d321d9",
+        "liu_grating_d050/reference.csv": "ab7f6e6959affd01271940c420842189faf6dae7ad35ebacb86f1386c0821c02"
+      }
+    },
+    {
+      "id": "liu_grating_d150",
+      "version": "1.0.0",
+      "label": "liu grating d150",
+      "family": "Optical spectra",
+      "kind": "simulation",
+      "engine": null,
+      "study": null,
+      "source": {
+        "title": "Optimally designed narrowband guided-mode resonance reflectance filters for mid-infrared spectroscopy",
+        "doi": "10.1364/OE.19.024182",
+        "url": "https://nano.ece.illinois.edu/files/2017/11/109.pdf",
+        "figure": "Fig.2(a,e)",
+        "reference_kind": "digitized_primary_paper",
+        "calibration": {
+          "id": "liu_d150",
+          "paper": "Liu 2011",
+          "figure": "2(a) inset",
+          "source_url": "https://nano.ece.illinois.edu/files/2017/11/109.pdf",
+          "pdf_page_zero_based": 5,
+          "render_size_px": [
+            3600,
+            4600
+          ],
+          "crop_box_px": [
+            650,
+            600,
+            1500,
+            1150
+          ],
+          "axis_corners_crop_px": [
+            [
+              474,
+              454
+            ],
+            [
+              743,
+              454
+            ],
+            [
+              474,
+              240
+            ]
+          ],
+          "x_range": [
+            2750,
+            2500
+          ],
+          "y_range": [
+            0,
+            1
+          ],
+          "pixel_uncertainty": 2,
+          "selection": "red channel exceeds others by30, intensity>70; interior only",
+          "source_pdf": "liu2011.pdf",
+          "source_raster": "liu2011-digitization-crop.png",
+          "observations": 158,
+          "source_pdf_sha256": "af8cedb7295c7136f94066911ff63aecb8c5be6e66b7af6645204f2fdea11d3d",
+          "source_raster_sha256": "66048958ebf131dc010dece7ba55196a3750210419f6ef1c152272e317ff3d23",
+          "csv_sha256": "72f3308cf66c7f4e462fed0079bbcd91c4642d82b57159969bede9eaf79791da",
+          "x_units": "wavenumber_cm^-1",
+          "y_units": "power_reflectance"
+        }
+      },
+      "limitations": [
+        "Primary-paper raster digitization; no original author numeric curve. No fitting or synthetic missing points.",
+        "Fourier-basis and wavelength convergence must be measured separately from paper agreement."
+      ],
+      "case_file": "liu_grating_d150/case.json",
+      "files": {
+        "liu_grating_d150/case.json": "a22af28627d2bd47a546cd70e98afce163b88ce194fd29c55622f6de1ba31fc8",
+        "liu_grating_d150/reference.csv": "72f3308cf66c7f4e462fed0079bbcd91c4642d82b57159969bede9eaf79791da"
+      }
+    },
+    {
+      "id": "liu_grating_d300",
+      "version": "1.0.0",
+      "label": "liu grating d300",
+      "family": "Optical spectra",
+      "kind": "simulation",
+      "engine": null,
+      "study": null,
+      "source": {
+        "title": "Optimally designed narrowband guided-mode resonance reflectance filters for mid-infrared spectroscopy",
+        "doi": "10.1364/OE.19.024182",
+        "url": "https://nano.ece.illinois.edu/files/2017/11/109.pdf",
+        "figure": "Fig.2(a,e)",
+        "reference_kind": "digitized_primary_paper",
+        "calibration": {
+          "id": "liu_d300",
+          "paper": "Liu 2011",
+          "figure": "2(a) inset",
+          "source_url": "https://nano.ece.illinois.edu/files/2017/11/109.pdf",
+          "pdf_page_zero_based": 5,
+          "render_size_px": [
+            3600,
+            4600
+          ],
+          "crop_box_px": [
+            650,
+            600,
+            1500,
+            1150
+          ],
+          "axis_corners_crop_px": [
+            [
+              474,
+              454
+            ],
+            [
+              743,
+              454
+            ],
+            [
+              474,
+              240
+            ]
+          ],
+          "x_range": [
+            2750,
+            2500
+          ],
+          "y_range": [
+            0,
+            1
+          ],
+          "pixel_uncertainty": 2,
+          "selection": "blue channel exceeds others by30, intensity>70; interior only",
+          "source_pdf": "liu2011.pdf",
+          "source_raster": "liu2011-digitization-crop.png",
+          "observations": 208,
+          "source_pdf_sha256": "af8cedb7295c7136f94066911ff63aecb8c5be6e66b7af6645204f2fdea11d3d",
+          "source_raster_sha256": "66048958ebf131dc010dece7ba55196a3750210419f6ef1c152272e317ff3d23",
+          "csv_sha256": "4d5823e6e26f9e2dd0fa47dede011a5bebf89dba5185eb67acb57b24ad73e612",
+          "x_units": "wavenumber_cm^-1",
+          "y_units": "power_reflectance"
+        }
+      },
+      "limitations": [
+        "Primary-paper raster digitization; no original author numeric curve. No fitting or synthetic missing points.",
+        "Fourier-basis and wavelength convergence must be measured separately from paper agreement."
+      ],
+      "case_file": "liu_grating_d300/case.json",
+      "files": {
+        "liu_grating_d300/case.json": "5b8dc10876e8e59fc77ce01be73ac6f5d5979e166bee8bffd394f58ebf22b30d",
+        "liu_grating_d300/reference.csv": "4d5823e6e26f9e2dd0fa47dede011a5bebf89dba5185eb67acb57b24ad73e612"
+      }
+    },
+    {
+      "id": "metrology_a61_c05_disk4um",
+      "version": "1.0.0",
+      "label": "metrology a61 c05 disk4um",
+      "family": "Dielectric capacitance",
+      "kind": "electrical",
+      "engine": null,
+      "study": null,
+      "source": {
+        "url": "https://doi.org/10.3390/nano11030820",
+        "reference_kind": "published_scalar",
+        "parameters": {
+          "id": "metrology_a61_c05_disk4um",
+          "paper": "https://doi.org/10.3390/nano11030820",
+          "material": "SiO2",
+          "epsilon": 3.9,
+          "thickness_um": 0.0531,
+          "width_um": 8.0,
+          "diameter_um": 4.0,
+          "air_um": 0.5,
+          "reported_capacitance_fF": 8.79,
+          "reported_uncertainty_fF": 0.19,
+          "notes": "A61 first plateau, nominal 4 um circular pad. Ideal grounded substrate replaces doped Si (reported Na≈8.2e18 cm^-3); depletion is omitted. Top 275 nm truncated-cone metal/Ti rim and the paper 200×100 um far-field box are omitted. This is a partial electrostatic reconstruction, not a metrological replication."
+        }
+      },
+      "limitations": [
+        "A61 first plateau, nominal 4 um circular pad. Ideal grounded substrate replaces doped Si (reported Na≈8.2e18 cm^-3); depletion is omitted. Top 275 nm truncated-cone metal/Ti rim and the paper 200×100 um far-field box are omitted. This is a partial electrostatic reconstruction, not a metrological replication.",
+        "Static electrostatics does not model leakage, AC dispersion or breakdown; completed solve is not experimental reproduction."
+      ],
+      "case_file": "metrology_a61_c05_disk4um/case.json",
+      "files": {
+        "metrology_a61_c05_disk4um/case.json": "80a0648f7a7e49606a78df08c1b538ce321bb61f6b2e4ded575e695ef2348551"
+      }
+    },
+    {
+      "id": "xiong_al2o3_12p10nm",
+      "version": "1.0.0",
+      "label": "xiong al2o3 12p10nm",
+      "family": "Dielectric capacitance",
+      "kind": "electrical",
+      "engine": null,
+      "study": null,
+      "source": {
+        "url": "https://doi.org/10.3390/molecules27123951",
+        "reference_kind": "published_scalar",
+        "parameters": {
+          "id": "xiong_al2o3_12p10nm",
+          "paper": "https://doi.org/10.3390/molecules27123951",
+          "material": "Al2O3",
+          "epsilon": 9.0,
+          "thickness_um": 0.0121,
+          "width_um": 80.0,
+          "reported_density_fF_um2": 13.19,
+          "reported_current": {
+            "bias_V": 4.3,
+            "density_A_cm2": 5.3e-09
+          },
+          "notes": "Second measured thickness in the same primary paper. Epsilon=9 is not fitted. Thin-film process effects and measured leakage are omitted."
+        }
+      },
+      "limitations": [
+        "Second measured thickness in the same primary paper. Epsilon=9 is not fitted. Thin-film process effects and measured leakage are omitted.",
+        "Static electrostatics does not model leakage, AC dispersion or breakdown; completed solve is not experimental reproduction."
+      ],
+      "case_file": "xiong_al2o3_12p10nm/case.json",
+      "files": {
+        "xiong_al2o3_12p10nm/case.json": "b056ce6c4585f1c004b5f991494cbedabd7be5b47e06997ff868e9c3a5b2fec4"
+      }
+    },
+    {
+      "id": "xiong_al2o3_24p72nm",
+      "version": "1.0.0",
+      "label": "xiong al2o3 24p72nm",
+      "family": "Dielectric capacitance",
+      "kind": "electrical",
+      "engine": null,
+      "study": null,
+      "source": {
+        "url": "https://doi.org/10.3390/molecules27123951",
+        "reference_kind": "published_scalar",
+        "parameters": {
+          "id": "xiong_al2o3_24p72nm",
+          "paper": "https://doi.org/10.3390/molecules27123951",
+          "material": "Al2O3",
+          "epsilon": 9.0,
+          "thickness_um": 0.02472,
+          "width_um": 80.0,
+          "reported_density_fF_um2": 7.89,
+          "reported_current": {
+            "bias_V": 12.0,
+            "density_A_cm2": 1.4e-10
+          },
+          "notes": "Reported area and measured dielectric thickness. Epsilon=9 is an unfitted bulk assumption from the independent Yu paper. AC dispersion, traps, leakage and breakdown are unsupported."
+        }
+      },
+      "limitations": [
+        "Reported area and measured dielectric thickness. Epsilon=9 is an unfitted bulk assumption from the independent Yu paper. AC dispersion, traps, leakage and breakdown are unsupported.",
+        "Static electrostatics does not model leakage, AC dispersion or breakdown; completed solve is not experimental reproduction."
+      ],
+      "case_file": "xiong_al2o3_24p72nm/case.json",
+      "files": {
+        "xiong_al2o3_24p72nm/case.json": "3d6e635afbf32ab8f499302dc85ad40ee0c1e2dfb0350d18425d8272567391ec"
+      }
+    },
+    {
+      "id": "xiong_tio2_26p20nm_k50",
+      "version": "1.0.0",
+      "label": "xiong tio2 26p20nm k50",
+      "family": "Dielectric capacitance",
+      "kind": "electrical",
+      "engine": null,
+      "study": null,
+      "source": {
+        "url": "https://doi.org/10.3390/molecules27123951",
+        "reference_kind": "published_scalar",
+        "parameters": {
+          "id": "xiong_tio2_26p20nm_k50",
+          "paper": "https://doi.org/10.3390/molecules27123951",
+          "material": "TiO2",
+          "epsilon": 50.0,
+          "thickness_um": 0.0262,
+          "width_um": 80.0,
+          "reported_density_fF_um2": 21.08,
+          "notes": "Reported area and capacitance-study thickness. TiO2 epsilon=50 is the lower end of the 50–80 literature range cited in the independent STS paper, not a fitted film value."
+        }
+      },
+      "limitations": [
+        "Reported area and capacitance-study thickness. TiO2 epsilon=50 is the lower end of the 50–80 literature range cited in the independent STS paper, not a fitted film value.",
+        "Static electrostatics does not model leakage, AC dispersion or breakdown; completed solve is not experimental reproduction."
+      ],
+      "case_file": "xiong_tio2_26p20nm_k50/case.json",
+      "files": {
+        "xiong_tio2_26p20nm_k50/case.json": "6f4186fc52ee5b09979aa9e139fd40667fb4249bdadbed7d1fc19c918dca3dfa"
+      }
+    },
+    {
+      "id": "xiong_tio2_26p20nm_k80",
+      "version": "1.0.0",
+      "label": "xiong tio2 26p20nm k80",
+      "family": "Dielectric capacitance",
+      "kind": "electrical",
+      "engine": null,
+      "study": null,
+      "source": {
+        "url": "https://doi.org/10.3390/molecules27123951",
+        "reference_kind": "published_scalar",
+        "parameters": {
+          "id": "xiong_tio2_26p20nm_k80",
+          "paper": "https://doi.org/10.3390/molecules27123951",
+          "material": "TiO2",
+          "epsilon": 80.0,
+          "thickness_um": 0.0262,
+          "width_um": 80.0,
+          "reported_density_fF_um2": 21.08,
+          "notes": "Upper-end epsilon sensitivity case. Bracketing measurement with an uncertain input range is not an independent prediction or fitted validation."
+        }
+      },
+      "limitations": [
+        "Upper-end epsilon sensitivity case. Bracketing measurement with an uncertain input range is not an independent prediction or fitted validation.",
+        "Static electrostatics does not model leakage, AC dispersion or breakdown; completed solve is not experimental reproduction."
+      ],
+      "case_file": "xiong_tio2_26p20nm_k80/case.json",
+      "files": {
+        "xiong_tio2_26p20nm_k80/case.json": "8564b88a5538761566bc51ef53b7fd4b3b75606a113a9b5f11ce92144b1e6474"
+      }
+    },
+    {
+      "id": "yu_al2o3_1017nm_normalized",
+      "version": "1.0.0",
+      "label": "yu al2o3 1017nm normalized",
+      "family": "Dielectric capacitance",
+      "kind": "electrical",
+      "engine": null,
+      "study": null,
+      "source": {
+        "url": "https://doi.org/10.1016/j.sse.2021.108167",
+        "reference_kind": "published_scalar",
+        "parameters": {
+          "id": "yu_al2o3_1017nm_normalized",
+          "paper": "https://doi.org/10.1016/j.sse.2021.108167",
+          "material": "Al2O3",
+          "epsilon": 9.0,
+          "thickness_um": 1.017,
+          "width_um": 80.0,
+          "reported_density_fF_um2": 0.08,
+          "notes": "Reported 1017 nm TiN/Al2O3/TiN stack and nominal epsilon=9. The accessible primary text did not specify electrode area: 80×80 um is explicitly a normalization assumption, not the paper device footprint. Only near-zero static capacitance density is compared; 500 V leakage/breakdown is unsupported and exceeds the app 100 V input limit."
+        }
+      },
+      "limitations": [
+        "Reported 1017 nm TiN/Al2O3/TiN stack and nominal epsilon=9. The accessible primary text did not specify electrode area: 80×80 um is explicitly a normalization assumption, not the paper device footprint. Only near-zero static capacitance density is compared; 500 V leakage/breakdown is unsupported and exceeds the app 100 V input limit.",
+        "Static electrostatics does not model leakage, AC dispersion or breakdown; completed solve is not experimental reproduction."
+      ],
+      "case_file": "yu_al2o3_1017nm_normalized/case.json",
+      "files": {
+        "yu_al2o3_1017nm_normalized/case.json": "ccfabfcb6e5af9919c84ba75871842c62f5b80e32ada90bc917da04b91ed64f0"
+      }
+    },
+    {
+      "id": "jamois_airholes_2003",
+      "version": "1.0.0",
+      "label": "Jamois 2003 hexagonal air holes",
+      "family": "Photonic bands",
+      "kind": "research_simulation",
+      "engine": "photonic_bands",
+      "study": "band_structure",
+      "source": {
+        "url": "https://doi.org/10.1016/j.photonics.2003.10.001",
+        "reference_kind": "primary_paper_stated_edges",
+        "figure": "Figure 1",
+        "stated_resolution": 64,
+        "secondary_comparison": "ZenBand Figure 4b shading is a separate digitized reference and is not substituted for these original stated edges."
+      },
+      "limitations": [
+        "Infinite lossless 2D material, epsilon=11.6 and r/a=0.43. TE has out-of-plane H; TM has out-of-plane E.",
+        "Paper rounded edge values have no supplied statistical uncertainty. Differences are reported without a fabricated acceptance threshold.",
+        "Default resolution32 is an initial run; refine resolution and interior k sampling before claiming convergence."
+      ],
+      "case_file": "jamois_airholes_2003/case.json",
+      "files": {
+        "jamois_airholes_2003/case.json": "d9ddca47595d0c053fb54f7e648bbfd4090b5d2e5f33421f42dc0ef4bc4a88a9"
+      }
+    },
+    {
+      "id": "sesame_1d_heterojunction",
+      "version": "1.0.0",
+      "label": "Sesame 1D CdS/CdTe author-data comparison",
+      "family": "Semiconductor transport",
+      "kind": "research_simulation",
+      "engine": "sesame_transport",
+      "study": "drift_diffusion",
+      "source": {
+        "url": "https://doi.org/10.1016/j.solmat.2019.03.037",
+        "author_data": "https://doi.org/10.17632/34gb6xjt4g.1",
+        "author_data_license": "CC0",
+        "author_archive_sha256": "5dcee3de75fe634885099fbfea7a3485024b5b8c31fdbf3bef7d41a15ff2ee35",
+        "reference_kind": "author_numerical_data",
+        "figure": "Figure 2a",
+        "reference_conversion": "Author A/m2 multiplied by 0.1 to mA/cm2; solver diode_current_A_cm2 multiplied by 1000"
+      },
+      "limitations": [
+        "Both contacts are nonselective Ohmic with four velocities1.16e7 cm/s; these contact choices were reconstructed, not uniquely given in the paper.",
+        "Uniform generation1e21/3 cm^-3 s^-1 is an inferred unrounded value; printed3.3e20 remains a distinct editable scenario.",
+        "360-node mesh is an initial reconstruction. Bias/mesh convergence and contact uncertainty remain separate from author-data agreement."
+      ],
+      "case_file": "sesame_1d_heterojunction/case.json",
+      "files": {
+        "sesame_1d_heterojunction/case.json": "89a07df2a74ea889dc399741d92da98a1c8a44c11740ca2883fdd1aae6881aad",
+        "sesame_1d_heterojunction/reference.csv": "74559cd8b14623ced009d02447eda9f26ff8b5e3f61b6fbb198a94c2635e5915"
+      }
+    },
+    {
+      "id": "sesame_2d_grain_boundary",
+      "version": "1.0.0",
+      "label": "Sesame 2D grain boundary author-data comparison",
+      "family": "Semiconductor transport",
+      "kind": "research_simulation",
+      "engine": "sesame_transport",
+      "study": "drift_diffusion",
+      "source": {
+        "url": "https://doi.org/10.1016/j.solmat.2019.03.037",
+        "author_data": "https://doi.org/10.17632/34gb6xjt4g.1",
+        "author_data_license": "CC0",
+        "author_archive_sha256": "5dcee3de75fe634885099fbfea7a3485024b5b8c31fdbf3bef7d41a15ff2ee35",
+        "reference_kind": "author_numerical_data",
+        "figure": "Figure 3",
+        "reference_conversion": "Author A/m2 multiplied by 0.1 to mA/cm2; solver diode_current_A_cm2 multiplied by 1000",
+        "energy_reference": "Paper +0.4eV above geometric midgap converted to intrinsic-reference energy using Ei shift kT/2 ln(Nv/Nc)",
+        "vector_extraction": {
+          "source": "Accepted manuscript Figure 3(b), page 4, /Im3, /x14 through /x25",
+          "x_tick_pdf": [
+            68.965,
+            129.785,
+            190.605,
+            251.426,
+            312.246
+          ],
+          "y_tick_pdf": [
+            403.562,
+            361.254,
+            318.945,
+            276.637
+          ],
+          "xfit": [
+            60.82029999999998,
+            68.96480000000005
+          ],
+          "yfit": [
+            -42.30840000000003,
+            318.94529999999975
+          ],
+          "limitation": "Vector path vertices may have been simplified by plotting software; they are not raw simulation samples. Use approximately 5 meV as a conservative graphical comparison scale away from discontinuities; interpolation between sparse vertices adds uncertainty.",
+          "energy_offset_fitted": false,
+          "COMSOL-Ec": 150,
+          "COMSOL-Efn": 129,
+          "COMSOL-Efp": 132,
+          "COMSOL-Ev": 150,
+          "Sentaurus-Ec": 36,
+          "Sentaurus-Efn": 29,
+          "Sentaurus-Efp": 41,
+          "Sentaurus-Ev": 36,
+          "Sesame-Ec": 38,
+          "Sesame-Efn": 30,
+          "Sesame-Efp": 44,
+          "Sesame-Ev": 38
+        }
+      },
+      "limitations": [
+        "Ohmic contact velocities and unrounded uniform generation are reconstructed assumptions.",
+        "Reported current is conservative transverse mean, not the historical Sesame spline integral.",
+        "Grain-boundary energy is relative to intrinsic Ei; no hidden fitted energy offset.",
+        "Coarse initial mesh; refine both axes and biases. Band reference consists of PDF vector vertices and may omit/simplify interface discontinuities."
+      ],
+      "case_file": "sesame_2d_grain_boundary/case.json",
+      "files": {
+        "sesame_2d_grain_boundary/case.json": "c60251e35e3f312661ea4ee45cd2c4fb2588062c0f195606a5c96c5c1438268c",
+        "sesame_2d_grain_boundary/reference.csv": "3a76937e77d1a44fe6ad5841f5c5a7e5f13ff7b080d2813b786d70d84e348f57",
+        "sesame_2d_grain_boundary/Ec.csv": "7563b28513f5f7741a4a29a5fe70f58955ed006f6c31c3d239870a41914cccdd",
+        "sesame_2d_grain_boundary/Ev.csv": "1f27655e1b83b5ded5a81a69d53bf8a13e9a57697c1db3ec67e872331ac5be24",
+        "sesame_2d_grain_boundary/Efn.csv": "6d8faa8fb49c20dc8673a222ed150f8b3ad5093c98f69f7630ae0bdae7975bac",
+        "sesame_2d_grain_boundary/Efp.csv": "ddba89062ee1ecd8f9e6f86c17802a168fe755096794390707c221a433b94b0e"
+      }
+    },
+    {
+      "id": "cersonsky_diamond_2021",
+      "version": "1.0.0",
+      "label": "Cersonsky 2021 direct diamond",
+      "family": "Photonic bands",
+      "kind": "research_simulation",
+      "engine": "photonic_bands",
+      "study": "band_structure",
+      "source": {
+        "url": "https://doi.org/10.1038/s41467-021-22809-6",
+        "author_database": "https://glotzerlab.github.io/photonics/",
+        "template": "cF8-C",
+        "figure": "Figure 3b",
+        "reference_kind": "primary_paper_stated_gap_ratio",
+        "coordinate_conversion": "Author sphere centers +/-[1/8,1/8,1/8] in fractional primitive coordinates converted to Cartesian via lattice rows."
+      },
+      "limitations": [
+        "Frequency normalization uses primitive-vector length, not conventional cubic-cell edge.",
+        "14.74% is the paper reported gap/midgap ratio; no unreported edge frequencies or acceptance tolerance invented.",
+        "The supplied path is a standard FCC path. Original redundant author path was unavailable. Interior k-grid and resolution convergence remain required.",
+        "Initial resolution16 is not converged. Duplicate this case and use parameter_sweep to explore editable radii, material values and lattice vectors."
+      ],
+      "case_file": "cersonsky_diamond_2021/case.json",
+      "files": {
+        "cersonsky_diamond_2021/case.json": "984e79c8c17f64178ddd566559abd5437b721d97eea141b41f92beefac596721"
+      }
+    },
+    {
+      "id": "pcsel_2021_hole_vertical",
+      "version": "1.0.0",
+      "label": "Yang 2021 air-hole vertical QW overlap",
+      "family": "PCSEL",
+      "kind": "research_simulation",
+      "engine": "pcsel",
+      "study": "research",
+      "source": {
+        "url": "https://doi.org/10.3390/photonics8060189",
+        "title": "Simulation of Photonic-Crystal Surface-Emitting Lasers with Air-Hole and Air-Pillar Structures",
+        "authors": "Yang, Kuo and Lin",
+        "year": 2021,
+        "license": "CC BY 4.0",
+        "paper_sha256": "dc11746c47103f737e7801ba2221924fd44cc2390e799d389901483c22674919",
+        "reference_kind": "primary_paper_pdf_vector_vertices",
+        "reference_is_author_raw_data": false,
+        "calibration_source": "Recovered PDF vector-path axis calibration, reproduced from the saved study build_report.py; no fitted material or geometry parameters.",
+        "figure": "Figure 2 or 3, QW overlap panel",
+        "extracted_coordinate": "Air filling fraction f and normalized QW intensity overlap",
+        "reference_interpolation": "Linear interpolation of extracted vertices at f=0.16, within their domain",
+        "extraction_sha256": "09c246c8096b189d2d380cd748aeb2c28e1de11d847c82a2dbca30954ee29a47",
+        "calibration": {
+          "x0": 342.337,
+          "x1": 480.248,
+          "xmax": 0.3,
+          "y0": 625.935,
+          "yspan": 101.025,
+          "ymax": 0.25
+        }
+      },
+      "limitations": [
+        "Passive area-averaged vertical optical model. Layer thicknesses and refractive indices follow Tables1-2.",
+        "Lower AlGaAs cladding is continued into a semi-infinite medium; unspecified substrate is a modeling assumption.",
+        "Reference is extracted from plotted PDF vector vertices, not author raw output; no invented statistical tolerance.",
+        "A single f=0.16 point does not establish full sweep agreement. Vertical spacing/padding convergence remain separate."
+      ],
+      "case_file": "pcsel_2021_hole_vertical/case.json",
+      "files": {
+        "pcsel_2021_hole_vertical/case.json": "bcac13486846a0127170c6200097686a88e23df658653ab238fea6ae472d98aa",
+        "pcsel_2021_hole_vertical/reference.csv": "5fb8207e2bd074bc6d8a0d81badf46b6a3b54fe53d877a4e11a0f5be99737f1d"
+      }
+    },
+    {
+      "id": "pcsel_2021_hole_rit_finite",
+      "version": "1.0.0",
+      "label": "Yang 2021 air-hole RIT finite 200um slope",
+      "family": "PCSEL",
+      "kind": "research_simulation",
+      "engine": "pcsel",
+      "study": "research",
+      "source": {
+        "url": "https://doi.org/10.3390/photonics8060189",
+        "title": "Simulation of Photonic-Crystal Surface-Emitting Lasers with Air-Hole and Air-Pillar Structures",
+        "authors": "Yang, Kuo and Lin",
+        "year": 2021,
+        "license": "CC BY 4.0",
+        "paper_sha256": "dc11746c47103f737e7801ba2221924fd44cc2390e799d389901483c22674919",
+        "reference_kind": "primary_paper_pdf_vector_vertices",
+        "reference_is_author_raw_data": false,
+        "calibration_source": "Recovered PDF vector-path axis calibration, reproduced from the saved study build_report.py; no fitted material or geometry parameters.",
+        "figure": "Figure 8",
+        "extracted_coordinate": "Square cavity length and plotted A0 slope-efficiency curve",
+        "reference_interpolation": "Linear interpolation of extracted vertices at L=200um, within their domain",
+        "extraction_sha256": "8703889c6e102cd626e1c056a481b4432d271ddb47d118fa8604a5f691dd427a",
+        "calibration": {
+          "x0": 122.205,
+          "x1": 259.695,
+          "xmax_um": 400.0,
+          "y0": 192.27,
+          "yspan": 101.603,
+          "ymax_W_A": 0.65
+        }
+      },
+      "limitations": [
+        "Conditional passive-optics slope estimate: hc/q=1240nm V, injection efficiency1, upward radiation fraction0.5 and internal loss5cm^-1, following the saved paper-equation reconstruction.",
+        "No threshold-current, nonlinear L-I, transport or heating prediction follows from this estimate.",
+        "Current adapter uses a layer-resolved radiation Green function; older saved study used optical-path approximation for pillars. Differences remain visible.",
+        "Lowest-loss eligible returned sparse mode is used; the global lowest-loss mode is not proven. Refine Fourier harmonics, collocation order and mode search.",
+        "Reference is a PDF vector curve, not author raw output; no fabricated acceptance tolerance."
+      ],
+      "case_file": "pcsel_2021_hole_rit_finite/case.json",
+      "files": {
+        "pcsel_2021_hole_rit_finite/case.json": "6c97147e1ecf67bb5a304c7171d97cc98a1c9ae300286fcb1f154adaf415d35d",
+        "pcsel_2021_hole_rit_finite/reference.csv": "62f394433683910c07bb040f251a5d9a05434fd53dab90c2597ab8729e593283"
+      }
+    },
+    {
+      "id": "pcsel_2021_hole_cc_finite",
+      "version": "1.0.0",
+      "label": "Yang 2021 air-hole CC finite 200um slope",
+      "family": "PCSEL",
+      "kind": "research_simulation",
+      "engine": "pcsel",
+      "study": "research",
+      "source": {
+        "url": "https://doi.org/10.3390/photonics8060189",
+        "title": "Simulation of Photonic-Crystal Surface-Emitting Lasers with Air-Hole and Air-Pillar Structures",
+        "authors": "Yang, Kuo and Lin",
+        "year": 2021,
+        "license": "CC BY 4.0",
+        "paper_sha256": "dc11746c47103f737e7801ba2221924fd44cc2390e799d389901483c22674919",
+        "reference_kind": "primary_paper_pdf_vector_vertices",
+        "reference_is_author_raw_data": false,
+        "calibration_source": "Recovered PDF vector-path axis calibration, reproduced from the saved study build_report.py; no fitted material or geometry parameters.",
+        "figure": "Figure 10",
+        "extracted_coordinate": "Square cavity length and plotted A0 slope-efficiency curve",
+        "reference_interpolation": "Linear interpolation of extracted vertices at L=200um, within their domain",
+        "extraction_sha256": "8703889c6e102cd626e1c056a481b4432d271ddb47d118fa8604a5f691dd427a",
+        "calibration": {
+          "x0": 122.498,
+          "x1": 259.748,
+          "xmax_um": 400.0,
+          "y0": 232.59,
+          "yspan": 101.603,
+          "ymax_W_A": 0.65
+        }
+      },
+      "limitations": [
+        "Conditional passive-optics slope estimate: hc/q=1240nm V, injection efficiency1, upward radiation fraction0.5 and internal loss5cm^-1, following the saved paper-equation reconstruction.",
+        "No threshold-current, nonlinear L-I, transport or heating prediction follows from this estimate.",
+        "Current adapter uses a layer-resolved radiation Green function; older saved study used optical-path approximation for pillars. Differences remain visible.",
+        "Lowest-loss eligible returned sparse mode is used; the global lowest-loss mode is not proven. Refine Fourier harmonics, collocation order and mode search.",
+        "Reference is a PDF vector curve, not author raw output; no fabricated acceptance tolerance."
+      ],
+      "case_file": "pcsel_2021_hole_cc_finite/case.json",
+      "files": {
+        "pcsel_2021_hole_cc_finite/case.json": "775d510ecc0826aa9118e45db297d9ba714ae88f7dc329be0ff99b4659cc363e",
+        "pcsel_2021_hole_cc_finite/reference.csv": "b11dfc41f4b3a336803fe7a78a8a3536aaf94e0e769777c4730be65088297c93"
+      }
+    },
+    {
+      "id": "pcsel_2021_pillar_vertical",
+      "version": "1.0.0",
+      "label": "Yang 2021 air-pillar vertical QW overlap",
+      "family": "PCSEL",
+      "kind": "research_simulation",
+      "engine": "pcsel",
+      "study": "research",
+      "source": {
+        "url": "https://doi.org/10.3390/photonics8060189",
+        "title": "Simulation of Photonic-Crystal Surface-Emitting Lasers with Air-Hole and Air-Pillar Structures",
+        "authors": "Yang, Kuo and Lin",
+        "year": 2021,
+        "license": "CC BY 4.0",
+        "paper_sha256": "dc11746c47103f737e7801ba2221924fd44cc2390e799d389901483c22674919",
+        "reference_kind": "primary_paper_pdf_vector_vertices",
+        "reference_is_author_raw_data": false,
+        "calibration_source": "Recovered PDF vector-path axis calibration, reproduced from the saved study build_report.py; no fitted material or geometry parameters.",
+        "figure": "Figure 2 or 3, QW overlap panel",
+        "extracted_coordinate": "Air filling fraction f and normalized QW intensity overlap",
+        "reference_interpolation": "Linear interpolation of extracted vertices at f=0.16, within their domain",
+        "extraction_sha256": "09c246c8096b189d2d380cd748aeb2c28e1de11d847c82a2dbca30954ee29a47",
+        "calibration": {
+          "x0": 342.337,
+          "x1": 480.248,
+          "xmax": 0.3,
+          "y0": 417.712,
+          "yspan": 100.936,
+          "ymax": 0.25
+        }
+      },
+      "limitations": [
+        "Passive area-averaged vertical optical model. Layer thicknesses and refractive indices follow Tables1-2.",
+        "Lower AlGaAs cladding is continued into a semi-infinite medium; unspecified substrate is a modeling assumption.",
+        "Reference is extracted from plotted PDF vector vertices, not author raw output; no invented statistical tolerance.",
+        "A single f=0.16 point does not establish full sweep agreement. Vertical spacing/padding convergence remain separate."
+      ],
+      "case_file": "pcsel_2021_pillar_vertical/case.json",
+      "files": {
+        "pcsel_2021_pillar_vertical/case.json": "9938a9a1c2d6b135f9347dbe848e6b1702e3f138e2febce0924e735dd9e42442",
+        "pcsel_2021_pillar_vertical/reference.csv": "b77acb658f583ce283ba3144ecfc090dfd9f2c17bdc0fd1af0c329f57b0aeb07"
+      }
+    },
+    {
+      "id": "pcsel_2021_pillar_rit_finite",
+      "version": "1.0.0",
+      "label": "Yang 2021 air-pillar RIT finite 200um slope",
+      "family": "PCSEL",
+      "kind": "research_simulation",
+      "engine": "pcsel",
+      "study": "research",
+      "source": {
+        "url": "https://doi.org/10.3390/photonics8060189",
+        "title": "Simulation of Photonic-Crystal Surface-Emitting Lasers with Air-Hole and Air-Pillar Structures",
+        "authors": "Yang, Kuo and Lin",
+        "year": 2021,
+        "license": "CC BY 4.0",
+        "paper_sha256": "dc11746c47103f737e7801ba2221924fd44cc2390e799d389901483c22674919",
+        "reference_kind": "primary_paper_pdf_vector_vertices",
+        "reference_is_author_raw_data": false,
+        "calibration_source": "Recovered PDF vector-path axis calibration, reproduced from the saved study build_report.py; no fitted material or geometry parameters.",
+        "figure": "Figure 8",
+        "extracted_coordinate": "Square cavity length and plotted A0 slope-efficiency curve",
+        "reference_interpolation": "Linear interpolation of extracted vertices at L=200um, within their domain",
+        "extraction_sha256": "8703889c6e102cd626e1c056a481b4432d271ddb47d118fa8604a5f691dd427a",
+        "calibration": {
+          "x0": 342.765,
+          "x1": 480.255,
+          "xmax_um": 400.0,
+          "y0": 192.27,
+          "yspan": 101.603,
+          "ymax_W_A": 0.65
+        }
+      },
+      "limitations": [
+        "Conditional passive-optics slope estimate: hc/q=1240nm V, injection efficiency1, upward radiation fraction0.5 and internal loss5cm^-1, following the saved paper-equation reconstruction.",
+        "No threshold-current, nonlinear L-I, transport or heating prediction follows from this estimate.",
+        "Current adapter uses a layer-resolved radiation Green function; older saved study used optical-path approximation for pillars. Differences remain visible.",
+        "Lowest-loss eligible returned sparse mode is used; the global lowest-loss mode is not proven. Refine Fourier harmonics, collocation order and mode search.",
+        "Reference is a PDF vector curve, not author raw output; no fabricated acceptance tolerance."
+      ],
+      "case_file": "pcsel_2021_pillar_rit_finite/case.json",
+      "files": {
+        "pcsel_2021_pillar_rit_finite/case.json": "a3f4d22a738eb862f6406c9a112dc8e6031023e38d4bcb6bf4c446e44fe37407",
+        "pcsel_2021_pillar_rit_finite/reference.csv": "9ebd98ee3d48d441298ff442964de99bfdd1d13e3fb98197571a41ac05137f14"
+      }
+    },
+    {
+      "id": "pcsel_2021_pillar_cc_finite",
+      "version": "1.0.0",
+      "label": "Yang 2021 air-pillar CC finite 200um slope",
+      "family": "PCSEL",
+      "kind": "research_simulation",
+      "engine": "pcsel",
+      "study": "research",
+      "source": {
+        "url": "https://doi.org/10.3390/photonics8060189",
+        "title": "Simulation of Photonic-Crystal Surface-Emitting Lasers with Air-Hole and Air-Pillar Structures",
+        "authors": "Yang, Kuo and Lin",
+        "year": 2021,
+        "license": "CC BY 4.0",
+        "paper_sha256": "dc11746c47103f737e7801ba2221924fd44cc2390e799d389901483c22674919",
+        "reference_kind": "primary_paper_pdf_vector_vertices",
+        "reference_is_author_raw_data": false,
+        "calibration_source": "Recovered PDF vector-path axis calibration, reproduced from the saved study build_report.py; no fitted material or geometry parameters.",
+        "figure": "Figure 10",
+        "extracted_coordinate": "Square cavity length and plotted A0 slope-efficiency curve",
+        "reference_interpolation": "Linear interpolation of extracted vertices at L=200um, within their domain",
+        "extraction_sha256": "8703889c6e102cd626e1c056a481b4432d271ddb47d118fa8604a5f691dd427a",
+        "calibration": {
+          "x0": 342.765,
+          "x1": 480.255,
+          "xmax_um": 400.0,
+          "y0": 232.59,
+          "yspan": 101.603,
+          "ymax_W_A": 0.65
+        }
+      },
+      "limitations": [
+        "Conditional passive-optics slope estimate: hc/q=1240nm V, injection efficiency1, upward radiation fraction0.5 and internal loss5cm^-1, following the saved paper-equation reconstruction.",
+        "No threshold-current, nonlinear L-I, transport or heating prediction follows from this estimate.",
+        "Current adapter uses a layer-resolved radiation Green function; older saved study used optical-path approximation for pillars. Differences remain visible.",
+        "Lowest-loss eligible returned sparse mode is used; the global lowest-loss mode is not proven. Refine Fourier harmonics, collocation order and mode search.",
+        "Reference is a PDF vector curve, not author raw output; no fabricated acceptance tolerance."
+      ],
+      "case_file": "pcsel_2021_pillar_cc_finite/case.json",
+      "files": {
+        "pcsel_2021_pillar_cc_finite/case.json": "dd5dfde5f9f43395a74e6b89b36d8f814400407544a676ef95d8b300a21218bf",
+        "pcsel_2021_pillar_cc_finite/reference.csv": "ff8ebba1b7d02e1606dd2ae41210d4300eb0ac06758983c15d358fad15706bd9"
+      }
+    }
+  ]
+}

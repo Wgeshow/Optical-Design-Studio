@@ -21,7 +21,7 @@ def main():
         raise ValueError('Source smoke checks require the exact staged snapshot.')
     output = ROOT/'source-smoke-final'
     output.mkdir(exist_ok=False)
-    session = Path(tempfile.mkdtemp(prefix='ods-src-132-'))
+    session = Path(tempfile.mkdtemp(prefix='ods-src-140a1-'))
     report_path = output/'report.json'
     env = dict(os.environ)
     env.update(
@@ -57,17 +57,17 @@ def main():
     speed = report.get('checks',{}).get('simulation_speed_and_scan_storage',{})
     maximize = report.get('checks',{}).get('maximize_restore_painting',{})
     passed = bool(exit_code == 0 and report.get('passed') is True and report.get('frozen') is False
-                  and report.get('version') == '1.3.2'
+                  and report.get('version') == '1.4.0-alpha.1'
                   and len(report.get('checks',{})) >= 9 and fields.get('passed') is True
                   and fields['detail'].get('selected_csv_verified') is True
                   and fields['detail'].get('volume_depths') == 5
                   and speed.get('passed') is True
                   and all(speed.get('detail',{}).get(name) is True for name in (
-                      'shared_spectrum_solutions', 'validated_fourier_sampling',
+                      'spectrum_rta_only','separate_field_job', 'validated_fourier_sampling',
                       'exact_disk_backed_spectrum', 'compact_scan_roundtrip', 'contour_label_parity'))
                   and speed['detail'].get('field_sample_count') == 3
                   and maximize.get('passed') is True
-                  and maximize.get('detail',{}).get('maximized_opaque_workspace') is True
+                  and maximize.get('detail',{}).get('maximized_transparency_policy_verified') is True
                   and maximize.get('detail',{}).get('restored_glass_policy') is True
                   and maximize.get('detail',{}).get('looks') == ['glass_dark', 'glass_light'])
     verification = dict(status='passed' if passed else 'failed',passed=passed,exit_code=exit_code,

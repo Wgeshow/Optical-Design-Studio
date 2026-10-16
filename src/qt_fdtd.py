@@ -84,11 +84,18 @@ class MeepWorker(QThread):
             self.completed.emit(dict(run_kind='fdtd', status=status, directory=str(self.directory),
                 output=str(self.directory/'results.csv'), info=terminal.get('info', {})))
         except Exception as exc:
+            errors = [str(exc)]
             if managed is not None:
-                managed.terminate(force=True)
+                try:
+                    managed.terminate(force=True)
+                except Exception as cleanup_exc:
+                    errors.append('Could not stop the Meep process: '+str(cleanup_exc))
             if self.directory:
-                self.library.record(self.directory, status='error')
-            self.failed.emit(str(exc))
+                try:
+                    self.library.record(self.directory, status='error')
+                except Exception as record_exc:
+                    errors.append('Could not save the failed run status: '+str(record_exc))
+            self.failed.emit('\n'.join(errors))
 
 
 class _RuntimeTask(QThread):
@@ -372,6 +379,7 @@ class MeepRuntimeSettings(QWidget):
 
 
 class FDTDPage(QWidget):
+    routeRequested = pyqtSignal(str)
     def __init__(self, store, parent=None):
         super().__init__(parent)
         self.store, self.directory, self._active = store, None, False
@@ -392,8 +400,9 @@ class FDTDPage(QWidget):
             pml_um=number(1., .001), padding_um=number(1., .001),
             run_after_sources=number(200., 1., 1e7), courant=number(.5, .001, .5),
             section_y_um=number(0.), decay_by=number(1e-7, 1e-12, .1, 12),
-            fit_materials=QCheckBox('Fit tabulated n,k to passive dispersion'),
-            save_fields=QCheckBox('Save centre-frequency XZ field map'))
+            fit_materials=QCheckBox('Fit material dispersion'),
+            save_fields=QCheckBox('Save XZ field map'))
+        self.controls['save_fields'].setToolTip('Save the centre-frequency XZ field map.')
         self.controls['dimensions'].addItem('2D · XZ section (extruded along Y)', 2)
         self.controls['dimensions'].addItem('3D · full periodic structure', 3)
         self.controls['polarization'].addItem('s · Ey', 's')
@@ -403,6 +412,7 @@ class FDTDPage(QWidget):
         self.controls['dimensions'].currentIndexChanged.connect(lambda: self.controls['section_y_um'].setEnabled(self.controls['dimensions'].currentData()==2))
         left = QWidget()
         controls_layout = QVBoxLayout(left)
+        self.input_groups = []
         for group_title, rows in [
             ('Domain & excitation', [('View', 'dimensions'), ('Resolution (cells/µm)', 'resolution'), ('Section Y (µm)', 'section_y_um'), ('Polarization', 'polarization')]),
             ('Spectrum', [('First wavelength (nm)', 'wavelength_min_nm'), ('Last wavelength (nm)', 'wavelength_max_nm'), ('Frequency samples', 'frequency_points')]),
@@ -413,6 +423,7 @@ class FDTDPage(QWidget):
             for label, key in rows:
                 form.addRow(label, self.controls[key])
             controls_layout.addWidget(group)
+            self.input_groups.append(group)
         controls_layout.addWidget(self.controls['fit_materials'])
         fit_note = QLabel('Fits must stay within 5% relative permittivity error over the selected band. Complex constant materials need tabulated n,k data. Incident and exit media must be lossless constants.')
         fit_note.setWordWrap(True)
@@ -517,6 +528,21 @@ class FDTDPage(QWidget):
         store.run_failed.connect(self._failed)
         self._busy(store.busy)
         self._restore()
+        from qt_legacy_study_workbench import StudyWorkbench
+        # Retain the existing controls and result widgets; only their placement changes.
+        action_layout.removeWidget(area)
+        area.takeWidget()
+        action_layout.insertWidget(1, left, 1)
+        area.deleteLater()
+        layout.removeWidget(splitter)
+        self.workbench = StudyWorkbench(store, 'Time-domain optics',
+            ['Domain', 'Pulse & sampling', 'Calculate'], action_panel, output,
+            edit_geometry=lambda: self.routeRequested.emit('structure.original'),
+            preview_note='Shared optical unit cell. Lateral boundaries are periodic; PML and padding apply along the propagation direction. Normal incidence.')
+        self.workbench.add_parameter_tab(recent, 'Saved runs')
+        self.workbench.set_step_targets(self.input_groups)
+        layout.insertWidget(0, self.workbench, 1)
+        splitter.hide()
 
     def _restore(self):
         options = self.store.search_state.get('fdtd', {})
@@ -632,6 +658,7 @@ class FDTDPage(QWidget):
         self.samples.selectRow(position)
 
     def _display_result(self, event):
+        self.workbench.show_results()
         try:
             self.directory = Path(event['directory'])
             from qt_compute import _read_csv

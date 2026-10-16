@@ -1,0 +1,563 @@
+{
+  "id": "liu_grating_d050",
+  "label": "liu grating d050",
+  "family": "Optical spectra",
+  "kind": "simulation",
+  "project": {
+    "format_version": 3,
+    "materials": [
+      {
+        "Name": "Air",
+        "Model": "constant_nk",
+        "A": 1.0,
+        "B": 0.0,
+        "DataFile": "",
+        "WavelengthUnit": "nm"
+      },
+      {
+        "Name": "SiN_2p02",
+        "Model": "constant_nk",
+        "A": 2.02,
+        "B": 0.0,
+        "DataFile": "",
+        "WavelengthUnit": "nm"
+      },
+      {
+        "Name": "Glass_1p47",
+        "Model": "constant_nk",
+        "A": 1.47,
+        "B": 0.0,
+        "DataFile": "",
+        "WavelengthUnit": "nm"
+      }
+    ],
+    "layers": [
+      {
+        "Name": "Incident",
+        "Thickness_um": 0.0,
+        "Material": "Air"
+      },
+      {
+        "Name": "Grating",
+        "Thickness_um": 0.05,
+        "Material": "Air"
+      },
+      {
+        "Name": "Waveguide",
+        "Thickness_um": 0.5499999999999999,
+        "Material": "SiN_2p02"
+      },
+      {
+        "Name": "Exit",
+        "Thickness_um": 0.0,
+        "Material": "Glass_1p47"
+      }
+    ],
+    "patterns": [
+      {
+        "Shape": "rectangle",
+        "Layer": "Grating",
+        "Material": "SiN_2p02",
+        "CenterX_um": 0.0,
+        "CenterY_um": 0.0,
+        "SizeX_um": 1.25,
+        "SizeY_um": 0.25,
+        "Angle_deg": 0.0
+      }
+    ],
+    "settings": {
+      "ax_um": 2.5,
+      "ay_um": 0.25,
+      "NumG": 169,
+      "mode": "Wavelength sweep",
+      "wl_start_nm": 3500.0,
+      "wl_stop_nm": 4100.0,
+      "wl_step_nm": 2.0,
+      "fixed_wl_nm": 1550.0,
+      "theta_deg": 0.0,
+      "phi_deg": 0.0,
+      "angle_start": 0.0,
+      "angle_stop": 60.0,
+      "angle_step": 2.0,
+      "polarization": "s"
+    },
+    "performance": {
+      "mode": "CPU only",
+      "workers": 2,
+      "threads": 1,
+      "gpu_device": 0,
+      "gpu_min_n": 1024,
+      "gpu_block": 256,
+      "chunk_size": 8,
+      "timeout_seconds": 1200,
+      "require_gpu": false,
+      "solver_backend": "native",
+      "mirror_symmetry": true,
+      "eigenfree_symmetry": true,
+      "eigenfree_batch_size": 32
+    },
+    "desktop_search": {
+      "simulation": {
+        "optical_geometry_source": "original_tables",
+        "electric_fields": {
+          "grid": 25,
+          "depth_samples": 3,
+          "contour_step": 0.1
+        }
+      }
+    },
+    "appearance": {
+      "layer_colors": {},
+      "material_opacities": {}
+    },
+    "device": {
+      "schema_version": 1,
+      "name": "Imported optical device",
+      "width_um": 2.5,
+      "depth_um": 0.25,
+      "temperature_K": 300.0,
+      "mesh": {
+        "nx": 16,
+        "ny": 16,
+        "nz_per_layer": 8,
+        "max_nodes": 120000
+      },
+      "layers": [
+        {
+          "id": "layer_62c42627629a",
+          "name": "Grating",
+          "material_id": "air",
+          "optical_material_name": "Air",
+          "thickness_um": 0.05,
+          "donor_cm3": 0.0,
+          "acceptor_cm3": 0.0,
+          "enabled": true
+        },
+        {
+          "id": "layer_bb817ad97acb",
+          "name": "Waveguide",
+          "material_id": "",
+          "optical_material_name": "SiN_2p02",
+          "thickness_um": 0.5499999999999999,
+          "donor_cm3": 0.0,
+          "acceptor_cm3": 0.0,
+          "enabled": true
+        }
+      ],
+      "shapes": [
+        {
+          "id": "shape_e80537be904a",
+          "name": "Imported rectangle",
+          "layer_id": "layer_62c42627629a",
+          "material_id": "",
+          "optical_material_name": "SiN_2p02",
+          "operation": "material",
+          "shape": "rectangle",
+          "cx_um": 0.0,
+          "cy_um": 0.0,
+          "size_x_um": 1.25,
+          "size_y_um": 0.25,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true
+        }
+      ],
+      "contacts": [],
+      "doping_regions": []
+    },
+    "electrical_materials": [
+      {
+        "id": "gaas",
+        "name": "GaAs",
+        "kind": "semiconductor",
+        "temperature_K": 300.0,
+        "model": "gaas_reference",
+        "color": "#ef7595",
+        "optical_material_name": "GaAs",
+        "aliases": [
+          "Gallium arsenide"
+        ],
+        "properties": {
+          "epsilon_r": 12.9,
+          "bandgap_eV": 1.424,
+          "affinity_eV": 4.07,
+          "electron_mass_ratio": 0.063,
+          "hole_mass_ratio": 0.51,
+          "electron_dos_mass_ratio": 0.063,
+          "hole_dos_mass_ratio": 0.51,
+          "Nc_cm3": 3.953218625373507e+17,
+          "Nv_cm3": 9.105321246392134e+18,
+          "intrinsic_cm3": 2075149.9917685564,
+          "electron_mobility_cm2_Vs": 8500.0,
+          "hole_mobility_cm2_Vs": 400.0
+        },
+        "sources": [
+          {
+            "title": "Ioffe NSM: AlGaAs basic parameters (GaAs x=0 limit)",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/basic.html",
+            "properties": [
+              "epsilon_r",
+              "affinity_eV",
+              "electron_mass_ratio",
+              "hole_mass_ratio"
+            ],
+            "note": "",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Ioffe NSM: AlGaAs band structure (GaAs x=0 limit)",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/bandstr.html",
+            "properties": [
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3",
+              "intrinsic_cm3"
+            ],
+            "note": "DOS and ni are calculated from the reference model.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "TYDEX: GaAs electronic properties",
+            "url": "https://www.tydexoptics.com/materials1/for_transmission_optics/gaas/",
+            "properties": [
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs"
+            ],
+            "note": "Low-field bulk reference; not a mobility fit for heavily doped material.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "300 K bulk reference. Masses follow the Ioffe x=0 alloy limit. Mobility is constant unless edited. No recombination, high-field transport or impurity-scattering model is implied.",
+        "property_overrides": []
+      },
+      {
+        "id": "ito",
+        "name": "ITO",
+        "kind": "conductor",
+        "temperature_K": 300.0,
+        "model": "constant",
+        "color": "#67c9e5",
+        "optical_material_name": "ITO",
+        "aliases": [
+          "Indium tin oxide"
+        ],
+        "properties": {
+          "epsilon_r": 9.0,
+          "bandgap_eV": 3.5,
+          "affinity_eV": 4.5,
+          "electron_mass_ratio": 0.35,
+          "hole_mass_ratio": 1.0,
+          "electron_dos_mass_ratio": 0.35,
+          "hole_dos_mass_ratio": 1.0,
+          "Nc_cm3": 5.176569810212164e+18,
+          "Nv_cm3": 2.5e+19,
+          "electron_mobility_cm2_Vs": 30.0,
+          "hole_mobility_cm2_Vs": 0.0,
+          "bulk_electron_cm3": 8e+20,
+          "bulk_hole_cm3": 0.0,
+          "intrinsic_cm3": 4.5423956659835214e-11
+        },
+        "sources": [
+          {
+            "title": "Khusayfan & El-Nahass (2013): structure and electro-optical characteristics of ITO",
+            "url": "https://doi.org/10.1155/2013/408182",
+            "properties": [
+              "electron_mass_ratio"
+            ],
+            "note": "The paper uses assumed mass 0.35 m0 and reports process-dependent carrier density and mobility. Its measured optical band gap is not used as a universal electronic gap.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Editable ITO device-study assumptions",
+            "url": "",
+            "properties": [
+              "epsilon_r",
+              "bandgap_eV",
+              "affinity_eV",
+              "electron_mass_ratio",
+              "hole_mass_ratio",
+              "electron_dos_mass_ratio",
+              "hole_dos_mass_ratio",
+              "Nc_cm3",
+              "Nv_cm3",
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs",
+              "bulk_electron_cm3",
+              "bulk_hole_cm3",
+              "intrinsic_cm3"
+            ],
+            "note": "All preset values are model assumptions, not measurements of your film: n=8e20 cm−3, μn=30 cm²/(V·s), static εr=9, m*=0.35 m0, χ=4.5 eV, electronic gap=3.5 eV. Hole/DOS values are closure assumptions; degenerate ITO requires Fermi statistics.",
+            "kind": "assumption",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Transparent conductor with degenerate electrons. Carrier density, mobility, static permittivity, mass and affinity depend on film growth; replace these assumptions with measured values. Static εr is not optical ε∞. The fixed mass approximation does not model nonparabolicity. Temperature is held constant in this preset.",
+        "property_overrides": []
+      },
+      {
+        "id": "algaas",
+        "name": "AlGaAs",
+        "kind": "semiconductor",
+        "temperature_K": 300.0,
+        "al_fraction": 0.5,
+        "model": "algaas_reference",
+        "color": "#9c8cef",
+        "optical_material_name": "AlGaAs",
+        "aliases": [
+          "Aluminium gallium arsenide"
+        ],
+        "properties": {
+          "epsilon_r": 11.48,
+          "bandgap_eV": 1.9982499999999999,
+          "affinity_eV": 3.5700000000000003,
+          "electron_mass_ratio": 0.26,
+          "hole_mass_ratio": 0.635,
+          "electron_dos_mass_ratio": 0.78,
+          "hole_dos_mass_ratio": 0.635,
+          "Nc_cm3": 1.7221933689339302e+19,
+          "Nv_cm3": 1.26502933513417e+19,
+          "intrinsic_cm3": 242.3985345457434,
+          "electron_mobility_cm2_Vs": 1000.0,
+          "hole_mobility_cm2_Vs": 100.0
+        },
+        "sources": [
+          {
+            "title": "Ioffe NSM: AlGaAs basic parameters",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/basic.html",
+            "properties": [
+              "epsilon_r",
+              "affinity_eV",
+              "electron_mass_ratio",
+              "hole_mass_ratio",
+              "electron_dos_mass_ratio"
+            ],
+            "note": "",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Ioffe NSM: AlGaAs band structure",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/bandstr.html",
+            "properties": [
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3",
+              "intrinsic_cm3"
+            ],
+            "note": "Piecewise 300 K fit. Indirect branch above x=0.45 uses DOS mass 0.85−0.14x and conductivity mass 0.26 m0.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Editable transport assumptions",
+            "url": "",
+            "properties": [
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs"
+            ],
+            "note": "1000 / 100 cm²/(V·s) are starting estimates, not measured mobility for a particular alloy or doping.",
+            "kind": "assumption",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Editable alloy fraction x∈[0,1]. The approximate direct/indirect transition is represented at x=0.45; Ioffe also reports a 0.41–0.45 crossover region. Mobility values are explicit assumptions. Temperature gaps use Varshni corrections and DOS scales as T^1.5; validity outside the 300 K reference must be assessed for the device.",
+        "property_overrides": []
+      },
+      {
+        "id": "silicon",
+        "name": "Silicon",
+        "kind": "semiconductor",
+        "temperature_K": 300.0,
+        "model": "silicon_reference",
+        "color": "#70cfa7",
+        "optical_material_name": "Si",
+        "aliases": [
+          "Si",
+          "Crystalline silicon"
+        ],
+        "properties": {
+          "epsilon_r": 11.7,
+          "bandgap_eV": 1.124,
+          "affinity_eV": 4.05,
+          "electron_mass_ratio": 0.26,
+          "hole_mass_ratio": 0.39,
+          "electron_dos_mass_ratio": 1.08,
+          "hole_dos_mass_ratio": 0.81,
+          "Nc_cm3": 2.82e+19,
+          "Nv_cm3": 1.83e+19,
+          "intrinsic_cm3": 8225562977.908778,
+          "electron_mobility_cm2_Vs": 1400.0,
+          "hole_mobility_cm2_Vs": 470.0
+        },
+        "sources": [
+          {
+            "title": "University of Colorado ECEE: silicon material parameters",
+            "url": "https://www.colorado.edu/ecee/sites/default/files/attached-files/sd_constants_sheet.pdf",
+            "properties": [
+              "epsilon_r",
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3",
+              "electron_mass_ratio",
+              "hole_mass_ratio",
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs"
+            ],
+            "note": "300 K parameter sheet. ni is recalculated consistently from Eg/Nc/Nv rather than mixing independent rounded ni values.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Ioffe NSM: silicon reference",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/Si/basic.html",
+            "properties": [
+              "affinity_eV"
+            ],
+            "note": "Conventional electron-affinity estimate 4.05 eV. Surface/interface processing can change the effective band alignment.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Silicon temperature model",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/Si/bandstr.html",
+            "properties": [
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3"
+            ],
+            "note": "Varshni α=4.73e−4 eV/K, β=636 K; DOS T^1.5 scaling. Static permittivity and mobility are held constant.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Crystalline silicon, 300 K low-field reference. Electron/hole conductivity masses are distinct from DOS masses. Mobility is not a fit to high doping or field; edit to match your sample.",
+        "property_overrides": []
+      },
+      {
+        "id": "air",
+        "name": "Air / void",
+        "kind": "dielectric",
+        "temperature_K": 300.0,
+        "model": "constant",
+        "color": "#cbd5df",
+        "optical_material_name": "Air",
+        "aliases": [
+          "Air",
+          "Void"
+        ],
+        "properties": {
+          "epsilon_r": 1.0,
+          "conductivity_S_m": 0.0
+        },
+        "sources": [
+          {
+            "title": "Ideal void model",
+            "url": "",
+            "properties": [
+              "epsilon_r",
+              "conductivity_S_m"
+            ],
+            "note": "Vacuum-permittivity, zero-conductivity approximation.",
+            "kind": "assumption",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Ideal dielectric void. No mobile carriers or optical material data are inferred from this record.",
+        "property_overrides": []
+      }
+    ],
+    "optical_constants": {}
+  },
+  "options": {
+    "optical_geometry_source": "original_tables",
+    "electric_fields": {
+      "grid": 25,
+      "depth_samples": 3,
+      "contour_step": 0.1
+    }
+  },
+  "source": {
+    "title": "Optimally designed narrowband guided-mode resonance reflectance filters for mid-infrared spectroscopy",
+    "doi": "10.1364/OE.19.024182",
+    "url": "https://nano.ece.illinois.edu/files/2017/11/109.pdf",
+    "figure": "Fig.2(a,e)",
+    "reference_kind": "digitized_primary_paper",
+    "calibration": {
+      "id": "liu_d050",
+      "paper": "Liu 2011",
+      "figure": "2(a) inset",
+      "source_url": "https://nano.ece.illinois.edu/files/2017/11/109.pdf",
+      "pdf_page_zero_based": 5,
+      "render_size_px": [
+        3600,
+        4600
+      ],
+      "crop_box_px": [
+        650,
+        600,
+        1500,
+        1150
+      ],
+      "axis_corners_crop_px": [
+        [
+          474,
+          454
+        ],
+        [
+          743,
+          454
+        ],
+        [
+          474,
+          240
+        ]
+      ],
+      "x_range": [
+        2750,
+        2500
+      ],
+      "y_range": [
+        0,
+        1
+      ],
+      "pixel_uncertainty": 2,
+      "selection": "green channel exceeds others by30, intensity>70; interior only",
+      "source_pdf": "liu2011.pdf",
+      "source_raster": "liu2011-digitization-crop.png",
+      "observations": 255,
+      "source_pdf_sha256": "af8cedb7295c7136f94066911ff63aecb8c5be6e66b7af6645204f2fdea11d3d",
+      "source_raster_sha256": "66048958ebf131dc010dece7ba55196a3750210419f6ef1c152272e317ff3d23",
+      "csv_sha256": "ab7f6e6959affd01271940c420842189faf6dae7ad35ebacb86f1386c0821c02",
+      "x_units": "wavenumber_cm^-1",
+      "y_units": "power_reflectance"
+    }
+  },
+  "limitations": [
+    "Primary-paper raster digitization; no original author numeric curve. No fitting or synthetic missing points.",
+    "Fourier-basis and wavelength convergence must be measured separately from paper agreement."
+  ],
+  "comparisons": [
+    {
+      "id": "published_curve",
+      "label": "Digitized paper curve",
+      "type": "curve",
+      "actual_file": "results.csv",
+      "actual_x": "wavelength_nm",
+      "actual_y": "R",
+      "x_transform": "reciprocal",
+      "x_factor": 10000000.0,
+      "reference_file": "liu_grating_d050/reference.csv",
+      "exclude_flags": [
+        "ambiguous",
+        "clipped"
+      ],
+      "tolerance_column": "y_uncertainty",
+      "tolerance_basis": "Estimated raster/calibration bounds; excludes x uncertainty and is not statistical confidence",
+      "units": "R"
+    }
+  ]
+}

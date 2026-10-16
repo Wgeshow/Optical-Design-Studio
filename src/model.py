@@ -9,9 +9,12 @@ MAT_COLS = ["Name", "Model", "A", "B", "DataFile", "WavelengthUnit"]
 LAYER_COLS = ["Name", "Thickness_um", "Material"]
 PAT_COLS = ["Shape", "Layer", "Material", "CenterX_um", "CenterY_um", "SizeX_um", "SizeY_um", "Angle_deg"]
 MODES = ("CPU only", "CPU + GPU", "GPU-assisted (one worker)")
+SOLVER_BACKENDS = ('native', 'eigenfree-gpu')
 DEFAULT_PERFORMANCE = dict(mode=MODES[0], workers=0, threads=1, gpu_device=0,
                            gpu_min_n=1024, gpu_block=256, chunk_size=8,
-                           timeout_seconds=3600, require_gpu=False)
+                           timeout_seconds=3600, require_gpu=False,
+                           solver_backend='native', mirror_symmetry=True,
+                           eigenfree_symmetry=True, eigenfree_batch_size=32)
 # Sweeps are evaluated in performance-sized chunks by the compute layer.  Keep
 # a generous input guard only to catch accidental unit/step mistakes.
 MAX_SWEEP_POINTS = 20_000_000
@@ -144,10 +147,44 @@ def numeric_rows(path, unit):
 
 
 def epsilon(material, wavelength):
+    if 'epsilon_tensor' in material:
+        return tensor_epsilon(material, wavelength)
     if material["model"] == "constant_eps":
         return complex(material["a"], material["b"])
     n, k = interpolate_nk(material, wavelength)
     return complex(n * n - k * k, 2 * n * k)
+
+
+def tensor_epsilon(material, wavelength):
+    """Interpolate a coupled DC optical tensor accepted by native S4.
+
+    S4 exposes the xy block and zz; off-plane coupling is unsupported by
+    its Python binding and must never be silently discarded.
+    """
+    grid=material.get('grid', [])
+    tensors=material['epsilon_tensor']
+    if not grid or len(tensors)!=len(grid):
+        raise ValueError('Optical tensor samples must match a wavelength grid.')
+    if any(not math.isfinite(float(w)) for w in grid) or any(b<=a for a,b in zip(grid,grid[1:])):
+        raise ValueError('Optical tensor wavelength grid must be finite and increasing.')
+    index=bisect.bisect_left(grid,wavelength)
+    lo=max(0,min(index-1,len(grid)-1));hi=min(index,len(grid)-1)
+    fraction=0. if lo==hi else (wavelength-grid[lo])/(grid[hi]-grid[lo])
+    result=[]
+    for row in range(3):
+        entries=[]
+        for col in range(3):
+            try:
+                left=complex(*tensors[lo][row][col]);right=complex(*tensors[hi][row][col])
+            except (TypeError,ValueError,IndexError):
+                raise ValueError('Optical tensor must contain 3x3 complex [real, imaginary] samples.') from None
+            if not all(math.isfinite(v) for v in (left.real,left.imag,right.real,right.imag)):
+                raise ValueError('Optical tensor samples must be finite.')
+            if (row,col) in ((0,2),(1,2),(2,0),(2,1)) and (abs(left)>0 or abs(right)>0):
+                raise ValueError('Native S4 supports the xy tensor block and zz; off-plane terms must be zero.')
+            entries.append(left+(right-left)*fraction)
+        result.append(tuple(entries))
+    return tuple(result)
 
 
 def prepare(materials, layers, patterns, files, settings, compact_points=False):
@@ -251,6 +288,16 @@ def prepare(materials, layers, patterns, files, settings, compact_points=False):
 
 def performance(values, point_count, cpu_count):
     p = dict(DEFAULT_PERFORMANCE, **values)
+    if p['solver_backend'] not in SOLVER_BACKENDS:
+        raise ValueError('Invalid solver backend')
+    for name in ('mirror_symmetry', 'eigenfree_symmetry'):
+        if not isinstance(p[name], bool):
+            raise ValueError(name.replace('_', ' ') + ' must be true or false')
+    p['eigenfree_batch_size'] = integer(p['eigenfree_batch_size'], 'GPU wavelengths per batch', 1)
+    if p['eigenfree_batch_size'] > 256:
+        raise ValueError('GPU wavelengths per batch must be at most 256')
+    if p['solver_backend'] == 'eigenfree-gpu':
+        p.update(mode=MODES[2], workers=1)
     if point_count < 1 or cpu_count < 1:
         raise ValueError("Need at least one sweep point and one logical CPU")
     if not isinstance(p["require_gpu"], bool):

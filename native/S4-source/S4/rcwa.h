@@ -123,7 +123,8 @@ void SolveLayerEigensystem(
 	std::complex<double> *phi, // size (2*glist.n)^2
 	std::complex<double> *work = NULL, // length lwork
 	double *rwork = NULL, // length 4*n
-	size_t lwork = 0 // set to -1 for query into work[0], at least 4*n*n+2*n
+	size_t lwork = 0, // set to -1 for query into work[0], at least 4*n*n+2*n
+	const int *mirror_g = NULL // exact geometric eligibility verified by caller
 );
 
 // Purpose
@@ -277,7 +278,8 @@ int SolveAll(
 	std::complex<double> *ab, // length 2*n*nlayers
 	std::complex<double> *work_ = NULL, // length lwork
 	size_t *iwork = NULL, // length n2*nlayers
-	size_t lwork = 0 // set to -1 for query into iwork[0], at least 6*n2^2*nlayers
+	size_t lwork = 0, // set to -1 for query into iwork[0], at least 6*n2^2*nlayers
+	const int *mirror_g = NULL // exact geometric eligibility verified by caller
 );
 
 // Purpose
@@ -479,6 +481,17 @@ void GetFieldAtPoint(
 	std::complex<double> efield[3],
 	std::complex<double> hfield[3],
 	std::complex<double> *work = NULL
+);
+// Fourier coefficients in basis order, interleaved Ex,Ey,Ez,Hx,Hy,Hz.
+// Same sign convention as GetFieldAtPoint; excludes exp(i*(kx*x+ky*y)).
+// The caller provides workspace of length 16*n and output of length 6*n.
+void GetFieldCoefficients(
+	size_t n, const double *kx, const double *ky,
+	std::complex<double> omega, const std::complex<double> *q,
+	const std::complex<double> *kp, const std::complex<double> *phi,
+	const std::complex<double> *epsilon_inv, int epstype,
+	const std::complex<double> *ab, std::complex<double> *output,
+	std::complex<double> *work
 );
 void GetFieldOnGrid(
 	size_t n, // glist.n

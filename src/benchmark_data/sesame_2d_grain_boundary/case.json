@@ -1,0 +1,1167 @@
+{
+  "id": "sesame_2d_grain_boundary",
+  "label": "Sesame 2D grain boundary author-data comparison",
+  "family": "Semiconductor transport",
+  "kind": "research_simulation",
+  "project": {
+    "format_version": 3,
+    "materials": [
+      {
+        "Name": "Air",
+        "Model": "constant_nk",
+        "A": 1.0,
+        "B": 0.0,
+        "DataFile": "",
+        "WavelengthUnit": "nm"
+      },
+      {
+        "Name": "Ideal_eps12",
+        "Model": "constant_nk",
+        "A": 3.4641016151377544,
+        "B": 0.0,
+        "DataFile": "",
+        "WavelengthUnit": "nm"
+      }
+    ],
+    "layers": [
+      {
+        "Name": "Incident",
+        "Thickness_um": 0.0,
+        "Material": "Air"
+      },
+      {
+        "Name": "Slab",
+        "Thickness_um": 0.5,
+        "Material": "Ideal_eps12"
+      },
+      {
+        "Name": "Exit",
+        "Thickness_um": 0.0,
+        "Material": "Air"
+      }
+    ],
+    "patterns": [
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": -1.0,
+        "CenterY_um": -1.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": 0.0,
+        "CenterY_um": -1.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": 1.0,
+        "CenterY_um": -1.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": -1.0,
+        "CenterY_um": 0.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": 0.0,
+        "CenterY_um": 0.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": 1.0,
+        "CenterY_um": 0.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": -1.0,
+        "CenterY_um": 1.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": 0.0,
+        "CenterY_um": 1.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": 1.0,
+        "CenterY_um": 1.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      }
+    ],
+    "settings": {
+      "ax_um": 3.0,
+      "ay_um": 3.0,
+      "NumG": 169,
+      "mode": "Wavelength sweep",
+      "wl_start_nm": 1667.0,
+      "wl_stop_nm": 4000.0,
+      "wl_step_nm": 2.0,
+      "fixed_wl_nm": 1550.0,
+      "theta_deg": 0.0,
+      "phi_deg": 0.0,
+      "angle_start": 0.0,
+      "angle_stop": 60.0,
+      "angle_step": 2.0,
+      "polarization": "s"
+    },
+    "performance": {
+      "mode": "CPU only",
+      "workers": 2,
+      "threads": 1,
+      "gpu_device": 0,
+      "gpu_min_n": 1024,
+      "gpu_block": 256,
+      "chunk_size": 8,
+      "timeout_seconds": 1200,
+      "require_gpu": false,
+      "solver_backend": "native",
+      "mirror_symmetry": true,
+      "eigenfree_symmetry": true,
+      "eigenfree_batch_size": 32
+    },
+    "desktop_search": {
+      "simulation": {
+        "optical_geometry_source": "original_tables",
+        "electric_fields": {
+          "grid": 25,
+          "depth_samples": 3,
+          "contour_step": 0.1
+        }
+      }
+    },
+    "appearance": {
+      "layer_colors": {},
+      "material_opacities": {}
+    },
+    "device": {
+      "schema_version": 1,
+      "name": "Fan 2002 finite 3x3 PC r=0.2a",
+      "width_um": 3.0,
+      "depth_um": 3.0,
+      "temperature_K": 300.0,
+      "mesh": {
+        "nx": 24,
+        "ny": 24,
+        "nz_per_layer": 4,
+        "max_nodes": 32000
+      },
+      "layers": [
+        {
+          "id": "slab",
+          "name": "Slab",
+          "material_id": "silicon",
+          "optical_material_name": "Ideal_eps12",
+          "thickness_um": 0.5,
+          "donor_cm3": 0.0,
+          "acceptor_cm3": 0.0,
+          "enabled": true
+        }
+      ],
+      "shapes": [
+        {
+          "id": "paper_pc_h_0_0",
+          "name": "Published square PC [1,1]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": -1.0,
+          "cy_um": -1.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            0,
+            0
+          ]
+        },
+        {
+          "id": "paper_pc_h_1_0",
+          "name": "Published square PC [2,1]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": 0.0,
+          "cy_um": -1.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            1,
+            0
+          ]
+        },
+        {
+          "id": "paper_pc_h_2_0",
+          "name": "Published square PC [3,1]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": 1.0,
+          "cy_um": -1.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            2,
+            0
+          ]
+        },
+        {
+          "id": "paper_pc_h_0_1",
+          "name": "Published square PC [1,2]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": -1.0,
+          "cy_um": 0.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            0,
+            1
+          ]
+        },
+        {
+          "id": "paper_pc_h_1_1",
+          "name": "Published square PC [2,2]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": 0.0,
+          "cy_um": 0.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            1,
+            1
+          ]
+        },
+        {
+          "id": "paper_pc_h_2_1",
+          "name": "Published square PC [3,2]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": 1.0,
+          "cy_um": 0.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            2,
+            1
+          ]
+        },
+        {
+          "id": "paper_pc_h_0_2",
+          "name": "Published square PC [1,3]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": -1.0,
+          "cy_um": 1.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "paper_pc_h_1_2",
+          "name": "Published square PC [2,3]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": 0.0,
+          "cy_um": 1.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            1,
+            2
+          ]
+        },
+        {
+          "id": "paper_pc_h_2_2",
+          "name": "Published square PC [3,3]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": 1.0,
+          "cy_um": 1.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            2,
+            2
+          ]
+        }
+      ],
+      "contacts": [],
+      "doping_regions": [],
+      "pc_arrays": [
+        {
+          "id": "paper_pc",
+          "name": "Published square PC",
+          "layer_id": "slab",
+          "enabled": true,
+          "cx_um": 0.0,
+          "cy_um": 0.0,
+          "width_um": 3.0,
+          "depth_um": 3.0,
+          "cell_width_um": 1.0,
+          "cell_depth_um": 1.0,
+          "radius_um": 0.2,
+          "nx": 3,
+          "ny": 3,
+          "hole_count": 9,
+          "unused_x_um": 0.0,
+          "unused_y_um": 0.0,
+          "margin_x_um": 0.0,
+          "margin_y_um": 0.0,
+          "shape_ids": [
+            "paper_pc_h_0_0",
+            "paper_pc_h_1_0",
+            "paper_pc_h_2_0",
+            "paper_pc_h_0_1",
+            "paper_pc_h_1_1",
+            "paper_pc_h_2_1",
+            "paper_pc_h_0_2",
+            "paper_pc_h_1_2",
+            "paper_pc_h_2_2"
+          ]
+        }
+      ]
+    },
+    "electrical_materials": [
+      {
+        "id": "gaas",
+        "name": "GaAs",
+        "kind": "semiconductor",
+        "temperature_K": 300.0,
+        "model": "gaas_reference",
+        "color": "#ef7595",
+        "optical_material_name": "GaAs",
+        "aliases": [
+          "Gallium arsenide"
+        ],
+        "properties": {
+          "epsilon_r": 12.9,
+          "bandgap_eV": 1.424,
+          "affinity_eV": 4.07,
+          "electron_mass_ratio": 0.063,
+          "hole_mass_ratio": 0.51,
+          "electron_dos_mass_ratio": 0.063,
+          "hole_dos_mass_ratio": 0.51,
+          "Nc_cm3": 3.953218625373507e+17,
+          "Nv_cm3": 9.105321246392134e+18,
+          "intrinsic_cm3": 2075149.9917685564,
+          "electron_mobility_cm2_Vs": 8500.0,
+          "hole_mobility_cm2_Vs": 400.0
+        },
+        "sources": [
+          {
+            "title": "Ioffe NSM: AlGaAs basic parameters (GaAs x=0 limit)",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/basic.html",
+            "properties": [
+              "epsilon_r",
+              "affinity_eV",
+              "electron_mass_ratio",
+              "hole_mass_ratio"
+            ],
+            "note": "",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Ioffe NSM: AlGaAs band structure (GaAs x=0 limit)",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/bandstr.html",
+            "properties": [
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3",
+              "intrinsic_cm3"
+            ],
+            "note": "DOS and ni are calculated from the reference model.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "TYDEX: GaAs electronic properties",
+            "url": "https://www.tydexoptics.com/materials1/for_transmission_optics/gaas/",
+            "properties": [
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs"
+            ],
+            "note": "Low-field bulk reference; not a mobility fit for heavily doped material.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "300 K bulk reference. Masses follow the Ioffe x=0 alloy limit. Mobility is constant unless edited. No recombination, high-field transport or impurity-scattering model is implied.",
+        "property_overrides": []
+      },
+      {
+        "id": "ito",
+        "name": "ITO",
+        "kind": "conductor",
+        "temperature_K": 300.0,
+        "model": "constant",
+        "color": "#67c9e5",
+        "optical_material_name": "ITO",
+        "aliases": [
+          "Indium tin oxide"
+        ],
+        "properties": {
+          "epsilon_r": 9.0,
+          "bandgap_eV": 3.5,
+          "affinity_eV": 4.5,
+          "electron_mass_ratio": 0.35,
+          "hole_mass_ratio": 1.0,
+          "electron_dos_mass_ratio": 0.35,
+          "hole_dos_mass_ratio": 1.0,
+          "Nc_cm3": 5.176569810212164e+18,
+          "Nv_cm3": 2.5e+19,
+          "electron_mobility_cm2_Vs": 30.0,
+          "hole_mobility_cm2_Vs": 0.0,
+          "bulk_electron_cm3": 8e+20,
+          "bulk_hole_cm3": 0.0,
+          "intrinsic_cm3": 4.5423956659835214e-11
+        },
+        "sources": [
+          {
+            "title": "Khusayfan & El-Nahass (2013): structure and electro-optical characteristics of ITO",
+            "url": "https://doi.org/10.1155/2013/408182",
+            "properties": [
+              "electron_mass_ratio"
+            ],
+            "note": "The paper uses assumed mass 0.35 m0 and reports process-dependent carrier density and mobility. Its measured optical band gap is not used as a universal electronic gap.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Editable ITO device-study assumptions",
+            "url": "",
+            "properties": [
+              "epsilon_r",
+              "bandgap_eV",
+              "affinity_eV",
+              "electron_mass_ratio",
+              "hole_mass_ratio",
+              "electron_dos_mass_ratio",
+              "hole_dos_mass_ratio",
+              "Nc_cm3",
+              "Nv_cm3",
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs",
+              "bulk_electron_cm3",
+              "bulk_hole_cm3",
+              "intrinsic_cm3"
+            ],
+            "note": "All preset values are model assumptions, not measurements of your film: n=8e20 cm−3, μn=30 cm²/(V·s), static εr=9, m*=0.35 m0, χ=4.5 eV, electronic gap=3.5 eV. Hole/DOS values are closure assumptions; degenerate ITO requires Fermi statistics.",
+            "kind": "assumption",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Transparent conductor with degenerate electrons. Carrier density, mobility, static permittivity, mass and affinity depend on film growth; replace these assumptions with measured values. Static εr is not optical ε∞. The fixed mass approximation does not model nonparabolicity. Temperature is held constant in this preset.",
+        "property_overrides": []
+      },
+      {
+        "id": "algaas",
+        "name": "AlGaAs",
+        "kind": "semiconductor",
+        "temperature_K": 300.0,
+        "al_fraction": 0.5,
+        "model": "algaas_reference",
+        "color": "#9c8cef",
+        "optical_material_name": "AlGaAs",
+        "aliases": [
+          "Aluminium gallium arsenide"
+        ],
+        "properties": {
+          "epsilon_r": 11.48,
+          "bandgap_eV": 1.9982499999999999,
+          "affinity_eV": 3.5700000000000003,
+          "electron_mass_ratio": 0.26,
+          "hole_mass_ratio": 0.635,
+          "electron_dos_mass_ratio": 0.78,
+          "hole_dos_mass_ratio": 0.635,
+          "Nc_cm3": 1.7221933689339302e+19,
+          "Nv_cm3": 1.26502933513417e+19,
+          "intrinsic_cm3": 242.3985345457434,
+          "electron_mobility_cm2_Vs": 1000.0,
+          "hole_mobility_cm2_Vs": 100.0
+        },
+        "sources": [
+          {
+            "title": "Ioffe NSM: AlGaAs basic parameters",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/basic.html",
+            "properties": [
+              "epsilon_r",
+              "affinity_eV",
+              "electron_mass_ratio",
+              "hole_mass_ratio",
+              "electron_dos_mass_ratio"
+            ],
+            "note": "",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Ioffe NSM: AlGaAs band structure",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/bandstr.html",
+            "properties": [
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3",
+              "intrinsic_cm3"
+            ],
+            "note": "Piecewise 300 K fit. Indirect branch above x=0.45 uses DOS mass 0.85−0.14x and conductivity mass 0.26 m0.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Editable transport assumptions",
+            "url": "",
+            "properties": [
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs"
+            ],
+            "note": "1000 / 100 cm²/(V·s) are starting estimates, not measured mobility for a particular alloy or doping.",
+            "kind": "assumption",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Editable alloy fraction x∈[0,1]. The approximate direct/indirect transition is represented at x=0.45; Ioffe also reports a 0.41–0.45 crossover region. Mobility values are explicit assumptions. Temperature gaps use Varshni corrections and DOS scales as T^1.5; validity outside the 300 K reference must be assessed for the device.",
+        "property_overrides": []
+      },
+      {
+        "id": "silicon",
+        "name": "Silicon",
+        "kind": "semiconductor",
+        "temperature_K": 300.0,
+        "model": "silicon_reference",
+        "color": "#70cfa7",
+        "optical_material_name": "Si",
+        "aliases": [
+          "Si",
+          "Crystalline silicon"
+        ],
+        "properties": {
+          "epsilon_r": 11.7,
+          "bandgap_eV": 1.124,
+          "affinity_eV": 4.05,
+          "electron_mass_ratio": 0.26,
+          "hole_mass_ratio": 0.39,
+          "electron_dos_mass_ratio": 1.08,
+          "hole_dos_mass_ratio": 0.81,
+          "Nc_cm3": 2.82e+19,
+          "Nv_cm3": 1.83e+19,
+          "intrinsic_cm3": 8225562977.908778,
+          "electron_mobility_cm2_Vs": 1400.0,
+          "hole_mobility_cm2_Vs": 470.0
+        },
+        "sources": [
+          {
+            "title": "University of Colorado ECEE: silicon material parameters",
+            "url": "https://www.colorado.edu/ecee/sites/default/files/attached-files/sd_constants_sheet.pdf",
+            "properties": [
+              "epsilon_r",
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3",
+              "electron_mass_ratio",
+              "hole_mass_ratio",
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs"
+            ],
+            "note": "300 K parameter sheet. ni is recalculated consistently from Eg/Nc/Nv rather than mixing independent rounded ni values.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Ioffe NSM: silicon reference",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/Si/basic.html",
+            "properties": [
+              "affinity_eV"
+            ],
+            "note": "Conventional electron-affinity estimate 4.05 eV. Surface/interface processing can change the effective band alignment.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Silicon temperature model",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/Si/bandstr.html",
+            "properties": [
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3"
+            ],
+            "note": "Varshni α=4.73e−4 eV/K, β=636 K; DOS T^1.5 scaling. Static permittivity and mobility are held constant.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Crystalline silicon, 300 K low-field reference. Electron/hole conductivity masses are distinct from DOS masses. Mobility is not a fit to high doping or field; edit to match your sample.",
+        "property_overrides": []
+      },
+      {
+        "id": "air",
+        "name": "Air / void",
+        "kind": "dielectric",
+        "temperature_K": 300.0,
+        "model": "constant",
+        "color": "#cbd5df",
+        "optical_material_name": "Air",
+        "aliases": [
+          "Air",
+          "Void"
+        ],
+        "properties": {
+          "epsilon_r": 1.0,
+          "conductivity_S_m": 0.0
+        },
+        "sources": [
+          {
+            "title": "Ideal void model",
+            "url": "",
+            "properties": [
+              "epsilon_r",
+              "conductivity_S_m"
+            ],
+            "note": "Vacuum-permittivity, zero-conductivity approximation.",
+            "kind": "assumption",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Ideal dielectric void. No mobile carriers or optical material data are inferred from this record.",
+        "property_overrides": []
+      }
+    ],
+    "optical_constants": {}
+  },
+  "options": {
+    "engine": "sesame_transport",
+    "study": "drift_diffusion",
+    "settings": {
+      "dimension": 2,
+      "x_nodes_um": [
+        0.0,
+        0.0005,
+        0.001,
+        0.003875,
+        0.00675,
+        0.009625000000000002,
+        0.0125,
+        0.015375,
+        0.018250000000000002,
+        0.021125,
+        0.024,
+        0.0245,
+        0.025,
+        0.025500000000000002,
+        0.026,
+        0.0308,
+        0.0356,
+        0.0404,
+        0.045200000000000004,
+        0.05,
+        0.060000000000000005,
+        0.07,
+        0.08,
+        0.09,
+        0.1,
+        0.13333333333333333,
+        0.16666666666666669,
+        0.2,
+        0.23333333333333334,
+        0.26666666666666666,
+        0.30000000000000004,
+        0.33333333333333337,
+        0.3666666666666667,
+        0.4,
+        0.43333333333333335,
+        0.4666666666666667,
+        0.5,
+        0.5555555555555556,
+        0.6111111111111112,
+        0.6666666666666666,
+        0.7222222222222222,
+        0.7777777777777778,
+        0.8333333333333333,
+        0.8888888888888888,
+        0.9444444444444444,
+        1.0,
+        1.0555555555555556,
+        1.1111111111111112,
+        1.1666666666666665,
+        1.2222222222222223,
+        1.2777777777777777,
+        1.3333333333333333,
+        1.3888888888888888,
+        1.4444444444444444,
+        1.5,
+        1.582142857142857,
+        1.6642857142857144,
+        1.7464285714285714,
+        1.8285714285714285,
+        1.9107142857142856,
+        1.9928571428571429,
+        2.075,
+        2.157142857142857,
+        2.2392857142857143,
+        2.321428571428571,
+        2.4035714285714285,
+        2.4857142857142858,
+        2.567857142857143,
+        2.65,
+        2.732142857142857,
+        2.814285714285714,
+        2.8964285714285714,
+        2.9785714285714286,
+        3.060714285714286,
+        3.142857142857143,
+        3.225,
+        3.307142857142857,
+        3.3892857142857142,
+        3.4714285714285715,
+        3.5535714285714284,
+        3.6357142857142857,
+        3.717857142857143,
+        3.8,
+        3.8249999999999997,
+        3.8499999999999996,
+        3.875,
+        3.9,
+        3.925,
+        3.937375,
+        3.94975,
+        3.962125,
+        3.9745,
+        3.986875,
+        3.99925,
+        4.011625,
+        4.024,
+        4.0245,
+        4.025
+      ],
+      "materials": {
+        "cds": {
+          "Nc": 2.2e+18,
+          "Nv": 1.8e+19,
+          "Eg": 2.4,
+          "epsilon": 10,
+          "Et": 0,
+          "mu_e": 100,
+          "mu_h": 25,
+          "tau_e": 1e-08,
+          "tau_h": 1e-13,
+          "affinity": 4.0
+        },
+        "cdte": {
+          "Nc": 8e+17,
+          "Nv": 1.8e+19,
+          "Eg": 1.5,
+          "epsilon": 9.4,
+          "Et": 0,
+          "mu_e": 320,
+          "mu_h": 40,
+          "tau_e": 5e-09,
+          "tau_h": 5e-09,
+          "affinity": 3.9
+        }
+      },
+      "regions": [
+        {
+          "id": "absorber",
+          "material": "cdte",
+          "x_range_um": [
+            0.025,
+            4.025
+          ],
+          "acceptors_cm3": 1000000000000000.0,
+          "generation_cm3_s": 3.333333333333333e+20,
+          "y_range_um": [
+            0.0,
+            3.0
+          ]
+        },
+        {
+          "id": "window",
+          "material": "cds",
+          "x_range_um": [
+            0.0,
+            0.025
+          ],
+          "donors_cm3": 1e+17,
+          "generation_cm3_s": 3.333333333333333e+20,
+          "y_range_um": [
+            0.0,
+            3.0
+          ]
+        }
+      ],
+      "contacts": {
+        "left": {
+          "kind": "Ohmic",
+          "electron_velocity_cm_s": 11600000.0,
+          "hole_velocity_cm_s": 11600000.0
+        },
+        "right": {
+          "kind": "Ohmic",
+          "electron_velocity_cm_s": 11600000.0,
+          "hole_velocity_cm_s": 11600000.0
+        }
+      },
+      "voltages_V": [
+        0.0,
+        0.025,
+        0.05,
+        0.07500000000000001,
+        0.1,
+        0.125,
+        0.15000000000000002,
+        0.17500000000000002,
+        0.2,
+        0.225,
+        0.25,
+        0.275,
+        0.30000000000000004,
+        0.325,
+        0.35000000000000003,
+        0.375,
+        0.4,
+        0.42500000000000004,
+        0.45,
+        0.47500000000000003,
+        0.5,
+        0.525,
+        0.55,
+        0.5750000000000001,
+        0.6000000000000001,
+        0.625,
+        0.65,
+        0.675,
+        0.7000000000000001,
+        0.7250000000000001,
+        0.75,
+        0.775,
+        0.8,
+        0.8250000000000001,
+        0.8500000000000001,
+        0.875,
+        0.9,
+        0.925,
+        0.9500000000000001,
+        0.9750000000000001,
+        1.0
+      ],
+      "temperature_K": 300.0,
+      "tolerance": 1e-09,
+      "max_iterations": 300,
+      "y_nodes_um": [
+        0.0,
+        0.125,
+        0.25,
+        0.375,
+        0.5,
+        0.625,
+        0.75,
+        0.875,
+        1.0,
+        1.0666666666666667,
+        1.1333333333333333,
+        1.2,
+        1.2666666666666666,
+        1.3333333333333333,
+        1.4,
+        1.42,
+        1.44,
+        1.46,
+        1.48,
+        1.4849999999999999,
+        1.49,
+        1.495,
+        1.5,
+        1.505,
+        1.51,
+        1.5150000000000001,
+        1.52,
+        1.54,
+        1.56,
+        1.58,
+        1.6,
+        1.6666666666666667,
+        1.7333333333333334,
+        1.8,
+        1.8666666666666667,
+        1.9333333333333333,
+        2.0,
+        2.125,
+        2.25,
+        2.375,
+        2.5,
+        2.625,
+        2.75,
+        2.875,
+        3.0
+      ],
+      "periodic_y": false,
+      "defects": [
+        {
+          "id": "gb_donor",
+          "location_um": [
+            [
+              0.05,
+              1.5
+            ],
+            [
+              3.925,
+              1.5
+            ]
+          ],
+          "density_cm2": 100000000000000.0,
+          "sigma_e_cm2": 1e-14,
+          "sigma_h_cm2": 1e-14,
+          "energy_eV": 0.35975470144561567,
+          "transition": [
+            1,
+            0
+          ]
+        },
+        {
+          "id": "gb_acceptor",
+          "location_um": [
+            [
+              0.05,
+              1.5
+            ],
+            [
+              3.925,
+              1.5
+            ]
+          ],
+          "density_cm2": 100000000000000.0,
+          "sigma_e_cm2": 1e-14,
+          "sigma_h_cm2": 1e-14,
+          "energy_eV": 0.35975470144561567,
+          "transition": [
+            0,
+            -1
+          ]
+        }
+      ]
+    }
+  },
+  "source": {
+    "url": "https://doi.org/10.1016/j.solmat.2019.03.037",
+    "author_data": "https://doi.org/10.17632/34gb6xjt4g.1",
+    "author_data_license": "CC0",
+    "author_archive_sha256": "5dcee3de75fe634885099fbfea7a3485024b5b8c31fdbf3bef7d41a15ff2ee35",
+    "reference_kind": "author_numerical_data",
+    "figure": "Figure 3",
+    "reference_conversion": "Author A/m2 multiplied by 0.1 to mA/cm2; solver diode_current_A_cm2 multiplied by 1000",
+    "energy_reference": "Paper +0.4eV above geometric midgap converted to intrinsic-reference energy using Ei shift kT/2 ln(Nv/Nc)",
+    "vector_extraction": {
+      "source": "Accepted manuscript Figure 3(b), page 4, /Im3, /x14 through /x25",
+      "x_tick_pdf": [
+        68.965,
+        129.785,
+        190.605,
+        251.426,
+        312.246
+      ],
+      "y_tick_pdf": [
+        403.562,
+        361.254,
+        318.945,
+        276.637
+      ],
+      "xfit": [
+        60.82029999999998,
+        68.96480000000005
+      ],
+      "yfit": [
+        -42.30840000000003,
+        318.94529999999975
+      ],
+      "limitation": "Vector path vertices may have been simplified by plotting software; they are not raw simulation samples. Use approximately 5 meV as a conservative graphical comparison scale away from discontinuities; interpolation between sparse vertices adds uncertainty.",
+      "energy_offset_fitted": false,
+      "COMSOL-Ec": 150,
+      "COMSOL-Efn": 129,
+      "COMSOL-Efp": 132,
+      "COMSOL-Ev": 150,
+      "Sentaurus-Ec": 36,
+      "Sentaurus-Efn": 29,
+      "Sentaurus-Efp": 41,
+      "Sentaurus-Ev": 36,
+      "Sesame-Ec": 38,
+      "Sesame-Efn": 30,
+      "Sesame-Efp": 44,
+      "Sesame-Ev": 38
+    }
+  },
+  "limitations": [
+    "Ohmic contact velocities and unrounded uniform generation are reconstructed assumptions.",
+    "Reported current is conservative transverse mean, not the historical Sesame spline integral.",
+    "Grain-boundary energy is relative to intrinsic Ei; no hidden fitted energy offset.",
+    "Coarse initial mesh; refine both axes and biases. Band reference consists of PDF vector vertices and may omit/simplify interface discontinuities."
+  ],
+  "comparisons": [
+    {
+      "id": "author_jv",
+      "label": "Author Sesame current-voltage data",
+      "type": "curve",
+      "actual_file": "transport_iv.csv",
+      "actual_x": "voltage_V",
+      "actual_y": "diode_current_A_cm2",
+      "y_factor": 1000.0,
+      "reference_file": "sesame_2d_grain_boundary/reference.csv",
+      "reference_x": "voltage_V",
+      "reference_y": "Sesame_mA_cm2",
+      "units": "mA/cm2"
+    },
+    {
+      "id": "band_Ec",
+      "label": "Short-circuit Ec at y=1.5um",
+      "type": "npz_slice_curve",
+      "actual_file": "transport_state_0000.npz",
+      "actual_x": "x_um",
+      "actual_y": "conduction_band_eV",
+      "slice_axis": "y_um",
+      "slice_coordinate": 1.5,
+      "reference_file": "sesame_2d_grain_boundary/Ec.csv",
+      "reference_x": "x_um",
+      "reference_y": "energy_eV",
+      "units": "eV"
+    },
+    {
+      "id": "band_Ev",
+      "label": "Short-circuit Ev at y=1.5um",
+      "type": "npz_slice_curve",
+      "actual_file": "transport_state_0000.npz",
+      "actual_x": "x_um",
+      "actual_y": "valence_band_eV",
+      "slice_axis": "y_um",
+      "slice_coordinate": 1.5,
+      "reference_file": "sesame_2d_grain_boundary/Ev.csv",
+      "reference_x": "x_um",
+      "reference_y": "energy_eV",
+      "units": "eV"
+    },
+    {
+      "id": "band_Efn",
+      "label": "Short-circuit Efn at y=1.5um",
+      "type": "npz_slice_curve",
+      "actual_file": "transport_state_0000.npz",
+      "actual_x": "x_um",
+      "actual_y": "electron_quasi_fermi_eV",
+      "slice_axis": "y_um",
+      "slice_coordinate": 1.5,
+      "reference_file": "sesame_2d_grain_boundary/Efn.csv",
+      "reference_x": "x_um",
+      "reference_y": "energy_eV",
+      "units": "eV"
+    },
+    {
+      "id": "band_Efp",
+      "label": "Short-circuit Efp at y=1.5um",
+      "type": "npz_slice_curve",
+      "actual_file": "transport_state_0000.npz",
+      "actual_x": "x_um",
+      "actual_y": "hole_quasi_fermi_eV",
+      "slice_axis": "y_um",
+      "slice_coordinate": 1.5,
+      "reference_file": "sesame_2d_grain_boundary/Efp.csv",
+      "reference_x": "x_um",
+      "reference_y": "energy_eV",
+      "units": "eV"
+    }
+  ]
+}

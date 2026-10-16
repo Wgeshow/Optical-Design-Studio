@@ -77,6 +77,14 @@ class AddonsUiTests(unittest.TestCase):
                 self.assertIn('Included', status.text())
                 self.assertFalse(button.isEnabled())
 
+    def test_startup_receipt_recovery_is_visible_in_settings(self):
+        result = dict(id='gpu', status='rejected', error='Invalid pending add-on receipt.',
+                      quarantined='gpu.pending.invalid-example.json')
+        with patch('desktop_runtime.startup_addon_results', [result]):
+            self.page = AddonsPage()
+        self.assertIn('Invalid pending add-on receipt', self.page.status.text())
+        self.assertIn(result['quarantined'], self.page.status.toolTip())
+
     def test_install_starts_on_first_click_without_second_confirmation(self):
         self.page = AddonsPage(store=self.store)
         with patch.object(QMessageBox, 'question') as confirm, patch('qt_addons.AddonWorker', Worker):

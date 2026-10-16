@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 import numpy as np
 from data_library import read_json, write_json
+from field_storage import field_data_exists, copy_field_data
 from ml_optimizer import model_for, encode, value_key, fit_predict, dependencies, expected_improvement
 from peak_optimizer import parse_search, geometry_error, write_csv
 from airhole_field_objective import aligned_hole, targets, choose_candidate,shape_covariates,feature_values
@@ -222,7 +223,7 @@ def execute_campaign(base,perf,cfg,directory,executor,emit=lambda e:None,cancell
                 if settings.get('grid')!=cfg['grid'] or settings.get('depth_samples',3)!=cfg['depth_samples'] or settings.get('contour_step',.1)!=cfg['contour_step'] or abs(snapshot['wavelength_nm']-cfg['wavelength_nm'])>1e-8:continue
                 metrics=read_json(folder/'airhole_field_metrics.json');msettings=metrics['settings']
                 if any(msettings[k]!=cfg[k] for k in ('shell_um','contrast_target','coverage_target')):continue
-                if not (folder/'electric_fields.csv').is_file():continue
+                if not field_data_exists(folder):continue
                 field_cache[measurement_key(snapshot['model'],cfg)]=folder
             except (OSError,ValueError,KeyError):continue
 
@@ -263,7 +264,8 @@ def execute_campaign(base,perf,cfg,directory,executor,emit=lambda e:None,cancell
                 if not verified and key in field_cache:
                     import shutil
                     source=field_cache[key];destination=folder/'fields';destination.mkdir(exist_ok=True)
-                    for filename in ('electric_fields.csv','field_model.json','airhole_field_metrics.json'):
+                    copy_field_data(source,destination)
+                    for filename in ('field_model.json','airhole_field_metrics.json'):
                         shutil.copy2(source/filename,destination/filename)
                     from field_tracking import enrich_fields
                     descriptor=enrich_fields(destination);fields_reused+=1

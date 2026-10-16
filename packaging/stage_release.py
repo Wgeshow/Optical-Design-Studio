@@ -12,8 +12,8 @@ import shutil
 import zipfile
 
 ROOT = Path(__file__).resolve().parent
-VERSION = '1.3.2'
-BUILD_DATE = '2026-10-09'
+VERSION = '1.4.0-alpha.1'
+BUILD_DATE = '2026-10-15'
 PINNED_INPUTS = Path(os.environ.get('ODS_NATIVE_INPUTS', ROOT.parent/'local-windows-review-1.2.5-ui-review2'/'build_input'))
 SOURCE_SUFFIXES = {'.py', '.md', '.txt', '.yml', '.yaml', '.cmd', '.sh', '.ps1', '.ico', '.html'}
 EXCLUDED_PREFIXES = ('_', 'preview_', 'check_', 'profile_', 'debug_', 'capture_', 'illustrate_', 'replace_ui_')
@@ -24,7 +24,92 @@ REQUIRED_MODULES = ('qt_native_plot', 'qt_native_figure', 'qt_native_field_volum
                     'qt_field_volume', 'qt_structure_3d', 'qt_lattice_diagram',
                     'qt_windows_glass', 'qt_help', 'qt_appearance', 'qt_surfaces',
                     'model', 'fdtd_model', 'data_library', 'installer_smoke',
-                    'scan_storage', 'field_sampling', 'simulation_fields', 'contour_sweep')
+                    'scan_storage', 'field_sampling', 'field_reconstruction', 'field_storage', 'direct_npz', 'simulation_fields', 'contour_sweep',
+                    'eigenfree_scan', 's4_eigenfree_gpu', 'gpu_solver_runtime',
+                    'qt_electrical', 'electrical_solver', 'electrical_optics', 'electrical_preset',
+                    'qt_custom_device','device_model','device_project_bridge','custom_electrical_solver',
+                    'custom_device_optics','electrical_material_library','qt_electrical_materials',
+                    'electrical_terminal_studies','electrical_thermal','research_simulation','photonic_bands','electrical_mesh','electrical_sweep',
+                    'research_catalog','research_diagnostics','thermal_study','benchmark_registry',
+                    'research_physics_runtime','research_physics_worker','sesame_transport',
+                    'input_diagnostics','qt_input_diagnostics','qt_photonic_bands','qt_photonic_band_results','qt_photonic_crystal_3d','qt_photonic_runtime','qt_research_studies','qt_research_results','qt_thermal_setup',
+                    'qt_study_flow','qt_simulation_flow','qt_legacy_study_workbench','qt_study_fields','qt_study_library', 'qt_simulation_picker','qt_transport_research_setup','qt_high_field_results','qt_pcsel_research_setup','qt_research_runtime',
+                    'qt_research_common','qt_sesame_setup','pcsel_research','pcsel_aperture','pcsel_optional','pcsel_physics_worker',
+                    'advanced_transport','advanced_transport_graph','electrical_temperature','nonlocal_tunnelling','high_field_optics','bandgap_narrowing',
+                    'pcsel_transport_study','pcsel_conformal_mesh','pcsel_conformal_solver','pcsel_transport_worker','pcsel_unitcell_transport',
+                    'electrical_transport','electrical_graph_transport','electrical_fermi_transport',
+                    'electrical_native_graph','electrical_transport_adapter','qt_transport_setup',
+                    'qt_electrical_results','contact_optics',
+                    'qt_reference_style','qt_results_workspace','optical_unit_cell','pc_array',
+                    'qt_simulation_setup','simulation_setup_state','qt_device_lighting',
+                    'qt_tool_workspace','qt_electrical_material_catalog','qt_optical_results','qt_workspace_start','meep_runner',
+                    'meep_runtime','meep_managed','meep_bootstrap','structure_preview')
+REQUIRED_RESOURCES = ('simulation_setup_plan.json',)
+
+
+def validate_benchmark_resources(source):
+    """Require immutable case/reference checksums in the distributable bundle."""
+    root = (Path(source)/'benchmark_data').resolve()
+    manifest = json.loads((root/'manifest.json').read_text(encoding='utf-8'))
+    if manifest.get('schema_version') != 1 or not manifest.get('cases'):
+        raise ValueError('The benchmark reference catalog is missing or invalid.')
+    identifiers = set()
+    for case in manifest['cases']:
+        if case['id'] in identifiers:
+            raise ValueError('Duplicate benchmark reference identity.')
+        identifiers.add(case['id'])
+        if case['case_file'] not in case['files']:
+            raise ValueError('Benchmark case inputs are missing their checksum.')
+        for name, expected in case['files'].items():
+            path = (root/name).resolve()
+            if not path.is_relative_to(root) or not path.is_file() or digest(path) != expected:
+                raise ValueError('Benchmark reference checksum/path mismatch: '+name)
+            if path.suffix in ('.json', '.csv') and has_personal_path(path.read_text(encoding='utf-8').replace('\\\\', '\\')):
+                raise ValueError('Personal path in benchmark reference: '+name)
+    return dict(cases=len(identifiers), manifest_sha256=digest(root/'manifest.json'))
+
+
+def validate_runtime_resources(source):
+    """Gate required UI catalogs without admitting arbitrary session JSON."""
+    source=Path(source)
+    records={}
+    for name in REQUIRED_RESOURCES:
+        path=source/name
+        if not path.is_file(): raise FileNotFoundError('Missing native setup runtime resource: '+name)
+        text=path.read_text(encoding='utf-8')
+        if has_personal_path(text.replace('\\\\','\\')):
+            raise ValueError('Personal path in native setup runtime resource: '+name)
+        try:
+            plan=json.loads(text)
+            modes=plan['modes']
+            if set(modes)!={'optical','electrical','coupled'}: raise ValueError('Expected all three solver modes')
+            ids=[]
+            for mode,count in (('optical',7),('electrical',7),('coupled',6)):
+                tabs=modes[mode]['tabs']
+                if len(tabs)!=count: raise ValueError(mode+' setup tabs are incomplete')
+                for tab in tabs:
+                    if not tab['id'].startswith(mode+'.') or not tab.get('title'): raise ValueError('Invalid setup tab identity')
+                    ids.append(tab['id'])
+                    for card in tab.get('cards',[]):
+                        for field in card.get('fields',[]):
+                            if not {'id','label','widget','key','default'}<=set(field): raise ValueError('Incomplete setup control')
+                            ids.append(field['id'])
+            if len(ids)!=len(set(ids)): raise ValueError('Duplicate setup tab/control IDs')
+            if not isinstance(plan.get('dialogs'),list) or not plan['dialogs']: raise ValueError('Setup dialogs are absent')
+        except (ValueError,TypeError,KeyError) as exc:
+            raise ValueError('Invalid native setup runtime resource '+name+': '+str(exc)) from exc
+        records[name]={'size':path.stat().st_size,'sha256':digest(path),'setup_tabs':sum(len(mode['tabs']) for mode in modes.values())}
+    return records
+
+
+def copy_runtime_resources(source,destination):
+    """Copy only explicitly required catalogs, preserving their exact bytes."""
+    records=validate_runtime_resources(source)
+    for name in REQUIRED_RESOURCES:
+        shutil.copy2(Path(source)/name,Path(destination)/name)
+        if digest(Path(destination)/name)!=records[name]['sha256']:
+            raise ValueError('Native setup runtime resource bytes changed: '+name)
+    return records
 
 
 def has_personal_path(text):
@@ -192,31 +277,37 @@ def selected_s4_runtime(source):
 
 
 def validate_dependencies(source):
-    root = Path(os.environ.get('ODS_RELEASE_DEPENDENCIES', source))
-    pins = {'pyqtgraph': ('plot_dependencies', '0.14.0'), 'colorama': ('plot_dependencies', '0.4.6')}
-    for package, (directory, version) in pins.items():
-        if not (root/directory/package/'__init__.py').is_file():
-            raise FileNotFoundError(root/directory/package)
-        if not (root/directory/f'{package}-{version}.dist-info'/'METADATA').is_file():
-            raise FileNotFoundError(f'Expected pinned {package} {version}')
-    runtime=selected_s4_runtime(source)
-    required = [runtime/'S4.cp312-win_amd64.pyd',
-                root/'ml_dependencies'/'sklearn'/'__init__.py', root/'geometry_dependencies'/'shapely'/'__init__.py',
-                root/'cad_runtime'/'OCP'/'__init__.py']
-    required += [PINNED_INPUTS/'gpu'/name for name in ('cublas64_11.dll', 'cublasLt64_11.dll', 'cudart64_110.dll')]
+    import importlib.metadata
+    import importlib.util
+    official = Path(os.environ['ODS_OFFICIAL_RUNTIME'])
+    pins = {'pyqtgraph': '0.14.0', 'colorama': '0.4.6'}
+    versions = {}
+    for package in ('pyqtgraph', 'colorama', 'scikit-learn', 'scipy', 'shapely'):
+        versions[package] = importlib.metadata.version(package)
+        if package in pins and versions[package] != pins[package]:
+            raise ValueError('Unexpected dependency version: ' + package)
+    for module in ('pyqtgraph', 'colorama', 'sklearn', 'scipy', 'shapely'):
+        if importlib.util.find_spec(module) is None:
+            raise ImportError(module)
+    required = [selected_s4_runtime(source)/'S4.cp312-win_amd64.pyd',
+                official/'cad_runtime'/'OCP'/'__init__.py']
+    required += [PINNED_INPUTS/'gpu'/name for name in
+                 ('cublas64_11.dll', 'cublasLt64_11.dll', 'cudart64_110.dll')]
     for path in required:
         if not path.is_file():
             raise FileNotFoundError(path)
-    return {'pyqtgraph': '0.14.0', 'colorama': '0.4.6',
-            's4_runtime_override_used': bool(os.environ.get('ODS_S4_RUNTIME')),
-            'pinned_native_inputs': {path.name: {'size': path.stat().st_size, 'sha256': digest(path)}
-                                     for path in required if path.suffix in ('.pyd', '.dll')}}
+    return dict(installed_versions=versions, s4_runtime_override_used=True,
+                official_runtime_reused=True,
+                pinned_native_inputs={path.name: {'size': path.stat().st_size, 'sha256': digest(path)}
+                                      for path in required if path.suffix in ('.pyd', '.dll')})
 
 
 def stage(source, destination):
     source, destination = Path(source).resolve(), Path(destination).resolve()
     release = release_info(source)
     dependencies = validate_dependencies(source)
+    runtime_resources=validate_runtime_resources(source)
+    validate_benchmark_resources(source)
     if destination.exists():
         raise FileExistsError('Use fresh staging; no previous release is overwritten: '+str(destination))
     if destination == source or destination.is_relative_to(source):
@@ -229,7 +320,12 @@ def stage(source, destination):
                 raise ValueError('Developer path in distributable production file: '+path.name)
             shutil.copy2(path, destination/path.name)
             copied[path.name] = digest(path)
-    for folder,origin in (('pcs_s4_runtime',selected_s4_runtime(source)),('help_assets',source/'help_assets')):
+    copy_runtime_resources(source,destination)
+    copied.update({name:record['sha256'] for name,record in runtime_resources.items()})
+    for folder,origin in (('pcs_s4_runtime',selected_s4_runtime(source)),('help_assets',source/'help_assets'),
+                          ('electrical_physics',source/'electrical_physics'),
+                          ('electrical_materials',source/'electrical_materials'),
+                          ('benchmark_data',source/'benchmark_data')):
         shutil.copytree(origin, destination/folder, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
     (destination/'tests').mkdir()
     for path in (source/'tests').glob('test_*.py'):
@@ -245,6 +341,7 @@ def stage(source, destination):
     for module in REQUIRED_MODULES:
         if not (destination/(module+'.py')).is_file():
             raise FileNotFoundError(module)
+        compile((destination/(module+'.py')).read_text(encoding='utf-8'),module+'.py','exec')
     for name, sha in copied.items():
         if digest(destination/name) != sha:
             raise ValueError('Production bytes changed: '+name)
@@ -252,6 +349,7 @@ def stage(source, destination):
     summary = {**release, 'profile': 'public', 'production_bytes_preserved': True,
                'seed_files': 0, 'seed_runs': 0, 'seed_presets': 0,
                'dependencies': dependencies, 'help': help_check,
+               'runtime_resources':runtime_resources,
                'files': files, 'source_tree_sha256': tree_digest(files)}
     write_json(ROOT/'stage-manifest.json', summary)
     write_json(ROOT/'source-stage-manifest.json', {'version': VERSION, 'build_date': BUILD_DATE,

@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from data_library import read_json, write_json
+from field_storage import field_data_exists, load_field_frame, export_field_csv
 from model import epsilon
 
 
@@ -52,7 +53,7 @@ def _safe_directory(library, identifier):
     path = (root / str(identifier)).resolve()
     if not path.is_relative_to(root) or path == root:
         raise ValueError('Choose a field dataset from the saved library')
-    if not (path / 'electric_fields.csv').is_file() or not (path / 'field_model.json').is_file():
+    if not field_data_exists(path) or not (path / 'field_model.json').is_file():
         raise ValueError('The selected field dataset is no longer available')
     return path
 
@@ -62,9 +63,10 @@ def saved_datasets(library, mode='All saved fields', query='', wavelength_nm=0):
     result = []
     wanted = MODES.get(mode)
     metadata = {}
-    for path in sorted(Path(library.runs).rglob('electric_fields.csv'), key=natural_key):
+    directories = {path.parent for filename in ('electric_fields.npz', 'electric_fields.csv')
+                   for path in Path(library.runs).rglob(filename)}
+    for directory in sorted(directories, key=natural_key):
         try:
-            directory = path.parent
             identifier = directory.relative_to(library.runs).as_posix()
             _safe_directory(library, identifier)
             snapshot = read_json(directory / 'field_model.json')
@@ -227,7 +229,7 @@ def plot_comparison(reference, current, layer='', alignment='Physical coordinate
         raise ValueError('Choose an XY layer name present in both field datasets')
     slices = []
     for path, model in zip(paths, models):
-        data = pd.read_csv(path / 'electric_fields.csv')
+        data = load_field_frame(path)
         maps = [_slice(data, model, plane, layer) for plane in ('xy', 'xz')]
         slices.append([(_coordinates(frame, model, plane, alignment), title)
                        for (frame, title), plane in zip(maps, ('xy', 'xz'))])
@@ -375,7 +377,7 @@ def save_comparison(library, reference_id, current_id, layer='', alignment='Phys
     plt.close(figure)
     for label, identifier in (('reference', reference_id), ('current', current_id)):
         source = _safe_directory(library, identifier)
-        shutil.copy2(source / 'electric_fields.csv', directory / (label + '_electric_fields.csv'))
+        export_field_csv(source, directory / (label + '_electric_fields.csv'))
         shutil.copy2(source / 'field_model.json', directory / (label + '_field_model.json'))
     library.record(directory, kind='field comparison', status='complete', title='Electric-field comparison',
                    notes=f'Reference {reference_id}; current {current_id}')

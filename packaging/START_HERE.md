@@ -1,12 +1,14 @@
-# Optical Design Studio 1.3.2
+# Optical Design Studio 1.4.0-alpha.1
+
+**Highly Experimental prerelease.** This version adds editable research and paper-comparison workspaces. Keep a separate copy of existing projects and review each model's assumptions, solver requirements and convergence status before relying on its results. A completed calculation does not establish agreement with a paper or physical convergence.
 
 ## Start the Windows portable application
 
-1. Download **OpticalDesignStudio-Portable-1.3.2-Windows-x64.zip** and **SHA256SUMS.txt** from the same release.
+1. Download **OpticalDesignStudio-Portable-1.4.0-alpha.1-Windows-x64.zip** and **SHA256SUMS.txt** from the same release.
 2. Verify the archive's SHA-256 checksum if you want to check download integrity:
 
    ```powershell
-   Get-FileHash -Algorithm SHA256 -LiteralPath .\OpticalDesignStudio-Portable-1.3.2-Windows-x64.zip
+   Get-FileHash -Algorithm SHA256 -LiteralPath .\OpticalDesignStudio-Portable-1.4.0-alpha.1-Windows-x64.zip
    ```
 
    Compare the result with the entry in **SHA256SUMS.txt**.
@@ -22,9 +24,11 @@ Save open projects, finish calculations, and close the old application before up
 
 For a default portable installation, data lives in **User Data** beside the executables. When using a new application folder, preserve that folder. If you configured another data location, preserve it and the adjacent **portable_settings.json** setting; confirm the selected location after launch. Extraction does not move an existing library for you. **Help → Quick actions → Open library folder** opens the active library.
 
-Supported installations can use **Help → Updates** after 1.3.2 is published. Read the offered release information before using its download and installation controls. **Help → About** shows the running version.
+Download this prerelease explicitly from its GitHub release page. Stable update checks may not offer prereleases. **Help → About** shows the running version.
 
 ## First session
+
+Choose from the 27 entries in **Choose a simulation**. Each opens an editable setup without starting a calculation. The workspace retains structure, material, contact, mesh and calculation controls appropriate to that model. **Paper references** offers 24 source-linked studies; open an editable copy before changing the original reference setup. A missing-input action opens the relevant control so it can be completed before running.
 
 Open **Help** to load the bundled Silicon example or inspect its actual saved simulation results. The tutorial uses constant-index approximations for a 220 nm Silicon layer on SiO₂, 100 nm radius Air holes, and a 540 nm square period. The saved spectrum covers 1515–1555 nm; the illustrated fields are at 1550 nm. Loading the example restores inputs; changing the structure requires a new calculation for corresponding results.
 
@@ -44,7 +48,7 @@ Use **Ctrl+O** to open a project, **Ctrl+S** to save, **Ctrl+Shift+S** to save a
 
 ## Source package
 
-**OpticalDesignStudio-Source-1.3.2.zip** is the corresponding source package, not the ready-to-run Windows application. It requires Python 3.12, the listed dependencies, and an S4 native extension built for your platform. Read its **README.md** and **src/DESKTOP_GUIDE.md** before running or rebuilding. Optional MEEP, GPU, CAD, and machine-learning components have their own runtime requirements.
+**OpticalDesignStudio-Source-1.4.0-alpha.1.zip** is the corresponding source package, not the ready-to-run Windows application. It requires Python 3.12, the listed dependencies, and an S4 native extension built for your platform. Read its **README.md** and **src/DESKTOP_GUIDE.md** before running or rebuilding. Optional MEEP, GPU, CAD, and machine-learning components have their own runtime requirements.
 
 ## Troubleshooting
 

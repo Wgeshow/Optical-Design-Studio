@@ -8,15 +8,17 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from PyQt6.QtCore import pyqtSignal
 from matplotlib.figure import Figure
 from matplotlib.ticker import PercentFormatter
-from PyQt6.QtCore import Qt, QSignalBlocker, QUrl, QSize, QAbstractListModel
+from PyQt6.QtCore import Qt, QSignalBlocker, QUrl, QSize, QAbstractListModel, QTimer
 from PyQt6.QtGui import QDesktopServices, QStandardItemModel
 from PyQt6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox,
     QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QProgressBar, QPushButton,
     QScrollArea, QSplitter, QTabWidget, QVBoxLayout, QWidget, QListWidget, QListWidgetItem)
 
 from model import MODES, MAX_SWEEP_POINTS
+from field_storage import field_data_exists, load_field_frame, export_field_csv
 from peak_optimizer import SEARCH_KEYS, SEARCH_DEFAULTS
 from ml_optimizer import ML_KEYS, ML_DEFAULTS, MODES as SEARCH_MODES
 from qt_common import PlotWidget, ActionStatusLabel, number, integer, table, fill_table
@@ -52,14 +54,10 @@ class FieldSamplesModel(QAbstractListModel):
         return f"{sample['wavelength_nm']:g} nm · {sample['angle_deg']:g}°"
 
 
-def phase_preview(path,count,limit=20000):
-    """Read a bounded display preview; the full phase CSV remains authoritative."""
-    import csv
-    if not Path(path).is_file():return pd.DataFrame()
-    stride=max(1,math.ceil(count/limit))
-    with Path(path).open(newline='',encoding='utf-8-sig') as stream:
-        rows=[row for i,row in enumerate(csv.DictReader(stream)) if i%stride==0 or i==count-1]
-    return pd.DataFrame(rows).apply(pd.to_numeric,errors='coerce')
+def phase_preview(path,count=None,limit=20000,reference_path=None):
+    """Unwrap every saved sample before selecting the bounded display rows."""
+    from spectral_phase import read_phase_preview
+    return read_phase_preview(path,count,limit,reference_path)
 
 
 def _label(text, muted=False):
@@ -157,7 +155,7 @@ class _ResponsiveSplitter(QSplitter):
         super().resizeEvent(event)
         if self.count() not in (2, 3):
             return
-        orientation=Qt.Orientation.Horizontal if self.width()>=980 else Qt.Orientation.Vertical
+        orientation=Qt.Orientation.Horizontal if self.width()>=getattr(self,'responsive_breakpoint',980) else Qt.Orientation.Vertical
         if orientation!=self.orientation():
             self.setOrientation(orientation)
             vertical=orientation==Qt.Orientation.Vertical
@@ -264,7 +262,7 @@ def spectrum_figure(frame, *, threshold=None, title='Optical response', peak_key
 def field_figure(directory, component='E2', arrows=True, logarithmic=False, amplitude=False):
     """Render saved native samples without a browser or a new solver calculation."""
     directory = Path(directory)
-    frame = _read_csv(directory / 'electric_fields.csv')
+    frame = load_field_frame(directory) if field_data_exists(directory) else pd.DataFrame()
     figure = Figure(figsize=(11, 5), layout='constrained')
     axes = figure.subplots(1, 2)
     model = {}
@@ -445,7 +443,9 @@ class _RunPage(QWidget):
 
 class SimulationPage(_RunPage):
     def __init__(self, store, parent=None):
-        super().__init__(store, 'Simulation', 'Sweep wavelength or incidence angle and inspect absorption, reflection and transmission.', {'simulation'}, parent)
+        super().__init__(store, 'Simulation', 'Sweep wavelength or incidence angle and inspect absorption, reflection and transmission.', {'simulation','simulation_fields'}, parent)
+        self.spectrum_directory=None;self.field_directory=None;self._spectrum_project=None
+        self._field_display_key=None;self._fields_dirty=True
         for index in (0,1):self.layout_.itemAt(index).widget().hide()
         left, right = WorkspacePanel(), WorkspacePanel()
         controls, output = QVBoxLayout(left), QVBoxLayout(right)
@@ -474,7 +474,7 @@ class SimulationPage(_RunPage):
         self.measure_phase = _check('Measure specular reflection / transmission phase', False)
         controls.addWidget(self.measure_phase)
         controls.addWidget(_label('Phase uses the co-polarized tangential electric field at the top and bottom stack boundaries. Phase change is relative to the first valid sample; zero signals are undefined.', True))
-        self.field_controls={'grid':integer(25,3,80),'depth_samples':integer(3,3,40),'contour_step':number(.1,.001,100,3)}
+        self.field_controls={'grid':integer(25,3,2147483647),'depth_samples':integer(3,3,2147483647),'contour_step':number(.1,.001,100,3)}
         field_box,_=_group('Electric fields with every simulation',[(label,self.field_controls[key]) for label,key in [('Field grid per axis','grid'),('Depth samples per layer','depth_samples'),('Contour amplitude step','contour_step')]])
         controls.addWidget(field_box)
         controls.addWidget(_label('Fields are calculated and saved at every wavelength / angle sample, with XY and full-stack XZ views. Finer sampling increases run time and saved data.',True))
@@ -497,8 +497,24 @@ class SimulationPage(_RunPage):
         self.measure_phase.setText('Measure phase')
         incident_form.addRow(self.measure_phase);self.measure_phase.show()
         controls.addWidget(incident_rows)
-        field_box.setTitle('Field sampling');field_box.show();controls.addWidget(field_box)
-        run_actions = self.actions('Run simulation', self.run)
+        field_box.setTitle('Electric fields');field_box.show();controls.addWidget(field_box)
+        field_form=field_box.layout()
+        self.field_single=_check('Single wavelength',True)
+        self.field_source=_combo([('Enter wavelength manually','manual'),('Maximum reflection (R)','maxR'),('Minimum reflection (R)','minR'),('Maximum transmission (T)','maxT'),('Minimum transmission (T)','minT'),('Maximum absorption (A)','maxA'),('Minimum absorption (A)','minA')])
+        self.field_wavelength=number(1550,.000001);self.field_wavelength.setSuffix(' nm')
+        self.field_selection=_label('Manual entry can run without a spectrum.')
+        field_form.insertRow(0,self.field_single)
+        field_form.insertRow(1,'Choose wavelength from',self.field_source)
+        field_form.insertRow(2,'Wavelength',self.field_wavelength)
+        field_form.insertRow(3,self.field_selection)
+        field_form.addRow(_label('Save full 3D E/H fields across all finite layers.'))
+        self.field_run=_button('Run electric fields',self.run_fields,True)
+        field_form.insertRow(4,self.field_run)
+        field_form.insertRow(5,_button('View saved electric fields',self.view_generated_fields))
+        self.field_wavelength.valueChanged.connect(self.update_field_selection)
+        for widget in (self.field_single,self.field_source,self.field_wavelength,self.measure_phase):_on_edit(widget,self.save_field_settings)
+        store.busy_changed.connect(self.update_field_selection)
+        run_actions = self.actions('Run spectrum', self.run)
         controls.addStretch()
         overview = QWidget()
         overview_layout = QHBoxLayout(overview)
@@ -532,8 +548,34 @@ class SimulationPage(_RunPage):
         tabs.addTab(self.plot, 'Spectrum')
         tabs.addTab(self.results, 'Samples')
         self.results.setToolTip('First 10,000 rows shown; CSV export includes all calculated samples.')
-        self.phase_plot = PlotWidget()
-        tabs.addTab(self.phase_plot, 'Phase')
+        self.phase_page=QWidget();phase_layout=QVBoxLayout(self.phase_page)
+        from spectral_phase import PHASE_MODES,PHASE_UNITS
+        display_options=self.store.search_state.get('phase_display',{})
+        self.phase_mode=_combo(PHASE_MODES,display_options.get('mode','positive'))
+        self.phase_unit=_combo(PHASE_UNITS,display_options.get('unit','radians'))
+        self.phase_reference_path=Path(display_options['reference_csv']) if display_options.get('reference_csv') else None
+        self.phase_reference=_combo([('Absolute · stack boundary planes','boundary'),('Relative · physical reference CSV','csv')],display_options.get('reference_mode','boundary'))
+        self.phase_mode.setAccessibleName('Phase wrapping mode');self.phase_unit.setAccessibleName('Phase display units')
+        self.phase_reference.setAccessibleName('Phase reference convention')
+        phase_controls=QHBoxLayout();phase_controls.addWidget(QLabel('Display'));phase_controls.addWidget(self.phase_mode)
+        phase_controls.addWidget(QLabel('Units'));phase_controls.addWidget(self.phase_unit);phase_controls.addStretch()
+        phase_layout.addLayout(phase_controls)
+        references=QHBoxLayout();references.addWidget(QLabel('Reference'));references.addWidget(self.phase_reference)
+        references.addWidget(_button('Choose reference CSV…',self.choose_phase_reference_csv));references.addStretch();phase_layout.addLayout(references)
+        self.phase_reference_label=QLabel('Absolute boundary phase includes propagation between the stack planes. A reference CSV must use matching polarization and physical boundary planes.')
+        self.phase_reference_label.setWordWrap(True);phase_layout.addWidget(self.phase_reference_label)
+        phase_note=QLabel('2π rad = 2 in Phase / π = 360°. The lower plot accumulates full cycles from each valid segment. Undefined signals / independent branches reset unwrapping; adjacent changes must be resolved below π.')
+        phase_note.setWordWrap(True);phase_layout.addWidget(phase_note)
+        self.phase_plot = PlotWidget();phase_layout.addWidget(self.phase_plot,1)
+        phase_exports=QHBoxLayout()
+        phase_exports.addWidget(_button('Export complete phase CSV…',self.export_phase_csv))
+        phase_exports.addWidget(_button('Export display CSV…',self.export_phase_display_csv))
+        phase_exports.addWidget(_button('Export phase figure…',self.phase_plot.export_dialog))
+        phase_layout.addLayout(phase_exports)
+        tabs.addTab(self.phase_page, 'Phase')
+        self.phase_mode.currentIndexChanged.connect(self.phase_display_changed)
+        self.phase_unit.currentIndexChanged.connect(self.phase_display_changed)
+        self.phase_reference.currentIndexChanged.connect(self.phase_reference_changed)
         self.generated_fields=QWidget();field_layout=QVBoxLayout(self.generated_fields)
         field_bar=QHBoxLayout();self.field_sample=QComboBox();self.field_sample.setMinimumContentsLength(18)
         self.field_sample.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
@@ -546,6 +588,11 @@ class SimulationPage(_RunPage):
         field_layout.addLayout(field_bar);self.generated_field_plot=PlotWidget();field_layout.addWidget(self.generated_field_plot,1)
         self.field_status=_label('');field_layout.addWidget(self.field_status)
         tabs.addTab(self.generated_fields,'Electric fields')
+        from qt_field_volume import FieldVolumeWidget
+        self.generated_volume=FieldVolumeWidget(store,campaign=True)
+        self._volume_display_key=None
+        tabs.addTab(self.generated_volume,'3D fields')
+        tabs.currentChanged.connect(lambda *_:QTimer.singleShot(0,self.draw_generated_fields))
         self.field_sample.currentIndexChanged.connect(self.draw_generated_fields);self.field_component.currentIndexChanged.connect(self.draw_generated_fields)
         self.field_position.valueChanged.connect(self.select_field_sample)
 
@@ -601,11 +648,15 @@ class SimulationPage(_RunPage):
         left.setMinimumWidth(0)
         recent.setMinimumWidth(240)
         panels.reference_ratios=(.305,.435,.26)
+        # A complete three-column optical setup needs room for all six digits
+        # of R/T/A and the field viewer controls. Only this workspace stacks
+        # earlier; the other compute tools retain their existing breakpoint.
+        panels.responsive_breakpoint=1120
         panels.setSizes([450,640,380])
         # Preserve full result and action panels when the three columns stack.
         # The surrounding scroll host absorbs their height instead of allowing
         # children to paint outside undersized splitter cells.
-        panels.vertical_minimum_sizes=(320,650,440)
+        panels.vertical_minimum_sizes=(520,850,440)
         self.workspace_scroll=_scroll(panels)
         self.layout_.addWidget(self.workspace_scroll, 1)
         store.library_changed.connect(self.refresh_recent)
@@ -614,6 +665,7 @@ class SimulationPage(_RunPage):
         for widget in self.controls.values():
             _on_edit(widget, self.save_settings)
         store.changed.connect(self.refresh)
+        store.changed.connect(self.update_field_selection)
         self.refresh()
 
     def refresh(self, reason=None):
@@ -625,6 +677,21 @@ class SimulationPage(_RunPage):
         with QSignalBlocker(self.measure_phase):
             self.measure_phase.setChecked(bool(self.store.search_state.get('simulation',{}).get('measure_phase',False)))
         for key,widget in self.field_controls.items():_set_value(widget,saved.get(key,{'grid':25,'depth_samples':3,'contour_step':.1}[key]))
+        options=self.store.search_state.get('simulation',{})
+        _set_value(self.field_single,options.get('single_wavelength',True))
+        _set_value(self.field_source,options.get('wavelength_source','manual'))
+        _set_value(self.field_wavelength,options.get('wavelength_nm',1550))
+        phase_options=self.store.search_state.get('phase_display',{})
+        previous_phase_display=(self.phase_mode.currentData(),self.phase_unit.currentData())
+        _set_value(self.phase_mode,phase_options.get('mode','positive'))
+        _set_value(self.phase_unit,phase_options.get('unit','radians'))
+        if previous_phase_display!=(self.phase_mode.currentData(),self.phase_unit.currentData()):self.draw_phase()
+        previous_reference=(self.phase_reference.currentData(),str(self.phase_reference_path or ''))
+        self.phase_reference_path=Path(phase_options['reference_csv']) if phase_options.get('reference_csv') else None
+        _set_value(self.phase_reference,phase_options.get('reference_mode','boundary'))
+        if previous_reference!=(self.phase_reference.currentData(),str(self.phase_reference_path or '')):
+            self.load_phase();self.draw_phase()
+        self.update_field_selection()
         self._mode()
 
     def field_options(self):
@@ -668,7 +735,7 @@ class SimulationPage(_RunPage):
             try:
                 if self.spectrum_results is not None:
                     import shutil
-                    source=self.directory/'results.csv'
+                    source=self.spectrum_directory/'results.csv'
                     if source.resolve()!=Path(path).resolve():shutil.copyfile(source,path)
                     count=len(self.spectrum_results)
                 else:
@@ -695,8 +762,9 @@ class SimulationPage(_RunPage):
         except Exception as exc:self.status.setText('Could not load setup: '+str(exc))
 
     def save_field_settings(self,*_):
-        try:self.store.save_search('simulation',dict(measure_phase=self.measure_phase.isChecked(),electric_fields=self.field_options()))
+        try:self.store.save_search('simulation',dict(measure_phase=self.measure_phase.isChecked(),electric_fields=self.field_options(),single_wavelength=self.field_single.isChecked(),wavelength_source=self.field_source.currentData(),wavelength_nm=self.field_wavelength.value()))
         except Exception as exc:self.status.setText(str(exc))
+        self.update_field_selection()
 
     def _mode(self):
         wavelength = self.controls['mode'].currentData() == 'Wavelength sweep'
@@ -714,14 +782,56 @@ class SimulationPage(_RunPage):
         return True
 
     def run(self):
+        options = {'measure_phase': self.measure_phase.isChecked()}
         if self.save_settings():
             self.save_field_settings()
-            self._start('simulation', {'measure_phase': self.measure_phase.isChecked(),'electric_fields':self.field_options()})
+            self._start('simulation', options)
+
+    def update_field_selection(self,*_):
+        from spectrum_field_job import compatible_project
+        single=self.field_single.isChecked();source=self.field_source.currentData()
+        manual=single and source=='manual'
+        self.field_source.setEnabled(single)
+        self.field_wavelength.setEnabled(manual)
+        valid=manual
+        self._selected_field_row=None
+        if manual:
+            text=f'Selected: {self.field_wavelength.value():g} nm. Manual entry can run without a spectrum.'
+        elif self.spectrum_directory is None or self.spectrum_results is None:
+            text='Run or load a matching completed spectrum first.'
+        elif not self._spectrum_project or not compatible_project(self.store.project(),self._spectrum_project):
+            text='Setup changed. Run a new spectrum or restore the saved setup.'
+        else:
+            try:
+                record=json.loads((self.spectrum_directory/'library_record.json').read_text(encoding='utf-8'))
+                if record.get('status')!='complete':raise ValueError('Use a completed spectrum for field selection.')
+                if single:
+                    row=self.spectrum_results.extremum(source[-1],maximum=source.startswith('max'))
+                    if row is None:raise ValueError('No finite samples for this extremum.')
+                    self._selected_field_row=row
+                    with QSignalBlocker(self.field_wavelength):self.field_wavelength.setValue(row[1])
+                    value=row['RTA'.index(source[-1])+3]
+                    text=f'{self.field_source.currentText()}: {value:.6g} at {row[1]:.8g} nm, {row[2]:g}°.'
+                else:text=f'{len(self.spectrum_results):,} saved samples. Each will get full 3D fields in a separate run.'
+                valid=True
+            except (OSError,ValueError,KeyError) as exc:text=str(exc)
+        self.field_selection.setText(text)
+        self.field_run.setText('Run electric fields' if single else 'Run fields for entire spectrum')
+        self.field_run.setEnabled(valid and not self.store.busy)
+
+    def run_fields(self):
+        if not self.save_settings():return
+        self.save_field_settings()
+        if not self.field_run.isEnabled():return
+        options=dict(electric_fields=self.field_options(),single_wavelength=self.field_single.isChecked(),
+            wavelength_source=self.field_source.currentData(),wavelength_nm=self.field_wavelength.value())
+        if self.spectrum_directory is not None:options['spectrum_id']=self.spectrum_directory.name
+        self._start('simulation_fields',options)
 
     def refresh_recent(self):
         self.recent_runs.clear()
         for record in self.store.library.entries():
-            if record.get('kind') != 'simulation':
+            if record.get('kind') != 'simulation' and record.get('summary',{}).get('task')!='simulation_fields':
                 continue
             item = QListWidgetItem(str(record.get('title', 'Simulation')) + '\n' +
                 str(record.get('created', ''))[:16] + ' · ' + str(record.get('status', 'saved')))
@@ -747,13 +857,17 @@ class SimulationPage(_RunPage):
     def load_spectrum(self,path=None):
         from scan_storage import SpectrumResults,legacy_spectrum_index
         path=Path(path or self.directory/'results.csv')
+        self.spectrum_directory=path.parent
+        try:self._spectrum_project=json.loads((path.parent/'project.json').read_text(encoding='utf-8'))
+        except (OSError,ValueError):self._spectrum_project=None
         index=path.parent/'spectrum.sqlite'
         self.spectrum_results=SpectrumResults(index) if index.is_file() else legacy_spectrum_index(path)
         self.result_frame=(self.spectrum_results.frame(preview=True) if self.spectrum_results is not None else _read_csv(path))
         shown=(self.spectrum_results.frame(limit=10000) if self.spectrum_results is not None else self.result_frame.iloc[:10000])
         fill_table(self.results,shown.drop(columns=['point_index'],errors='ignore'))
         count=len(self.spectrum_results) if self.spectrum_results is not None else len(self.result_frame)
-        self.phase_frame=phase_preview(path.parent/'phase.csv',count)
+        self.load_phase(count)
+        self.update_field_selection()
 
     def load_recent(self):
         item = self.recent_runs.currentItem()
@@ -762,8 +876,15 @@ class SimulationPage(_RunPage):
         try:
             directory = self.store.library.directory(item.data(Qt.ItemDataRole.UserRole))
             self.directory = Path(directory)
-            self.load_spectrum()
-            self.update_peak()
+            self.field_directory=self.directory
+            if (self.directory/'results.csv').is_file():
+                self.load_spectrum();self.update_peak()
+            else:
+                self.load_generated_fields()
+                self.result_tabs.setCurrentWidget(self.generated_fields)
+                QTimer.singleShot(0,self.draw_generated_fields)
+                self.status.setText(f'Loaded saved electric fields: {directory}')
+                return
             self.load_generated_fields()
             count=len(self.spectrum_results) if self.spectrum_results is not None else len(self.result_frame)
             self.metrics.setText(f'{count:,} saved samples loaded.')
@@ -777,7 +898,8 @@ class SimulationPage(_RunPage):
             old_model=self.field_sample.model()
             self.field_sample.setModel(QStandardItemModel(self.field_sample))
             if isinstance(old_model,FieldSamplesModel):old_model.deleteLater()
-            manifest=self.directory/'fields'/'samples.json' if self.directory else None
+            root=self.field_directory or self.directory
+            manifest=root/'fields'/'samples.json' if root else None
             if manifest and (manifest.parent/'samples.sqlite').is_file():
                 self.field_sample.setModel(FieldSamplesModel(manifest.parent,self.field_sample))
             elif manifest and manifest.is_file():
@@ -788,6 +910,7 @@ class SimulationPage(_RunPage):
             model=self.field_sample.model()
             count=len(model.index) if isinstance(model,FieldSamplesModel) else self.field_sample.count()
             self.field_position.setRange(1,max(1,count));self.field_position.setValue(1)
+        self._fields_dirty=True
         self.draw_generated_fields()
 
     def select_field_sample(self,value):
@@ -799,10 +922,21 @@ class SimulationPage(_RunPage):
         else:self.field_sample.setCurrentIndex(value-1)
 
     def draw_generated_fields(self,*_):
+        current=self.result_tabs.currentWidget()
+        if current not in (self.generated_fields,self.generated_volume) or not self.isVisible():return
+        if current is self.generated_volume:
+            path=self.field_sample.currentData()
+            if path and path!=self._volume_display_key:
+                self.generated_volume.load_directory(path);self._volume_display_key=path
+            elif not path:self.generated_volume.invalidate();self._volume_display_key=None
+            return
         model=self.field_sample.model()
         offset=model.offset if isinstance(model,FieldSamplesModel) else 0
         with QSignalBlocker(self.field_position):self.field_position.setValue(max(1,offset+self.field_sample.currentIndex()+1))
         path=self.field_sample.currentData()
+        key=(path,self.field_component.currentData())
+        if key==self._field_display_key and not self._fields_dirty:return
+        self._field_display_key=key;self._fields_dirty=False
         if not path:
             self.generated_field_plot.clear();self.field_status.setText('No saved electric fields');return
         try:
@@ -811,11 +945,15 @@ class SimulationPage(_RunPage):
             self.generated_field_plot.setToolTip('XY at the layer midplane · XZ through the full finite stack. Amplitudes are relative to incident |E|.')
         except Exception as exc:self.field_status.setText('Could not display saved fields: '+str(exc))
 
+    def view_generated_fields(self):
+        if not self.field_sample.count():
+            self.status.setText('Calculate electric fields separately or load a saved field run first.');return
+        self.result_tabs.setCurrentWidget(self.generated_volume)
+        QTimer.singleShot(0,self.draw_generated_fields)
+
     def update_peak(self, *_):
         frame = self.result_frame
-        from spectral_phase import phase_figure
-        phase = self.phase_frame
-        self.phase_plot.draw_figure(phase_figure(phase))
+        self.draw_phase()
         key = self.peak_quantity.currentData()
         name = self.peak_quantity.currentText().lower()
         self.plot.set_spectrum(frame,peak_key=key,sample_lookup=self.spectrum_results)
@@ -844,11 +982,88 @@ class SimulationPage(_RunPage):
             self.results.selectRow(position)
         self.inspect_sample(position,draw_cursor=False)
 
+    def draw_phase(self):
+        from spectral_phase import phase_figure
+        self.phase_plot.draw_figure(phase_figure(self.phase_frame,self.phase_mode.currentData(),self.phase_unit.currentData()))
+        if self.phase_frame.attrs.get('phase_reference_mode')=='reference_csv':
+            label='/'.join(self.phase_reference_path.parts[-3:])
+            self.phase_reference_label.setText(f'Reference-relative: {label}. Exact matching grid; arg(response / reference). Assumes matching polarization and boundary planes; undefined sample or reference signals remain gaps.')
+            self.phase_reference_label.setToolTip(str(self.phase_reference_path.resolve()))
+        else:
+            self.phase_reference_label.setText('Absolute boundary phase includes propagation between the top and bottom stack planes. A physical reference must use matching polarization and boundary planes.')
+            self.phase_reference_label.setToolTip('')
+
+    def phase_display_changed(self,*_):
+        self.store.save_search('phase_display',dict(mode=self.phase_mode.currentData(),unit=self.phase_unit.currentData(),
+            reference_mode=self.phase_reference.currentData(),reference_csv=str(self.phase_reference_path) if self.phase_reference_path else ''))
+        self.draw_phase()
+
+    def load_phase(self,count=None):
+        path=self._phase_path()
+        reference=self.phase_reference_path if self.phase_reference.currentData()=='csv' else None
+        try:self.phase_frame=phase_preview(path,count,reference_path=reference) if path else pd.DataFrame()
+        except (OSError,ValueError) as exc:
+            with QSignalBlocker(self.phase_reference):self.phase_reference.setCurrentIndex(0)
+            self.phase_frame=phase_preview(path,count) if path else pd.DataFrame()
+            self.status.setText(str(exc)+' Showing absolute boundary phase.')
+
+    def phase_reference_changed(self,*_):
+        if self.phase_reference.currentData()=='csv' and self.phase_reference_path is None:
+            with QSignalBlocker(self.phase_reference):self.phase_reference.setCurrentIndex(0)
+            self.status.setText('Choose a complete matching reference phase CSV first.');return
+        self.load_phase();self.phase_display_changed()
+
+    def set_phase_reference_path(self,path):
+        from spectral_phase import read_phase_preview
+        source=self._phase_path()
+        if source is None:self.status.setText('Load a saved phase result before selecting a physical reference.');return False
+        try:frame=read_phase_preview(source,reference_path=path)
+        except (OSError,ValueError) as exc:self.status.setText(str(exc));return False
+        self.phase_reference_path=Path(path);self.phase_frame=frame
+        with QSignalBlocker(self.phase_reference):self.phase_reference.setCurrentIndex(self.phase_reference.findData('csv'))
+        self.phase_display_changed();return True
+
+    def choose_phase_reference_csv(self):
+        source=self._phase_path()
+        if source is None:return
+        filename,_=QFileDialog.getOpenFileName(self,'Choose complete physical reference phase CSV',str(source.parent),'CSV (*.csv)')
+        if filename:self.set_phase_reference_path(filename)
+
+    def _phase_path(self):
+        directory=getattr(self,'spectrum_directory',None)
+        path=Path(directory)/'phase.csv' if directory else None
+        return path if path and path.is_file() else None
+
+    def export_phase_csv(self):
+        path=self._phase_path()
+        if not path:return
+        import shutil
+        filename,_=QFileDialog.getSaveFileName(self,'Export complete specular phase','specular-phase.csv','CSV (*.csv)')
+        if filename:shutil.copyfile(path,filename)
+
+    def export_phase_display_csv(self):
+        path=self._phase_path()
+        if not path:return
+        from spectral_phase import export_phase_display_csv
+        filename,_=QFileDialog.getSaveFileName(self,'Export complete phase with display units','specular-phase-display.csv','CSV (*.csv)')
+        if filename:
+            try:export_phase_display_csv(path,filename,self.phase_mode.currentData(),self.phase_unit.currentData(),self.phase_reference_path if self.phase_reference.currentData()=='csv' else None)
+            except (OSError,ValueError) as exc:self.status.setText(str(exc))
+
     def show_result(self, event):
+        if event.get('run_kind')=='simulation_fields':
+            self.field_directory=self.directory
+            self.load_generated_fields()
+            self.result_tabs.setCurrentWidget(self.generated_fields)
+            QTimer.singleShot(0,self.draw_generated_fields)
+            samples=event.get('summary',{}).get('electric_fields',{}).get('samples',0)
+            self.status.setText(f'Completed {samples:,} full 3D field samples. Saved to {self.directory}')
+            return
+        self.field_directory=self.directory
         self.load_spectrum(Path(event.get('output') or self.directory / 'results.csv'))
         self.update_peak()
         self.load_generated_fields()
-        if self.field_sample.count():self.result_tabs.setCurrentWidget(self.generated_fields)
+        self.result_tabs.setCurrentWidget(self.plot)
         self.plot.export_figure(self.directory / 'spectrum.png')
         if (self.directory / 'phase.csv').exists():
             self.phase_plot.export_figure(self.directory / 'phase.png')
@@ -863,6 +1078,7 @@ class SimulationPage(_RunPage):
 
 
 class OptimizePage(_RunPage):
+    routeRequested=pyqtSignal(str)
     def __init__(self, store, parent=None):
         super().__init__(store, 'Simulation Sweep', 'Design for absorption, transmission or reflection at your wavelength, with optional field-guided learning.', {'target', 'peaks'}, parent)
         self.result_directories = {}
@@ -888,6 +1104,27 @@ class OptimizePage(_RunPage):
         store.changed.connect(self.restore_saved)
         self.restore_saved()
         self._loading = False
+        self.tool_tabs={
+            'target':[(self.tabs,0)],'explore':[(self.tabs,1)],
+            'target.holes':[(self.tabs,0),(self.target_range_tabs,0)],
+            'target.parameters':[(self.tabs,0),(self.target_range_tabs,1)],
+            'target.sampling':[(self.tabs,0),(self.target_advanced_tabs,0)],
+            'target.learning':[(self.tabs,0),(self.target_advanced_tabs,1)],
+            'target.fields':[(self.tabs,0),(self.target_result_tabs,0)],
+            'target.designs':[(self.tabs,0),(self.target_result_tabs,1)],
+            'explore.constraints':[(self.tabs,1),(self.general_detail_tabs,0)],
+            'explore.detection':[(self.tabs,1),(self.general_detail_tabs,1)],
+            'explore.learning':[(self.tabs,1),(self.general_detail_tabs,2)],
+            'explore.spectrum':[(self.tabs,1),(self.general_result_tabs,0)],
+            'explore.q':[(self.tabs,1),(self.general_result_tabs,1)],
+            'explore.matches':[(self.tabs,1),(self.general_result_tabs,2)],
+            'explore.designs':[(self.tabs,1),(self.general_result_tabs,3)]}
+        from qt_tool_workspace import polish_tool_workspace
+        polish_tool_workspace(self)
+
+    def select_tool_tab(self,route):
+        from qt_tool_workspace import select_tool_tab
+        return select_tool_tab(self,route)
 
     def _target_page(self):
         left, right = QWidget(), QWidget()
@@ -926,6 +1163,7 @@ class OptimizePage(_RunPage):
         self.holes = HoleEditor(self.store)
         self.target_bounds = BoundsEditor(self.store)
         range_tabs = QTabWidget()
+        self.target_range_tabs=range_tabs
         range_tabs.addTab(self.holes, 'PCS hole limits')
         range_tabs.addTab(self.target_bounds, 'Other parameters')
         controls.addWidget(range_tabs)
@@ -934,6 +1172,7 @@ class OptimizePage(_RunPage):
         form.addRow(self.target_controls['use_fields'])
         controls.addWidget(learning)
         advanced = QTabWidget()
+        self.target_advanced_tabs=advanced
         sampling, _ = _group('Sampling and verification', [(label, self.target_controls[key]) for label, key in
             [('Window: target ± (nm)', 'half_window'), ('Initial wavelength step (nm)', 'step'), ('Sizes per range', 'grid_steps'),
              ('Initial designs', 'initial'), ('Finalists to verify', 'finalists'), ('Response agreement (absolute)', 'response_agreement')]])
@@ -952,6 +1191,7 @@ class OptimizePage(_RunPage):
         self.target_plot.setMinimumHeight(400)
         self.target_results = table([])
         result_tabs = QTabWidget()
+        self.target_result_tabs=result_tabs
         result_tabs.addTab(self.target_plot, 'Recommended fields')
         result_tabs.addTab(self.target_results, 'Designs and conditions')
         output.addWidget(result_tabs, 1)
@@ -1028,6 +1268,7 @@ class OptimizePage(_RunPage):
         method, _ = _group('Search method', [('Method', self.search_controls['search_mode']), ('Maximum designs', self.search_controls['design_budget'])])
         controls.addWidget(method)
         controls.addWidget(_label('Uses the wavelength range and incident-light settings in Simulation. Empty bounds evaluate the current design only.', True))
+        controls.addWidget(_button('Edit shared optical sampling',lambda:self.routeRequested.emit('optical.sweep')))
         self.bounds = BoundsEditor(self.store)
         from linked_hole_sweep import make_widget
         self.shared_hole = make_widget(self.store)
@@ -1036,6 +1277,7 @@ class OptimizePage(_RunPage):
         controls.addWidget(self.bounds)
         controls.addWidget(_button('Create fixed ranges from Structure', self.bounds.populate_current))
         details = QTabWidget()
+        self.general_detail_tabs=details
         constraints, form = _group('Acceptance and fabrication', [(label, self.search_controls[key]) for label, key in
             [('Response', 'response'), ('Response threshold (fraction)', 'absorption_target'), ('Circle r/a upper limit', 'ratio_limit'),
              ('Minimum circle gap (µm)', 'min_bridge_um'), ('Best-match tolerance (fraction)', 'tie_tolerance')]])
@@ -1065,6 +1307,7 @@ class OptimizePage(_RunPage):
         self.peak_plot.setMinimumHeight(360)
         self.peak_results, self.peak_matches, self.peak_feasible = table([]), table([]), table([])
         tabs = QTabWidget()
+        self.general_result_tabs=tabs
         tabs.addTab(self.peak_plot, 'Best spectrum')
         tabs.addTab(self.peak_feasible, 'Highest Q')
         tabs.addTab(self.peak_matches, 'Best response matches')
@@ -1210,7 +1453,7 @@ class OptimizePage(_RunPage):
             frame = _read_csv(self.directory / 'target_results.csv')
             fill_table(self.target_results, frame)
             path = self.directory / 'recommended_fields'
-            if (path / 'electric_fields.csv').is_file():
+            if field_data_exists(path):
                 self.target_plot.draw_figure(field_figure(path))
                 self.target_plot.export_figure(path / 'electric_field_maps.png')
             else:
@@ -1297,8 +1540,9 @@ class OptimizePage(_RunPage):
 
 
 class FieldsPage(_RunPage):
+    routeRequested=pyqtSignal(str)
     def __init__(self, store, parent=None):
-        super().__init__(store, 'Electric fields', '', {'fields'}, parent)
+        super().__init__(store, 'Optical field tools', '', {'fields'}, parent)
         from PyQt6.QtWidgets import QSlider, QButtonGroup
         self.field_directory = None
         self.layout_.setContentsMargins(0, 0, 0, 0)
@@ -1314,8 +1558,8 @@ class FieldsPage(_RunPage):
         self.wavelength = number(1550, .000001)
         self.wavelength.setSuffix(' nm')
         self.layer = QComboBox()
-        self.grid = integer(25, 3, 80)
-        self.depth = integer(3, 3, 40)
+        self.grid = integer(25, 3, 2147483647)
+        self.depth = integer(3, 3, 2147483647)
         self.component = _combo([('|E|', 'E2'), ('Ex', 'Ex'), ('Ey', 'Ey'), ('Ez', 'Ez')])
         self.component.setAccessibleName('Field component')
         self.arrows = _check('Show Re(E) arrows', False)
@@ -1345,6 +1589,7 @@ class FieldsPage(_RunPage):
         form.addRow(self.arrows)
         form.addRow(self.actions('Calculate field maps', self.run))
         self.setup_layout.addWidget(inputs)
+        self.setup_layout.addWidget(_button('Edit shared optical excitation',lambda:self.routeRequested.emit('optical.incident')))
         status_box = QGroupBox('Run status')
         status_body = QVBoxLayout(status_box)
         self.run_log = QPlainTextEdit()
@@ -1447,6 +1692,28 @@ class FieldsPage(_RunPage):
         for key, widget in [('wavelength_nm', self.wavelength), ('layer', self.layer), ('grid', self.grid), ('depth_samples', self.depth)]:
             if key in saved:
                 _set_value(widget, saved[key])
+        self.tool_tabs={'current':[(self.tabs,0)],'compare':[(self.tabs,1)],
+            'compare.conditions':[(self.tabs,1),(self.comparison.tabs,0)],
+            'compare.measurements':[(self.tabs,1),(self.comparison.tabs,1)],
+            'volume':[(self.tabs,2)]}
+        from qt_tool_workspace import polish_tool_workspace
+        polish_tool_workspace(self)
+        from qt_legacy_study_workbench import StudyWorkbench
+        self.layout_.removeWidget(self.panels)
+        self.workbench = StudyWorkbench(store, 'Optical fields',
+            ['Device & excitation', 'Field sampling', 'Calculate'], left, center,
+            edit_geometry=lambda: self.routeRequested.emit('structure.original'),
+            preview_note='Shared optical unit cell. Field maps appear only after a calculation or when saved field data is loaded.')
+        self.workbench.add_parameter_tab(right, 'Compare & export')
+        self.workbench.set_step_targets([inputs, inputs, status_box])
+        self.layout_.insertWidget(0, self.workbench, 1)
+        self.panels.hide()
+
+    def select_tool_tab(self,route):
+        from qt_tool_workspace import select_tool_tab
+        if not route or route.split('/')[-1] == 'setup': self.workbench.select_step(0)
+        else: self.workbench.show_results()
+        return select_tool_tab(self,route)
 
     def record_progress(self, event):
         if event.get('run_kind') in self.kinds:
@@ -1485,8 +1752,7 @@ class FieldsPage(_RunPage):
         path, _ = QFileDialog.getSaveFileName(self, 'Export field samples', 'electric-fields.csv', 'CSV data (*.csv)')
         if path:
             try:
-                import shutil
-                shutil.copyfile(self.field_directory / 'electric_fields.csv', path)
+                export_field_csv(self.field_directory, path)
                 self.status.setText('Complex field samples exported.')
             except Exception as exc:
                 self.status.setText('Could not export samples: ' + str(exc))
@@ -1509,7 +1775,7 @@ class FieldsPage(_RunPage):
             # XZ spans the full saved stack; retain its physical ticks while
             # allowing a deep substrate to remain visible in the map panel.
             figure.axes[1].set_aspect('auto')
-            frame = _read_csv(self.field_directory / 'electric_fields.csv')
+            frame = load_field_frame(self.field_directory)
             component = self.component.currentData()
             if component != 'E2':
                 frame[component] = frame[component + '_real'] ** 2 + frame[component + '_imag'] ** 2
@@ -1543,6 +1809,7 @@ class FieldsPage(_RunPage):
             self.status.setText(f'Field display failed: {exc}')
 
     def show_result(self, event):
+        self.workbench.show_results()
         self.field_directory = self.directory / 'fields'
         self.render_fields()
         self.plot.export_figure(self.field_directory / 'electric_field_maps.png')
@@ -1553,6 +1820,25 @@ class FieldsPage(_RunPage):
 
 
 class SettingsPage(_RunPage):
+    @staticmethod
+    def _note(text):
+        label=QLabel(text);label.setWordWrap(True);label.setObjectName('muted')
+        return label
+
+    @staticmethod
+    def _card(title,pairs=()):
+        from PyQt6.QtWidgets import QFrame
+        panel=WorkspacePanel();layout=QVBoxLayout(panel);layout.setContentsMargins(0,0,0,0);layout.setSpacing(0)
+        heading=QLabel(title);heading.setObjectName('sectionTitle');heading.setContentsMargins(14,10,14,10)
+        layout.addWidget(heading)
+        line=QFrame();line.setObjectName('builderSeparator');line.setFixedHeight(1);layout.addWidget(line)
+        body=QWidget();form=QFormLayout(body);form.setContentsMargins(14,12,14,14)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows);form.setHorizontalSpacing(12);form.setVerticalSpacing(10)
+        for label,widget in pairs:form.addRow(label,widget)
+        layout.addWidget(body)
+        return panel,form
+
     class _SettingsTabs(QTabWidget):
         def minimumSizeHint(self):
             current = self.currentWidget()
@@ -1563,13 +1849,18 @@ class SettingsPage(_RunPage):
 
     def __init__(self, store, parent=None):
         super().__init__(store, 'Settings', 'Customize appearance, data storage, accuracy and parallel execution.', {'diagnostic'}, parent)
+        self.setObjectName('settingsWorkspace')
+        self._execution_initialized=False
+        self._execution_draft=False
+        self._pending_storage=None
         left, right = QWidget(), QWidget()
         controls, details = QVBoxLayout(left), QVBoxLayout(right)
+        controls.setContentsMargins(0,0,0,0);details.setContentsMargins(0,0,0,0)
         from desktop_runtime import default_data_directory, saved_data_directory
         self.data_directory = QLineEdit(str(saved_data_directory() or default_data_directory()))
         self.data_directory.setAccessibleName('Data output folder')
-        storage, storage_form = _group('Data output folder', [('Folder for saved data', self.data_directory)])
-        storage_form.addRow(_label('Current folder: ' + str(store.library.root), True))
+        storage, storage_form = self._card('Data output folder', [('Folder for saved data', self.data_directory)])
+        storage_form.addRow(self._note('Current active library: ' + str(store.library.root)))
         storage_form.addRow(_button('Browse…', self.browse_data_directory))
         storage_form.addRow(_button('Use folder beside the program', self.default_data_directory))
         save_folder=_button('Save data folder', self.save_data_directory)
@@ -1577,36 +1868,63 @@ class SettingsPage(_RunPage):
         storage_form.addRow(save_folder)
         self.storage_note = ActionStatusLabel('')
         storage_form.addRow(self.storage_note)
-        details.addWidget(storage)
+        self.save_folder_button=save_folder
         self.basis = integer(32, 1, 4096)
-        accuracy, form = _group('Accuracy', [('Fourier basis count', self.basis)])
-        form.addRow(_label('Larger basis counts can resolve finer features and cost more memory and time. Check convergence before accepting a final Q estimate.', True))
+        accuracy, form = self._card('Optical accuracy', [('Fourier basis count', self.basis)])
+        form.addRow(self._note('Larger basis counts can resolve finer features and cost more memory and time. Check convergence before accepting a final Q estimate.'))
         controls.addWidget(accuracy)
         cpus = os.cpu_count() or 1
         self.controls = {
+            'solver_backend': _combo([('S4 native (recommended)', 'native'),
+                                      ('GPU scattering (eigenfree)', 'eigenfree-gpu')], 'native'),
+            'mirror_symmetry': _check('Use exact mirror symmetry', True),
+            'eigenfree_batch_size': integer(32, 1, 256),
             'mode': _combo(MODES), 'workers': integer(0, 0, cpus), 'threads': integer(1, 1, cpus),
             'gpu_device': integer(0, 0, 1024), 'gpu_min_n': integer(1024, 1, 2147483647),
             'gpu_block': _combo([(str(value), value) for value in (64, 128, 256, 512, 1024)], 256),
             'chunk_size': integer(8, 1, 10000), 'timeout_seconds': integer(3600, 1, 2147483647),
-            'require_gpu': _check('Require successful GPU work for each calculation', False),
+            'require_gpu': _check('Require successful GPU work', False),
         }
-        runtime, form = _group('Compute resources', [(label, self.controls[key]) for label, key in
+        runtime, form = self._card('CPU resources', [(label, self.controls[key]) for label, key in
             [('Execution mode', 'mode'), ('CPU workers (0 = automatic)', 'workers'), ('Threads per worker', 'threads'),
-             ('CUDA device index', 'gpu_device'), ('Minimum GPU matrix size', 'gpu_min_n'), ('GPU tile size', 'gpu_block'),
-             ('Wavelengths per work chunk', 'chunk_size'), ('Run timeout (seconds)', 'timeout_seconds')]])
-        form.addRow(self.controls['require_gpu'])
+             ('Wavelengths per work chunk', 'chunk_size'),('Run timeout (seconds)', 'timeout_seconds')]])
         controls.addWidget(runtime)
-        controls.addWidget(_label(f'{cpus} logical CPUs available. Worker count × threads per worker cannot exceed this count.', True))
-        controls.addWidget(_button('Use GPU for small matrices', self.small_matrices))
-        controls.addWidget(self.actions('Check selected runtime', self.run))
+        controls.addWidget(self._note(f'{cpus} logical CPUs available. Worker count × threads per worker cannot exceed this count.'))
+        self.execution_note=self._note('Changes remain a draft until you apply them to the current setup or save defaults for new projects.')
+        controls.addWidget(self.execution_note)
+        draft_actions=QWidget();draft_layout=QVBoxLayout(draft_actions);draft_layout.setContentsMargins(0,0,0,0)
+        self.apply_resources_button=_button('Apply to current setup',self.save_settings,True)
+        self.save_defaults_button=_button('Save defaults for new projects',self.save_execution_defaults)
+        self.load_resources_button=_button('Load current setup',self.load_current_settings)
+        for button in (self.apply_resources_button,self.save_defaults_button,self.load_resources_button):draft_layout.addWidget(button)
+        controls.addWidget(draft_actions)
         controls.addStretch()
+        gpu_resources,gpu_form=self._card('GPU resources',[(label,self.controls[key]) for label,key in
+            [('CUDA device index','gpu_device'),('Minimum GPU matrix size','gpu_min_n'),('GPU tile size','gpu_block'),
+             ('GPU wavelengths per batch','eigenfree_batch_size')]])
+        gpu_form.addRow(self.controls['require_gpu'])
+        gpu_form.addRow(_button('Apply GPU small-matrix preset',self.small_matrices))
+        details.addWidget(gpu_resources)
         self.gpu_note = _label('')
         details.addWidget(self.gpu_note)
+        details.addStretch()
+        engine_left,engine_right=QWidget(),QWidget()
+        engines,diagnostic_layout=QVBoxLayout(engine_left),QVBoxLayout(engine_right)
+        engines.setContentsMargins(0,0,0,0);diagnostic_layout.setContentsMargins(0,0,0,0)
+        native,native_form=self._card('S4 · periodic optical solver',[('S4 backend',self.controls['solver_backend'])])
+        native_form.addRow(self.controls['mirror_symmetry'])
+        native_form.addRow(self._note('S4 simulates one periodic cell or a periodic supercell. The device-footprint option repeats that footprint in X and Y. Phase requires the native backend.'))
+        native_form.addRow(self.actions('Apply && check selected runtime',self.run));engines.addWidget(native)
+        electrical,electrical_form=self._card('Electrical · finite device electrostatics')
+        electrical_form.addRow(self._note('The finite volume electrical solver runs locally with SciPy. Semiconductor Poisson and fixed-charge models share the canonical device. I–V is a frozen-conductivity estimate; C–V is a terminal-charge derivative.'))
+        engines.addWidget(electrical)
         self.diagnostics = QPlainTextEdit()
         self.diagnostics.setReadOnly(True)
-        self.diagnostics.setPlaceholderText('Run the diagnostic to see actual S4 CPU/GPU matrix-product counts and native runtime status.')
-        details.addWidget(self.diagnostics, 1)
-        details.addWidget(_label('GPU acceleration covers supported matrix products. S4 also uses CPU solver steps, and the ML surrogate fitting uses the CPU. A connected GPU does not imply every operation runs on it.', True))
+        self.diagnostics.setPlaceholderText('Run the diagnostic to verify the selected solver and its actual CPU/GPU work.')
+        diagnostic_panel=WorkspacePanel();diagnostic_body=QVBoxLayout(diagnostic_panel)
+        diagnostic_title=_label('Actual runtime diagnostic');diagnostic_title.setObjectName('sectionTitle');diagnostic_body.addWidget(diagnostic_title)
+        diagnostic_body.addWidget(self.diagnostics,1);diagnostic_layout.addWidget(diagnostic_panel,1)
+        diagnostic_layout.addWidget(self._note('Availability is verified by an actual solve when you press Check. Native-library files alone do not confirm a working CUDA device. GPU scattering needs compatible NVIDIA drivers and lossless uniform exterior layers.'))
         from qt_appearance import AppearancePage
         from PyQt6.QtWidgets import QSizePolicy, QFrame, QButtonGroup
         self.settings_tabs = self._SettingsTabs()
@@ -1617,13 +1935,40 @@ class SettingsPage(_RunPage):
         self.settings_tabs.setStyleSheet('QTabWidget#settingsStack::pane { border:0; background:transparent; }')
         self.appearance_page = AppearancePage(store=store)
         self.settings_tabs.addTab(self.appearance_page, 'Appearance')
+        resources_split=_split(left,right);resources_split.reference_ratios=(.5,.5)
+        self.settings_tabs.addTab(resources_split, 'Execution defaults')
         storage_page = QWidget()
-        QVBoxLayout(storage_page).addWidget(storage)
-        self.settings_tabs.addTab(storage_page, 'Data storage')
-        self.settings_tabs.addTab(_split(left,right), 'Performance')
+        storage_layout=QVBoxLayout(storage_page);storage_layout.setContentsMargins(0,0,0,0);storage_layout.addWidget(storage)
+        export_box,export_form=self._card('Backups & saved outputs')
+        export_form.addRow(self._note('Backups include saved simulations, material presets, and optical datasets. Import merges verified data. Per-run CSV, NPZ, VTK and figure exports are available from Results.'))
+        self.include_source=_check('Include application source in whole-library backup',False);export_form.addRow(self.include_source)
+        self.export_library_button=_button('Export whole library…',self.export_storage)
+        self.import_library_button=_button('Import library backup…',self.import_storage)
+        export_form.addRow(self.export_library_button);export_form.addRow(self.import_library_button)
+        export_form.addRow(_button('Open active library folder',self.open_storage_folder))
+        storage_layout.addWidget(export_box);storage_layout.addStretch()
+        self.settings_tabs.addTab(storage_page, 'Storage & exports')
         from qt_addons import AddonsPage
         self.addons_panel = AddonsPage(store=store)
+        # Keep the existing add-on controller and runtime signals. The complete
+        # Meep controls belong beside other solvers, rather than below downloads.
+        self.addons_panel.layout().removeWidget(self.addons_panel.meep_container)
+        self.addons_panel.meep_container.layout().itemAt(0).widget().hide()
+        meep_card,meep_form=self._card('Meep · FDTD engine')
+        self.addons_panel.meep_container.setTitle('')
+        self.addons_panel.meep_container.setStyleSheet('QGroupBox {border:0; margin:0; padding:0;}')
+        meep_form.addRow(self.addons_panel.meep_container);engines.addWidget(meep_card)
+        engines.addStretch()
+        engine_split=_split(engine_left,engine_right);engine_split.reference_ratios=(.62,.38)
+        self.settings_tabs.addTab(engine_split,'Solver runtimes')
+        self._runtime_button_rows=[]
+        if hasattr(self.addons_panel,'meep_settings'):
+            meep=self.addons_panel.meep_settings;meep.installEventFilter(self)
+            for row in meep.findChildren(QHBoxLayout):
+                if row.count() and all(isinstance(row.itemAt(index).widget(),QPushButton) for index in range(row.count())):
+                    self._runtime_button_rows.append(row)
         self.settings_tabs.addTab(_scroll(self.addons_panel), 'Add-ons')
+        self.section_indexes={'appearance':0,'resources':1,'execution_defaults':1,'storage':2,'exports':2,'runtimes':3,'engines':3,'addons':4}
         self.settings_navigation_panel = WorkspacePanel()
         navigation = QVBoxLayout(self.settings_navigation_panel)
         navigation.setContentsMargins(12,18,12,12)
@@ -1634,8 +1979,8 @@ class SettingsPage(_RunPage):
         self.settings_navigation = []
         self.settings_navigation_group = QButtonGroup(self)
         self.settings_navigation_group.setExclusive(True)
-        for index,label in enumerate(('Appearance','Data storage','Performance','Add-ons')):
-            control = _button(label,lambda checked=False,i=index:self.settings_tabs.setCurrentIndex(i))
+        for index,label in enumerate(('Appearance','Execution defaults','Storage & exports','Solver runtimes','Add-ons')):
+            control = _button(label.replace('&','&&'),lambda checked=False,i=index:self.settings_tabs.setCurrentIndex(i))
             control.setProperty('settingsNav',True)
             control.setCheckable(True)
             self.settings_navigation_group.addButton(control)
@@ -1664,16 +2009,20 @@ class SettingsPage(_RunPage):
         self.layout_.setContentsMargins(8,8,8,8)
         self._sync_settings_navigation(0)
         self.footer()
-        self.basis.editingFinished.connect(self.save_settings)
+        self.basis.valueChanged.connect(self.edit_resources)
         for widget in self.controls.values():
-            _on_edit(widget, self.save_settings)
+            if isinstance(widget,QComboBox):widget.currentIndexChanged.connect(self.edit_resources)
+            elif isinstance(widget,QCheckBox):widget.toggled.connect(self.edit_resources)
+            else:widget.valueChanged.connect(self.edit_resources)
         store.changed.connect(self.refresh)
+        store.task_finished.connect(self.storage_task_finished)
+        store.task_failed.connect(self.storage_task_failed)
         self.refresh()
 
     def refresh_tab_icons(self, *_):
         from qt_icons import navigation_icon
         from qt_common import COLORS, theme_manager
-        for index, name in enumerate(('appearance', 'storage', 'performance', 'addons')):
+        for index, name in enumerate(('appearance', 'performance', 'storage', 'Simulate', 'addons')):
             icon = navigation_icon('Settings' if index==0 else name, COLORS[theme_manager().mode]['accent'])
             self.settings_tabs.setTabIcon(index, icon)
             self.settings_navigation[index].setIcon(icon)
@@ -1691,6 +2040,41 @@ class SettingsPage(_RunPage):
     def _sync_settings_navigation(self,index):
         for row,control in enumerate(self.settings_navigation):
             with QSignalBlocker(control):control.setChecked(row==index)
+        QTimer.singleShot(0,self._layout_runtime_buttons)
+
+    def _layout_runtime_buttons(self):
+        from PyQt6.QtWidgets import QBoxLayout
+        meep=getattr(getattr(self,'addons_panel',None),'meep_settings',None)
+        if meep is None:return
+        direction=QBoxLayout.Direction.TopToBottom if meep.width()<620 else QBoxLayout.Direction.LeftToRight
+        for row in getattr(self,'_runtime_button_rows',[]):
+            if row.direction()!=direction:row.setDirection(direction)
+
+    def eventFilter(self,watched,event):
+        from PyQt6.QtCore import QEvent
+        if event.type()==QEvent.Type.Resize and watched is getattr(getattr(self,'addons_panel',None),'meep_settings',None):
+            QTimer.singleShot(0,self._layout_runtime_buttons)
+        return super().eventFilter(watched,event)
+
+    def select_section(self,section):
+        """Stable menu/context routes, including older settings aliases."""
+        text=str(section).casefold().replace('_','-')
+        focus=None
+        if 'meep' in text or 'runtime' in text or 'engine' in text:
+            index=3
+            if 'meep' in text:focus=getattr(getattr(self.addons_panel,'meep_settings',None),'check_button',None)
+        elif 'add-on' in text or 'addons' in text:
+            index=4
+            for name,(_,button) in self.addons_panel.cards.items():
+                if name.replace('_','-') in text:focus=button;break
+        elif 'storage' in text or 'export' in text:index=2
+        elif 'performance' in text or 'resource' in text or 'execution' in text:index=1
+        elif 'appearance' in text or text=='settings':index=0
+        else:return False
+        self.settings_tabs.setCurrentIndex(index)
+        if focus is not None:
+            QTimer.singleShot(0,lambda:(self.settings_scroll.ensureWidgetVisible(focus),focus.setFocus()))
+        return True
 
     def resizeEvent(self,event):
         super().resizeEvent(event)
@@ -1713,6 +2097,8 @@ class SettingsPage(_RunPage):
     def save_data_directory(self):
         from desktop_runtime import save_data_directory
         try:
+            if self.store.busy:
+                raise ValueError('Wait for the active operation to finish before changing storage.')
             if not self.data_directory.text().strip():
                 raise ValueError('Choose a folder first.')
             target = save_data_directory(self.data_directory.text().strip())
@@ -1721,23 +2107,147 @@ class SettingsPage(_RunPage):
             self.storage_note.setText('Could not save the data folder: ' + str(exc))
 
     def refresh(self, *_):
-        _set_value(self.basis, self.store.settings.get('NumG', 32))
-        for key, widget in self.controls.items():
-            if key in self.store.performance:
-                _set_value(widget, self.store.performance[key])
+        if not self._execution_initialized:
+            self._execution_initialized=True
+            saved=self.saved_execution_defaults()
+            settings=saved.get('settings',self.store.settings)
+            perf=saved.get('performance',self.store.performance)
+            _set_value(self.basis,settings.get('NumG',32))
+            for key,widget in self.controls.items():
+                if key in perf:_set_value(widget,perf[key])
+            self._last_resource_backend=self.controls['solver_backend'].currentData()
+        self._refresh_resource_availability()
+
+    def _refresh_resource_availability(self):
         mode = self.controls['mode'].currentData()
-        gpu = mode != MODES[0]
+        eigenfree = self.controls['solver_backend'].currentData() == 'eigenfree-gpu'
+        gpu = eigenfree or mode != MODES[0]
         for key in ('gpu_device', 'gpu_min_n', 'gpu_block', 'require_gpu'):
-            self.controls[key].setEnabled(gpu)
-        self.controls['workers'].setEnabled(mode != MODES[2])
+            self.controls[key].setEnabled(gpu and (not eigenfree or key in ('gpu_device','require_gpu')))
+        self.controls['mode'].setEnabled(not eigenfree)
+        self.controls['workers'].setEnabled(not eigenfree and mode != MODES[2])
+        self.controls['chunk_size'].setEnabled(not eigenfree)
+        self.controls['eigenfree_batch_size'].setEnabled(eigenfree)
         threshold = self.controls['gpu_min_n'].value()
+        if eigenfree:
+            self.gpu_note.setText(f'Fourier basis: {self.basis.value():,}. GPU scattering batch: '
+                f"{self.controls['eigenfree_batch_size'].value():,} wavelengths. Exact symmetry is applied when eligible. "
+                'Each wavelength is calculated directly. Full 3D fields are retained; field jobs use smaller batches to bound memory. '
+                'Check selected runtime verifies an actual GPU solve.')
+            return
         self.gpu_note.setText(f'Fourier basis: {self.basis.value():,}. GPU offload threshold: {threshold:,}. '
             'All dimensions of a matrix product must meet the threshold. Small structures may otherwise stay on the CPU. '
             'The runtime diagnostic uses threshold 1 to verify actual GPU work; it does not change your run threshold.')
 
+    @staticmethod
+    def saved_execution_defaults():
+        """Validated app preferences for explicitly creating a fresh project."""
+        from qt_common import preferences
+        from qt_core import desktop_performance
+        try:
+            value=json.loads(str(preferences().value('execution_defaults_v1','{}')))
+            if not isinstance(value,dict) or not value:return {}
+            basis=value['settings']['NumG']
+            if isinstance(basis,bool) or int(basis)!=basis or not 1<=basis<=4096:raise ValueError('Invalid basis')
+            return {'settings':{'NumG':int(basis)},'performance':desktop_performance(value['performance'])}
+        except (ValueError,TypeError,KeyError,OverflowError):return {}
+
+    def edit_resources(self,*_):
+        backend=self.controls['solver_backend'].currentData()
+        previous=getattr(self,'_last_resource_backend',backend)
+        if backend!=previous:
+            if backend=='eigenfree-gpu':
+                self._native_resources=(self.controls['mode'].currentData(),self.controls['workers'].value())
+                _set_value(self.controls['mode'],MODES[2]);_set_value(self.controls['workers'],1)
+            else:
+                mode,workers=getattr(self,'_native_resources',(MODES[0],0))
+                _set_value(self.controls['mode'],mode);_set_value(self.controls['workers'],workers)
+        self._last_resource_backend=backend;self._execution_draft=True
+        self.execution_note.setText('Unsaved execution draft. Apply to current setup changes this project. Save defaults is used when creating new projects.')
+        self._refresh_resource_availability()
+
+    def load_current_settings(self):
+        for key,widget in self.controls.items():
+            if key in self.store.performance:_set_value(widget,self.store.performance[key])
+        _set_value(self.basis,self.store.settings.get('NumG',32))
+        self._last_resource_backend=self.controls['solver_backend'].currentData();self._execution_draft=False
+        self.execution_note.setText('Loaded the current project. Edits remain a draft until explicitly applied or saved as defaults.')
+        self._refresh_resource_availability()
+
+    def save_execution_defaults(self):
+        from qt_common import preferences
+        from qt_core import desktop_performance
+        try:
+            perf={key:_value(widget) for key,widget in self.controls.items()}
+            perf['eigenfree_symmetry']=perf['mirror_symmetry']
+            if perf['solver_backend']=='eigenfree-gpu':perf.update(mode=MODES[2],workers=1)
+            if perf['mode']==MODES[0]:perf['require_gpu']=False
+            value={'settings':{'NumG':self.basis.value()},'performance':desktop_performance(perf)}
+            settings=preferences();settings.setValue('execution_defaults_v1',json.dumps(value,allow_nan=False));settings.sync()
+            from PyQt6.QtCore import QSettings
+            if settings.status()!=QSettings.Status.NoError:raise OSError('Desktop preferences could not be written')
+            self._execution_draft=False;self.execution_note.setText('Defaults saved for new projects. The current project keeps its applied execution settings.')
+            self.status.setText('Saved execution defaults for new projects.')
+            return True
+        except Exception as exc:
+            self.status.setText('Could not save execution defaults: '+str(exc));return False
+
+    def _busy(self,busy):
+        super()._busy(busy)
+        for name in ('apply_resources_button','save_folder_button','export_library_button','import_library_button','load_resources_button'):
+            widget=getattr(self,name,None)
+            if widget is not None:widget.setEnabled(not busy)
+
+    def open_storage_folder(self):
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.store.library.root)))
+
+    def export_storage(self):
+        if self.store.busy:return
+        filename,_=QFileDialog.getSaveFileName(self,'Export library backup','optical-design-studio-library.zip','ZIP archives (*.zip)')
+        if not filename:return
+        try:self.store.save_project()
+        except Exception as exc:self.status.setText('Could not save the project for backup: '+str(exc));return
+        from desktop_runtime import source_root
+        source=source_root() if self.include_source.isChecked() else None
+        library=self.store.library
+        def export():
+            import shutil
+            produced=Path(library.export(None,source))
+            if produced.resolve()!=Path(filename).resolve():shutil.copy2(produced,filename)
+            return {'path':filename}
+        self._pending_storage='settings-library-export';self.status.setText('Exporting a verified whole-library backup…')
+        self.store.run_task(self._pending_storage,export)
+
+    def import_storage(self):
+        if self.store.busy:return
+        filename,_=QFileDialog.getOpenFileName(self,'Import library backup','','ZIP archives (*.zip)')
+        if not filename:return
+        library=self.store.library;self._pending_storage='settings-library-import'
+        self.status.setText('Verifying and merging the library backup…')
+        self.store.run_task(self._pending_storage,lambda:library.import_bundle(filename))
+
+    def storage_task_finished(self,name,result):
+        if name!=self._pending_storage:return
+        self._pending_storage=None
+        if name=='settings-library-import':
+            self.store.notify_library();self.status.setText(f"Imported {result['runs']} saved runs, {result['presets']} material presets and {result['assets']} datasets.")
+        else:self.status.setText('Library backup saved: '+result['path'])
+
+    def storage_task_failed(self,name,error):
+        if name==self._pending_storage:
+            self._pending_storage=None;self.status.setText('Library backup needs attention: '+str(error))
+
     def save_settings(self, *_):
         # Capture both groups before either update emits the shared refresh signal.
+        if self.store.busy:
+            self.status.setText('Wait for the active operation to finish before applying execution settings.')
+            return False
         perf = {key: _value(widget) for key, widget in self.controls.items()}
+        # Backend transitions already update the detached controls in
+        # edit_resources. Preserve their restored native CPU values here.
+        perf['eigenfree_symmetry'] = perf['mirror_symmetry']
+        if perf['solver_backend'] == 'eigenfree-gpu':
+            perf.update(mode=MODES[2],workers=1)
         if perf['mode'] == MODES[0]:
             perf['require_gpu'] = False
         basis = self.basis.value()
@@ -1747,6 +2257,9 @@ class SettingsPage(_RunPage):
         except Exception as exc:
             self.status.setText(f'Could not apply solver settings: {exc}')
             return False
+        self._execution_draft=False
+        self._last_resource_backend=self.controls['solver_backend'].currentData()
+        self.execution_note.setText('Execution settings applied to the current project. Saved defaults for new projects are unchanged.')
         return True
 
     def small_matrices(self):

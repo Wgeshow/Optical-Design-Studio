@@ -8,6 +8,7 @@ import time
 import numpy as np
 
 from data_library import read_json, write_json
+from field_storage import field_data_exists, copy_field_data
 from ml_optimizer import model_for, value_key, pick_candidate, candidate_pool, encode, fit_predict
 from peak_optimizer import spectrum_peaks, refinement_points, conditions, geometry_error, write_csv
 from field_ml import field_augmented_candidate, _usable_descriptor
@@ -171,7 +172,7 @@ def load_saved_fields(runs,base,cfg):
             if (descriptor.get('grid')!=cfg['field_grid']
                     or model['basis']!=base['basis'] or family(model,cfg)!=family(base,cfg)):
                 continue
-            if descriptor.get('schema_version')!=2 and (path.parent/'electric_fields.csv').exists():
+            if descriptor.get('schema_version')!=2 and field_data_exists(path.parent):
                 descriptor=enrich_fields(path.parent)
             mode='resonance_fields' if descriptor.get('sampling_mode')=='selected_resonance' else 'fields'
             if not _usable_descriptor(descriptor,cfg,mode): continue
@@ -291,10 +292,10 @@ def execute_target_search(base,perf,cfg,directory,executor,emit,cancelled,field_
                         if abs(peak['wavelength_nm']-cfg['target_nm'])<1e-8:
                             # Same solve serves both views; retain explicit wavelength semantics.
                             record['resonance_fields']=dict(record['fields'],sampling_mode='selected_resonance')
-                            if (folder/'fields/electric_fields.csv').exists():
+                            if field_data_exists(folder/'fields'):
                                 alias=folder/'resonance_fields'
                                 alias.mkdir()
-                                (alias/'electric_fields.csv').write_bytes((folder/'fields/electric_fields.csv').read_bytes())
+                                copy_field_data(folder/'fields',alias)
                                 snapshot=read_json(folder/'fields/field_model.json')
                                 snapshot['settings']=dict(snapshot['settings'],sampling_mode='selected_resonance',reused_fixed_target_solve=True)
                                 write_json(alias/'field_model.json',snapshot)

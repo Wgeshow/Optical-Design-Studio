@@ -20,6 +20,9 @@ COUNTERS = ("cpu_gemm_calls", "gpu_gemm_calls", "gpu_failures")
 
 def load_runtime(p, gpu=False):
     initialize(p["threads"])
+    # The native guard proves geometry symmetry and otherwise uses the general
+    # solver. An explicit zero remains available for reference comparisons.
+    os.environ.setdefault('S4_MIRROR_SYMMETRY','1' if p.get('mirror_symmetry',True) else '0')
     resource_root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
     runtime = resource_root / "pcs_s4_runtime"
     if not runtime.is_dir():
@@ -87,6 +90,8 @@ def worker(connection, model, p, gpu, field_job=None):
         module = load_runtime(p, gpu)
         simulation = None
         material_values = {}
+        basis_orders = None
+        from cutoff_solver import cutoff_candidate, solve_cutoff
         pol = model["polarization"]
         samp, pamp = ((1.0, 0.0) if pol == "s" else (0.0, 1.0) if pol == "p" else (2**-.5, 2**-.5))
         # Original C++ GUI: v = k cross s. Python's p basis has the opposite
@@ -100,6 +105,8 @@ def worker(connection, model, p, gpu, field_job=None):
             before = module.AccelerationInfo()
             rows = []
             phase_rows = []
+            failures = []
+            cutoff_solutions = []
             for item in batch:
                 if field_job is None:
                     index, wavelength, theta = item
@@ -118,42 +125,72 @@ def worker(connection, model, p, gpu, field_job=None):
                 # the in-plane wavevector. This does not rebuild the geometry.
                 simulation.SetExcitationPlanewave(IncidenceAngles=(theta, model["phi"]),
                     sAmplitude=complex(samp), pAmplitude=complex(pamp), Order=0)
-                forward, backward = simulation.GetPowerFlux(model["layers"][0]["name"], 0.0)
-                transmitted, _ = simulation.GetPowerFlux(model["layers"][-1]["name"], 0.0)
+                if basis_orders is None:
+                    basis_orders = simulation.GetBasisSet()
+                point_simulation = simulation
+                exact_cutoff = cutoff_candidate(model, wavelength, theta, basis_orders)
+                if exact_cutoff:
+                    point_simulation, power, diagnostics = solve_cutoff(simulation, p)
+                    cutoff_solutions.append(dict(point_index=index,wavelength_nm=wavelength,
+                        angle_deg=theta,method='exact Maxwell radiation ports',**diagnostics))
+                    forward, backward = 1., power[0]
+                    transmitted = power[1]
+                else:
+                    forward, backward = simulation.GetPowerFlux(model["layers"][0]["name"], 0.0)
+                    transmitted, _ = simulation.GetPowerFlux(model["layers"][-1]["name"], 0.0)
                 # Match the original C++ runner: time-averaged REAL power flux.
                 incident = abs(complex(forward).real)
+                if not math.isfinite(incident) and model.get('allow_unavailable_points') and field_job is None:
+                    failures.append(dict(point_index=index,wavelength_nm=wavelength,angle_deg=theta,
+                        reason='Nonfinite incident power; the exact S4 point is unavailable.'))
+                    rows.append([index,wavelength,theta,None,None,None])
+                    simulation,material_values = None,{}
+                    continue
                 if not math.isfinite(incident) or incident < 1e-15:
                     raise ValueError(f"Zero/nonfinite incident power at {wavelength:g} nm, theta={theta:g}")
                 reflection = abs(complex(backward).real) / incident
                 transmission = abs(complex(transmitted).real) / incident
                 absorption = 1 - reflection - transmission
                 if not all(math.isfinite(v) for v in (reflection, transmission, absorption)):
+                    if model.get('allow_unavailable_points') and field_job is None:
+                        failures.append(dict(point_index=index,wavelength_nm=wavelength,angle_deg=theta,
+                            reason='Nonfinite S4 R/T/A. Exact diffraction cutoffs can be singular; no interpolation was substituted.'))
+                        rows.append([index,wavelength,theta,None,None,None])
+                        # Retire the singular solution rather than carrying its
+                        # native caches into the next exact wavelength.
+                        simulation,material_values = None,{}
+                        continue
                     raise ValueError(f"Nonfinite result at {wavelength:g} nm, theta={theta:g}. "
                                      "Check geometry, material data and basis convergence. Exact diffraction-order "
                                      "cutoffs can make S4 singular; no fabricated/interpolated result was substituted.")
                 rows.append([index, wavelength, theta, reflection, transmission, absorption])
                 if model.get('measure_phase'):
                     from spectral_phase import measure_phase
-                    phase_rows.append([index, wavelength, theta, *measure_phase(simulation, model, wavelength, theta)])
+                    phase_rows.append([index, wavelength, theta, *measure_phase(point_simulation, model, wavelength, theta)])
                 if field_job is not None:
                     # Save the spectrum before the longer field/contour stage.
                     info = module.AccelerationInfo()
                     connection.send(dict(kind='result', batch_done=False, rows=rows, phase_rows=phase_rows, status=info['status'],
-                        **{key:int(info[key])-int(before[key]) for key in COUNTERS}))
+                        cutoff_solutions=cutoff_solutions,**{key:int(info[key])-int(before[key]) for key in COUNTERS}))
                     before = info
                     rows, phase_rows = [], []
+                    cutoff_solutions = []
                     from field_solver import sample_fields
                     root = Path(field_job['root'])
                     folder = root if ordinal == 0 else root/'samples'/f'{ordinal+1:06d}'
                     local = dict(model, points=[[index,wavelength,theta]])
                     settings = dict(field_job['settings'],wavelength_nm=wavelength,maps=True,track_contours=True)
-                    sample_fields(local,p,settings,folder,module,simulation,solved=True)
+                    field_features = sample_fields(local,p,settings,folder,module,point_simulation,solved=True,field_gpu=gpu)
                     info = module.AccelerationInfo()
+                    counters = {key:int(info[key])-int(before[key]) for key in COUNTERS}
+                    counters['gpu_gemm_calls'] += field_features['acceleration'].get('field_gpu_gemm_calls', 0)
+                    counters['gpu_failures'] += field_features['acceleration']['sampling'].get('gpu_failures', 0)
                     connection.send(dict(kind='field_result', ordinal=ordinal, point=[index,wavelength,theta], status=info['status'],
-                        **{key:int(info[key])-int(before[key]) for key in COUNTERS}))
+                        **counters))
                     before = info
             info = module.AccelerationInfo()
-            connection.send(dict(kind="result", rows=rows, phase_rows=phase_rows, status=info["status"],
+            connection.send(dict(kind="result", rows=rows, phase_rows=phase_rows, failures=failures,
+                                 cutoff_solutions=cutoff_solutions,status=info["status"],
                                  **{key: int(info[key]) - int(before[key]) for key in COUNTERS}))
     except (EOFError, BrokenPipeError):
         pass
@@ -173,12 +210,17 @@ class Cancelled(RuntimeError):
 def execute(model, p, emit=lambda event: None, cancelled=lambda: False, checkpoint=None, result_store=None,
             field_settings=None, field_directory=None):
     """Bounded, dynamically balanced point batches with exactly one GPU owner."""
+    if p.get('solver_backend') == 'eigenfree-gpu':
+        from eigenfree_scan import execute as execute_eigenfree
+        return execute_eigenfree(model,p,emit,cancelled,checkpoint,result_store,field_settings,field_directory)
     points = model["points"]
     p = performance(p, len(points), os.cpu_count() or 1)
     context = mp.get_context("spawn")
     workers, connections, busy, reserved = [], {}, set(), {}
     rows, statuses = [], {}
     completed = 0
+    unavailable, failure_preview = 0, []
+    cutoff_count, cutoff_preview = 0, []
     phase_rows = []
     counters = dict.fromkeys(COUNTERS, 0)
     info = dict(performance=p, workers=[], **counters)
@@ -237,6 +279,13 @@ def execute(model, p, emit=lambda event: None, cancelled=lambda: False, checkpoi
                         phase_rows.extend(message.get("phase_rows", []))
                     else:
                         result_store.add_batch(message["rows"], message.get("phase_rows", []))
+                        result_store.add_failures(message.get('failures',[]))
+                    failures=message.get('failures',[])
+                    unavailable+=len(failures)
+                    failure_preview.extend(failures[:max(0,8-len(failure_preview))])
+                    cutoff_solutions=message.get('cutoff_solutions',[])
+                    cutoff_count+=len(cutoff_solutions)
+                    cutoff_preview.extend(cutoff_solutions[:max(0,8-len(cutoff_preview))])
                     completed += len(message['rows'])
                     if checkpoint is not None:
                         checkpoint(message["rows"])
@@ -265,12 +314,18 @@ def execute(model, p, emit=lambda event: None, cancelled=lambda: False, checkpoi
             done = completed if field_recorder is None else len(field_recorder.index)
             if now - last_emit >= .25 or not busy and completed == len(points):
                 emit(dict(kind="progress", done=done, spectrum_done=completed, total=len(points), elapsed=now-started,
-                          statuses=statuses, **counters))
+                          statuses=statuses, unavailable_points=unavailable,**counters))
                 last_emit = now
+        if completed and unavailable == completed:
+            raise RuntimeError('No finite spectrum samples were produced. Check the geometry, materials and excitation; all unavailable points were saved.')
         if p["require_gpu"] and (counters["gpu_gemm_calls"] == 0 or counters["gpu_failures"]):
             raise RuntimeError("GPU work was required, but no GPU products completed or a GPU failure occurred. Check GPU device, threshold and runtime. " + repr(statuses))
         info.update(counters)
         info.update(statuses=statuses, elapsed_seconds=time.monotonic()-started, points=completed, warnings=list(model.get("warnings", [])))
+        info.update(valid_points=completed-unavailable,unavailable_points=unavailable,unavailable_preview=failure_preview)
+        info.update(exact_cutoff_points=cutoff_count,exact_cutoff_preview=cutoff_preview)
+        if unavailable:
+            info['warnings'].append(f'{unavailable} exact spectrum point(s) are unavailable. R/T/A are blank there; see unavailable_points.csv. No interpolation was used.')
         info["warnings"].extend(acceleration_warnings(info, p))
         if field_recorder is not None:
             info['electric_fields'] = field_recorder.finish('complete')
@@ -314,12 +369,32 @@ def main():
     from evaluation_storage import EvaluationRecorder
     executor = EvaluationRecorder(directory, execute)
     def emit(event):
+        if event.get('kind') in ('complete', 'search_complete') and specification.get('benchmark'):
+            from benchmark_registry import complete_event
+            event = complete_event(event, specification, directory)
         print(json.dumps(event, allow_nan=False), flush=True)
     try:
         from data_library import read_json
         specification = read_json(args.job)
         if specification.get("search") is not None:
             search = specification['search']
+            if search.get('task') == 'research_simulation':
+                from research_simulation import execute_research
+                event=execute_research(search,directory,emit,lambda:(directory/'cancel.flag').exists())
+                emit(event)
+                return 0
+            if search.get('task') == 'electrical':
+                from electrical_optics import execute_electrical
+                event=execute_electrical(specification.get('model'),specification['performance'],search,
+                    directory,executor,emit,lambda:(directory/'cancel.flag').exists())
+                emit(event)
+                return 0
+            if search.get('task') == 'simulation_fields':
+                from spectrum_field_job import execute_field_job
+                features=execute_field_job(specification['model'],specification['performance'],search,
+                    directory,emit,lambda:(directory/'cancel.flag').exists())
+                emit(dict(kind='search_complete',directory=str(directory),summary=dict(status='complete',task='simulation_fields',electric_fields=features)))
+                return 0
             if search.get('task') == 'ai_search':
                 from ai_campaign import execute_campaign
                 event=execute_campaign(specification['model'],specification['performance'],search,directory,executor,emit,lambda:(directory/'cancel.flag').exists())
@@ -357,6 +432,8 @@ def main():
             emit(event)
             return 0 if event["summary"]["status"] == "complete" else 2
         from scan_storage import SpectrumResults
+        if specification.get('simulation_fields') is None:
+            specification['model']['allow_unavailable_points']=True
         result_store = SpectrumResults(directory / 'spectrum.sqlite', create=True)
         try:
             rows, info = executor(specification["model"], specification["performance"], emit,
@@ -371,6 +448,7 @@ def main():
                     from spectral_phase import write_phase_csv
                     write_phase_csv(directory / 'phase.csv', result_store.phase_rows())
                 result_store.export_csv(directory / 'results.csv')
+                result_store.export_failures(directory / 'unavailable_points.csv')
             finally:
                 result_store.close()
         output = directory / "results.csv"

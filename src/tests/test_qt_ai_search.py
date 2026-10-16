@@ -21,7 +21,10 @@ class UI(unittest.TestCase):
  def test_app_has_independent_ai_tab_without_reassigning_old_routes(self):
   window=OpticalStudio(self.store)
   labels=[window.optical_workflow.tabText(i) for i in range(window.optical_workflow.count())]
-  self.assertIn('AI Search',labels);window._navigate_route(8)
+  self.assertEqual(labels,['Structure','Materials','Simulation','Results','Settings','Help'])
+  menu=window.chrome.file_menu
+  self.assertTrue(any(action.menu() and any(child.text()=='AI Search' for child in action.menu().actions()) for action in menu.actions()))
+  window._navigate_route(8)
   self.assertIsInstance(window.pages['AI Search'],AISearchPage)
   self.assertEqual(window.pages['Settings'],window.pages[window.navigation.item(6).text()])
   window.close();window.deleteLater();self.app.processEvents()

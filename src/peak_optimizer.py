@@ -8,23 +8,30 @@ import time
 import zipfile
 from pathlib import Path
 import numpy as np
-from model import integer, number, sweep, MAX_SWEEP_POINTS
+from model import integer, number, sweep_range, MAX_SWEEP_POINTS
 from optical_objective import response_name, response_rows
 
 BOUND_COLS = ['Parameter', 'Target', 'Min', 'Max', 'Step', 'Choices']
 SEARCH_KEYS = ['ratio_limit', 'min_bridge_um', 'separate_circles', 'absorption_target',
                'tie_tolerance', 'prominence', 'refinement_rounds', 'design_budget', 'point_budget']
 SEARCH_DEFAULTS = [.6, 0., True, .99, .0001, .00001, 3, 500, 200000]
+MAX_DESIGN_BOUND_VALUES = 10_000
 
 
-def grid_values(lo, hi, step):
+def grid_values(lo, hi, step, max_values=MAX_DESIGN_BOUND_VALUES):
     lo, hi = number(lo, 'Minimum'), number(hi, 'Maximum')
     if hi < lo:
         raise ValueError('Maximum must be >= minimum')
     if lo == hi:
         return [lo]
-    values = sweep(lo, hi, step, 'Design bound', limit=math.inf)
-    if math.isclose(values[-1], hi, rel_tol=1e-12, abs_tol=1e-14):
+    start, spacing, count = sweep_range(lo, hi, step, 'Design bound', limit=math.inf)
+    last = start + (count-1)*spacing
+    includes_endpoint = math.isclose(last, hi, rel_tol=1e-12, abs_tol=1e-14)
+    size = count + (not includes_endpoint)
+    if size > max_values:
+        raise ValueError(f'Design bound has {size:,} values, exceeding the budget or safety limit of {max_values:,}; narrow bounds or increase the step.')
+    values = [start + i*spacing for i in range(count)]
+    if includes_endpoint:
         values[-1] = hi
     else:
         values.append(hi)
@@ -102,7 +109,13 @@ def parse_search(model, bounds, options):
             if not values or any(v not in mats for v in values):
                 raise ValueError('Material choices must be semicolon-separated material library names')
         else:
-            values = grid_values(row.get('Min'), row.get('Max'), row.get('Step'))
+            # Exhaustive searches must reject over-budget dimensions before
+            # allocating them. ML may search a much larger Cartesian product,
+            # while each materialized domain retains the design-bound cap.
+            maximum = MAX_DESIGN_BOUND_VALUES
+            if cfg.get('search_mode', 'Exhaustive grid') == 'Exhaustive grid':
+                maximum = min(maximum, cfg['design_budget']//math.prod(len(d['values']) for d in dims))
+            values = grid_values(row.get('Min'), row.get('Max'), row.get('Step'), maximum)
             if p not in ('center_x', 'center_y', 'rotation', 'thickness') and min(values) <= 0:
                 raise ValueError(f'{p} must be positive')
             if p == 'thickness' and min(values) < 0:

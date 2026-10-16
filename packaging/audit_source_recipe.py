@@ -26,6 +26,7 @@ def main():
         'source-stage-manifest.json', 'START_HERE.md', 'RELEASE_NOTES.md',
         'THIRD_PARTY_NOTICES.md', 'SOURCE_README.md', 'BUILDING.md',
         'test_packaging.py', 'verify_release_source_smoke.py', 'audit_source_recipe.py', 'audit_release_archives.py',
+        'test_native_setup_packaging.py',
     }
     assert required <= packaged, sorted(required-packaged)
     assert all((BUILD/name).is_file() for name in packaged)
@@ -53,7 +54,7 @@ def main():
     assert "names = ['sqlite3.dll'" in spec
     assert 'matching SQLite runtime' in readme and '**Library/bin**' in readme
     report = {
-        'passed': True, 'version': '1.3.2', 'packaging_files': sorted(packaged),
+        'passed': True, 'version': '1.4.0-alpha.1', 'packaging_files': sorted(packaged),
         'source_tree_sha256': json.loads((BUILD/'stage-manifest.json').read_text())['source_tree_sha256'],
         'local_python_imports': local_imports,
         'corresponding_native_source_fallback': 'native/S4-source',

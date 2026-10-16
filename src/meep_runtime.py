@@ -129,7 +129,10 @@ class ManagedProcess:
         if config['mode']=='wsl':
             # Positional arguments avoid interpolating user paths into shell
             # source. setsid creates an isolated group for precise cancellation.
-            argv = argv[:4]+['setsid', 'sh', '-c',
+            # --wait keeps WSL attached when setsid must fork a group leader;
+            # otherwise WSL can exit successfully before the solver output or
+            # its real failure status is delivered to the application.
+            argv = argv[:4]+['setsid', '--wait', 'sh', '-c',
                 'printf "ODS_MEEP_PID=%s\\n" "$$"; exec "$@"', 'ods-meep']+argv[4:]
         options = process_options()
         if config['mode']=='local':

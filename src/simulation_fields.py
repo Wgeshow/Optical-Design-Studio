@@ -9,9 +9,8 @@ DEFAULTS=dict(grid=25,depth_samples=3,contour_step=.1)
 
 def validate_settings(options):
     cfg=dict(DEFAULTS,**options)
-    for key,maximum in (('grid',80),('depth_samples',40)):
+    for key in ('grid','depth_samples'):
         cfg[key]=integer(cfg[key],key,3)
-        if cfg[key]>maximum:raise ValueError(f'{key} must be at most {maximum}')
     cfg['contour_step']=number(cfg['contour_step'],'Contour amplitude step')
     if cfg['contour_step']<=0:raise ValueError('Contour amplitude step must be positive')
     return {k:cfg[k] for k in DEFAULTS}

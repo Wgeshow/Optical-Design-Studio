@@ -1,0 +1,898 @@
+{
+  "id": "pcsel_2021_pillar_cc_finite",
+  "label": "Yang 2021 air-pillar CC finite 200um slope",
+  "family": "PCSEL",
+  "kind": "research_simulation",
+  "project": {
+    "format_version": 3,
+    "materials": [
+      {
+        "Name": "Air",
+        "Model": "constant_nk",
+        "A": 1.0,
+        "B": 0.0,
+        "DataFile": "",
+        "WavelengthUnit": "nm"
+      },
+      {
+        "Name": "Ideal_eps12",
+        "Model": "constant_nk",
+        "A": 3.4641016151377544,
+        "B": 0.0,
+        "DataFile": "",
+        "WavelengthUnit": "nm"
+      }
+    ],
+    "layers": [
+      {
+        "Name": "Incident",
+        "Thickness_um": 0.0,
+        "Material": "Air"
+      },
+      {
+        "Name": "Slab",
+        "Thickness_um": 0.5,
+        "Material": "Ideal_eps12"
+      },
+      {
+        "Name": "Exit",
+        "Thickness_um": 0.0,
+        "Material": "Air"
+      }
+    ],
+    "patterns": [
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": -1.0,
+        "CenterY_um": -1.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": 0.0,
+        "CenterY_um": -1.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": 1.0,
+        "CenterY_um": -1.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": -1.0,
+        "CenterY_um": 0.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": 0.0,
+        "CenterY_um": 0.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": 1.0,
+        "CenterY_um": 0.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": -1.0,
+        "CenterY_um": 1.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": 0.0,
+        "CenterY_um": 1.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      },
+      {
+        "Shape": "circle",
+        "Layer": "Slab",
+        "Material": "Air",
+        "CenterX_um": 1.0,
+        "CenterY_um": 1.0,
+        "SizeX_um": 0.2,
+        "SizeY_um": 0.0,
+        "Angle_deg": 0.0
+      }
+    ],
+    "settings": {
+      "ax_um": 3.0,
+      "ay_um": 3.0,
+      "NumG": 169,
+      "mode": "Wavelength sweep",
+      "wl_start_nm": 1667.0,
+      "wl_stop_nm": 4000.0,
+      "wl_step_nm": 2.0,
+      "fixed_wl_nm": 1550.0,
+      "theta_deg": 0.0,
+      "phi_deg": 0.0,
+      "angle_start": 0.0,
+      "angle_stop": 60.0,
+      "angle_step": 2.0,
+      "polarization": "s"
+    },
+    "performance": {
+      "mode": "CPU only",
+      "workers": 2,
+      "threads": 1,
+      "gpu_device": 0,
+      "gpu_min_n": 1024,
+      "gpu_block": 256,
+      "chunk_size": 8,
+      "timeout_seconds": 1200,
+      "require_gpu": false,
+      "solver_backend": "native",
+      "mirror_symmetry": true,
+      "eigenfree_symmetry": true,
+      "eigenfree_batch_size": 32
+    },
+    "desktop_search": {
+      "simulation": {
+        "optical_geometry_source": "original_tables",
+        "electric_fields": {
+          "grid": 25,
+          "depth_samples": 3,
+          "contour_step": 0.1
+        }
+      }
+    },
+    "appearance": {
+      "layer_colors": {},
+      "material_opacities": {}
+    },
+    "device": {
+      "schema_version": 1,
+      "name": "Fan 2002 finite 3x3 PC r=0.2a",
+      "width_um": 3.0,
+      "depth_um": 3.0,
+      "temperature_K": 300.0,
+      "mesh": {
+        "nx": 24,
+        "ny": 24,
+        "nz_per_layer": 4,
+        "max_nodes": 32000
+      },
+      "layers": [
+        {
+          "id": "slab",
+          "name": "Slab",
+          "material_id": "silicon",
+          "optical_material_name": "Ideal_eps12",
+          "thickness_um": 0.5,
+          "donor_cm3": 0.0,
+          "acceptor_cm3": 0.0,
+          "enabled": true
+        }
+      ],
+      "shapes": [
+        {
+          "id": "paper_pc_h_0_0",
+          "name": "Published square PC [1,1]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": -1.0,
+          "cy_um": -1.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            0,
+            0
+          ]
+        },
+        {
+          "id": "paper_pc_h_1_0",
+          "name": "Published square PC [2,1]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": 0.0,
+          "cy_um": -1.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            1,
+            0
+          ]
+        },
+        {
+          "id": "paper_pc_h_2_0",
+          "name": "Published square PC [3,1]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": 1.0,
+          "cy_um": -1.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            2,
+            0
+          ]
+        },
+        {
+          "id": "paper_pc_h_0_1",
+          "name": "Published square PC [1,2]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": -1.0,
+          "cy_um": 0.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            0,
+            1
+          ]
+        },
+        {
+          "id": "paper_pc_h_1_1",
+          "name": "Published square PC [2,2]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": 0.0,
+          "cy_um": 0.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            1,
+            1
+          ]
+        },
+        {
+          "id": "paper_pc_h_2_1",
+          "name": "Published square PC [3,2]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": 1.0,
+          "cy_um": 0.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            2,
+            1
+          ]
+        },
+        {
+          "id": "paper_pc_h_0_2",
+          "name": "Published square PC [1,3]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": -1.0,
+          "cy_um": 1.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "paper_pc_h_1_2",
+          "name": "Published square PC [2,3]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": 0.0,
+          "cy_um": 1.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            1,
+            2
+          ]
+        },
+        {
+          "id": "paper_pc_h_2_2",
+          "name": "Published square PC [3,3]",
+          "layer_id": "slab",
+          "shape": "circle",
+          "material_id": "air",
+          "operation": "void",
+          "cx_um": 1.0,
+          "cy_um": 1.0,
+          "size_x_um": 0.4,
+          "size_y_um": 0.4,
+          "angle_deg": 0.0,
+          "vertices": [],
+          "enabled": true,
+          "pc_array_id": "paper_pc",
+          "pc_cell": [
+            2,
+            2
+          ]
+        }
+      ],
+      "contacts": [],
+      "doping_regions": [],
+      "pc_arrays": [
+        {
+          "id": "paper_pc",
+          "name": "Published square PC",
+          "layer_id": "slab",
+          "enabled": true,
+          "cx_um": 0.0,
+          "cy_um": 0.0,
+          "width_um": 3.0,
+          "depth_um": 3.0,
+          "cell_width_um": 1.0,
+          "cell_depth_um": 1.0,
+          "radius_um": 0.2,
+          "nx": 3,
+          "ny": 3,
+          "hole_count": 9,
+          "unused_x_um": 0.0,
+          "unused_y_um": 0.0,
+          "margin_x_um": 0.0,
+          "margin_y_um": 0.0,
+          "shape_ids": [
+            "paper_pc_h_0_0",
+            "paper_pc_h_1_0",
+            "paper_pc_h_2_0",
+            "paper_pc_h_0_1",
+            "paper_pc_h_1_1",
+            "paper_pc_h_2_1",
+            "paper_pc_h_0_2",
+            "paper_pc_h_1_2",
+            "paper_pc_h_2_2"
+          ]
+        }
+      ]
+    },
+    "electrical_materials": [
+      {
+        "id": "gaas",
+        "name": "GaAs",
+        "kind": "semiconductor",
+        "temperature_K": 300.0,
+        "model": "gaas_reference",
+        "color": "#ef7595",
+        "optical_material_name": "GaAs",
+        "aliases": [
+          "Gallium arsenide"
+        ],
+        "properties": {
+          "epsilon_r": 12.9,
+          "bandgap_eV": 1.424,
+          "affinity_eV": 4.07,
+          "electron_mass_ratio": 0.063,
+          "hole_mass_ratio": 0.51,
+          "electron_dos_mass_ratio": 0.063,
+          "hole_dos_mass_ratio": 0.51,
+          "Nc_cm3": 3.953218625373507e+17,
+          "Nv_cm3": 9.105321246392134e+18,
+          "intrinsic_cm3": 2075149.9917685564,
+          "electron_mobility_cm2_Vs": 8500.0,
+          "hole_mobility_cm2_Vs": 400.0
+        },
+        "sources": [
+          {
+            "title": "Ioffe NSM: AlGaAs basic parameters (GaAs x=0 limit)",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/basic.html",
+            "properties": [
+              "epsilon_r",
+              "affinity_eV",
+              "electron_mass_ratio",
+              "hole_mass_ratio"
+            ],
+            "note": "",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Ioffe NSM: AlGaAs band structure (GaAs x=0 limit)",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/bandstr.html",
+            "properties": [
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3",
+              "intrinsic_cm3"
+            ],
+            "note": "DOS and ni are calculated from the reference model.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "TYDEX: GaAs electronic properties",
+            "url": "https://www.tydexoptics.com/materials1/for_transmission_optics/gaas/",
+            "properties": [
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs"
+            ],
+            "note": "Low-field bulk reference; not a mobility fit for heavily doped material.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "300 K bulk reference. Masses follow the Ioffe x=0 alloy limit. Mobility is constant unless edited. No recombination, high-field transport or impurity-scattering model is implied.",
+        "property_overrides": []
+      },
+      {
+        "id": "ito",
+        "name": "ITO",
+        "kind": "conductor",
+        "temperature_K": 300.0,
+        "model": "constant",
+        "color": "#67c9e5",
+        "optical_material_name": "ITO",
+        "aliases": [
+          "Indium tin oxide"
+        ],
+        "properties": {
+          "epsilon_r": 9.0,
+          "bandgap_eV": 3.5,
+          "affinity_eV": 4.5,
+          "electron_mass_ratio": 0.35,
+          "hole_mass_ratio": 1.0,
+          "electron_dos_mass_ratio": 0.35,
+          "hole_dos_mass_ratio": 1.0,
+          "Nc_cm3": 5.176569810212164e+18,
+          "Nv_cm3": 2.5e+19,
+          "electron_mobility_cm2_Vs": 30.0,
+          "hole_mobility_cm2_Vs": 0.0,
+          "bulk_electron_cm3": 8e+20,
+          "bulk_hole_cm3": 0.0,
+          "intrinsic_cm3": 4.5423956659835214e-11
+        },
+        "sources": [
+          {
+            "title": "Khusayfan & El-Nahass (2013): structure and electro-optical characteristics of ITO",
+            "url": "https://doi.org/10.1155/2013/408182",
+            "properties": [
+              "electron_mass_ratio"
+            ],
+            "note": "The paper uses assumed mass 0.35 m0 and reports process-dependent carrier density and mobility. Its measured optical band gap is not used as a universal electronic gap.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Editable ITO device-study assumptions",
+            "url": "",
+            "properties": [
+              "epsilon_r",
+              "bandgap_eV",
+              "affinity_eV",
+              "electron_mass_ratio",
+              "hole_mass_ratio",
+              "electron_dos_mass_ratio",
+              "hole_dos_mass_ratio",
+              "Nc_cm3",
+              "Nv_cm3",
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs",
+              "bulk_electron_cm3",
+              "bulk_hole_cm3",
+              "intrinsic_cm3"
+            ],
+            "note": "All preset values are model assumptions, not measurements of your film: n=8e20 cm−3, μn=30 cm²/(V·s), static εr=9, m*=0.35 m0, χ=4.5 eV, electronic gap=3.5 eV. Hole/DOS values are closure assumptions; degenerate ITO requires Fermi statistics.",
+            "kind": "assumption",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Transparent conductor with degenerate electrons. Carrier density, mobility, static permittivity, mass and affinity depend on film growth; replace these assumptions with measured values. Static εr is not optical ε∞. The fixed mass approximation does not model nonparabolicity. Temperature is held constant in this preset.",
+        "property_overrides": []
+      },
+      {
+        "id": "algaas",
+        "name": "AlGaAs",
+        "kind": "semiconductor",
+        "temperature_K": 300.0,
+        "al_fraction": 0.5,
+        "model": "algaas_reference",
+        "color": "#9c8cef",
+        "optical_material_name": "AlGaAs",
+        "aliases": [
+          "Aluminium gallium arsenide"
+        ],
+        "properties": {
+          "epsilon_r": 11.48,
+          "bandgap_eV": 1.9982499999999999,
+          "affinity_eV": 3.5700000000000003,
+          "electron_mass_ratio": 0.26,
+          "hole_mass_ratio": 0.635,
+          "electron_dos_mass_ratio": 0.78,
+          "hole_dos_mass_ratio": 0.635,
+          "Nc_cm3": 1.7221933689339302e+19,
+          "Nv_cm3": 1.26502933513417e+19,
+          "intrinsic_cm3": 242.3985345457434,
+          "electron_mobility_cm2_Vs": 1000.0,
+          "hole_mobility_cm2_Vs": 100.0
+        },
+        "sources": [
+          {
+            "title": "Ioffe NSM: AlGaAs basic parameters",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/basic.html",
+            "properties": [
+              "epsilon_r",
+              "affinity_eV",
+              "electron_mass_ratio",
+              "hole_mass_ratio",
+              "electron_dos_mass_ratio"
+            ],
+            "note": "",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Ioffe NSM: AlGaAs band structure",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/bandstr.html",
+            "properties": [
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3",
+              "intrinsic_cm3"
+            ],
+            "note": "Piecewise 300 K fit. Indirect branch above x=0.45 uses DOS mass 0.85−0.14x and conductivity mass 0.26 m0.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Editable transport assumptions",
+            "url": "",
+            "properties": [
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs"
+            ],
+            "note": "1000 / 100 cm²/(V·s) are starting estimates, not measured mobility for a particular alloy or doping.",
+            "kind": "assumption",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Editable alloy fraction x∈[0,1]. The approximate direct/indirect transition is represented at x=0.45; Ioffe also reports a 0.41–0.45 crossover region. Mobility values are explicit assumptions. Temperature gaps use Varshni corrections and DOS scales as T^1.5; validity outside the 300 K reference must be assessed for the device.",
+        "property_overrides": []
+      },
+      {
+        "id": "silicon",
+        "name": "Silicon",
+        "kind": "semiconductor",
+        "temperature_K": 300.0,
+        "model": "silicon_reference",
+        "color": "#70cfa7",
+        "optical_material_name": "Si",
+        "aliases": [
+          "Si",
+          "Crystalline silicon"
+        ],
+        "properties": {
+          "epsilon_r": 11.7,
+          "bandgap_eV": 1.124,
+          "affinity_eV": 4.05,
+          "electron_mass_ratio": 0.26,
+          "hole_mass_ratio": 0.39,
+          "electron_dos_mass_ratio": 1.08,
+          "hole_dos_mass_ratio": 0.81,
+          "Nc_cm3": 2.82e+19,
+          "Nv_cm3": 1.83e+19,
+          "intrinsic_cm3": 8225562977.908778,
+          "electron_mobility_cm2_Vs": 1400.0,
+          "hole_mobility_cm2_Vs": 470.0
+        },
+        "sources": [
+          {
+            "title": "University of Colorado ECEE: silicon material parameters",
+            "url": "https://www.colorado.edu/ecee/sites/default/files/attached-files/sd_constants_sheet.pdf",
+            "properties": [
+              "epsilon_r",
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3",
+              "electron_mass_ratio",
+              "hole_mass_ratio",
+              "electron_mobility_cm2_Vs",
+              "hole_mobility_cm2_Vs"
+            ],
+            "note": "300 K parameter sheet. ni is recalculated consistently from Eg/Nc/Nv rather than mixing independent rounded ni values.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Ioffe NSM: silicon reference",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/Si/basic.html",
+            "properties": [
+              "affinity_eV"
+            ],
+            "note": "Conventional electron-affinity estimate 4.05 eV. Surface/interface processing can change the effective band alignment.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          },
+          {
+            "title": "Silicon temperature model",
+            "url": "https://www.ioffe.ru/SVA/NSM/Semicond/Si/bandstr.html",
+            "properties": [
+              "bandgap_eV",
+              "Nc_cm3",
+              "Nv_cm3"
+            ],
+            "note": "Varshni α=4.73e−4 eV/K, β=636 K; DOS T^1.5 scaling. Static permittivity and mobility are held constant.",
+            "kind": "reference",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Crystalline silicon, 300 K low-field reference. Electron/hole conductivity masses are distinct from DOS masses. Mobility is not a fit to high doping or field; edit to match your sample.",
+        "property_overrides": []
+      },
+      {
+        "id": "air",
+        "name": "Air / void",
+        "kind": "dielectric",
+        "temperature_K": 300.0,
+        "model": "constant",
+        "color": "#cbd5df",
+        "optical_material_name": "Air",
+        "aliases": [
+          "Air",
+          "Void"
+        ],
+        "properties": {
+          "epsilon_r": 1.0,
+          "conductivity_S_m": 0.0
+        },
+        "sources": [
+          {
+            "title": "Ideal void model",
+            "url": "",
+            "properties": [
+              "epsilon_r",
+              "conductivity_S_m"
+            ],
+            "note": "Vacuum-permittivity, zero-conductivity approximation.",
+            "kind": "assumption",
+            "reference_temperature_K": 300.0
+          }
+        ],
+        "notes": "Ideal dielectric void. No mobile carriers or optical material data are inferred from this record.",
+        "property_overrides": []
+      }
+    ],
+    "optical_constants": {}
+  },
+  "options": {
+    "engine": "pcsel",
+    "study": "research",
+    "settings": {
+      "model": "finite",
+      "lattice_nm": 295.0,
+      "layers": [
+        {
+          "id": "layer-0",
+          "name": "PC1",
+          "thickness_nm": 100,
+          "index": 3.524,
+          "qw": false,
+          "patterned": true
+        },
+        {
+          "id": "layer-1",
+          "name": "PC2",
+          "thickness_nm": 400,
+          "index": 3.307,
+          "qw": false,
+          "patterned": true
+        },
+        {
+          "id": "layer-2",
+          "name": "spacer",
+          "thickness_nm": 40,
+          "index": 3.524,
+          "qw": false,
+          "patterned": false
+        },
+        {
+          "id": "layer-3",
+          "name": "QW",
+          "thickness_nm": 8,
+          "index": 3.6,
+          "qw": true,
+          "patterned": false
+        },
+        {
+          "id": "layer-4",
+          "name": "barrier",
+          "thickness_nm": 20,
+          "index": 3.524,
+          "qw": false,
+          "patterned": false
+        },
+        {
+          "id": "layer-5",
+          "name": "QW",
+          "thickness_nm": 8,
+          "index": 3.6,
+          "qw": true,
+          "patterned": false
+        },
+        {
+          "id": "layer-6",
+          "name": "barrier",
+          "thickness_nm": 20,
+          "index": 3.524,
+          "qw": false,
+          "patterned": false
+        },
+        {
+          "id": "layer-7",
+          "name": "QW",
+          "thickness_nm": 8,
+          "index": 3.6,
+          "qw": true,
+          "patterned": false
+        },
+        {
+          "id": "layer-8",
+          "name": "spacer",
+          "thickness_nm": 30,
+          "index": 3.524,
+          "qw": false,
+          "patterned": false
+        },
+        {
+          "id": "layer-9",
+          "name": "n-cladding",
+          "thickness_nm": 1500,
+          "index": 3.307,
+          "qw": false,
+          "patterned": false
+        }
+      ],
+      "shapes": [
+        {
+          "id": "circle-0",
+          "shape": "circle",
+          "center": [
+            -0.16666666666666666,
+            -0.16666666666666666
+          ],
+          "radius": 0.21850968611841584
+        },
+        {
+          "id": "circle-1",
+          "shape": "circle",
+          "center": [
+            0.16666666666666666,
+            0.16666666666666666
+          ],
+          "radius": 0.126156626101008
+        }
+      ],
+      "top_index": 1.0,
+      "bottom_index": 3.307,
+      "inclusion_index": 1.0,
+      "grid_nm": 1.0,
+      "pad_nm": 4000.0,
+      "harmonics": 15,
+      "green_model": "layer_resolved",
+      "aperture_um": [
+        200.0,
+        200.0
+      ],
+      "collocation_order": 12
+    }
+  },
+  "source": {
+    "url": "https://doi.org/10.3390/photonics8060189",
+    "title": "Simulation of Photonic-Crystal Surface-Emitting Lasers with Air-Hole and Air-Pillar Structures",
+    "authors": "Yang, Kuo and Lin",
+    "year": 2021,
+    "license": "CC BY 4.0",
+    "paper_sha256": "dc11746c47103f737e7801ba2221924fd44cc2390e799d389901483c22674919",
+    "reference_kind": "primary_paper_pdf_vector_vertices",
+    "reference_is_author_raw_data": false,
+    "calibration_source": "Recovered PDF vector-path axis calibration, reproduced from the saved study build_report.py; no fitted material or geometry parameters.",
+    "figure": "Figure 10",
+    "extracted_coordinate": "Square cavity length and plotted A0 slope-efficiency curve",
+    "reference_interpolation": "Linear interpolation of extracted vertices at L=200um, within their domain",
+    "extraction_sha256": "8703889c6e102cd626e1c056a481b4432d271ddb47d118fa8604a5f691dd427a",
+    "calibration": {
+      "x0": 342.765,
+      "x1": 480.255,
+      "xmax_um": 400.0,
+      "y0": 232.59,
+      "yspan": 101.603,
+      "ymax_W_A": 0.65
+    }
+  },
+  "limitations": [
+    "Conditional passive-optics slope estimate: hc/q=1240nm V, injection efficiency1, upward radiation fraction0.5 and internal loss5cm^-1, following the saved paper-equation reconstruction.",
+    "No threshold-current, nonlinear L-I, transport or heating prediction follows from this estimate.",
+    "Current adapter uses a layer-resolved radiation Green function; older saved study used optical-path approximation for pillars. Differences remain visible.",
+    "Lowest-loss eligible returned sparse mode is used; the global lowest-loss mode is not proven. Refine Fourier harmonics, collocation order and mode search.",
+    "Reference is a PDF vector curve, not author raw output; no fabricated acceptance tolerance."
+  ],
+  "comparisons": [
+    {
+      "id": "conditional_slope",
+      "label": "Conditional upward slope at L=200um",
+      "type": "pcsel_slope",
+      "actual_file": "finite_modes.csv",
+      "reference_value": 0.3681539915159986,
+      "reference_file": "pcsel_2021_pillar_cc_finite/reference.csv",
+      "units": "W/A",
+      "assumptions": {
+        "hc_over_q_nm_V": 1240.0,
+        "injection_efficiency": 1.0,
+        "upward_fraction": 0.5,
+        "internal_loss_cm1": 5.0
+      }
+    }
+  ]
+}

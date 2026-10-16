@@ -38,7 +38,12 @@ class ReferenceWorkspaceTests(unittest.TestCase):
                 QTest.mouseClick(page.starts[-1],Qt.MouseButton.LeftButton)
                 run.assert_called_with('search')
         self.assertTrue(page.field_plot.isVisible())
+        self.assertTrue(page.select_tool_tab('designs'))
+        self.app.processEvents()
         self.assertTrue(page.results.isVisible())
+        self.assertTrue(page.select_tool_tab('fields'))
+        self.app.processEvents()
+        self.assertTrue(page.field_plot.isVisible())
 
     def test_quick_help_restores_filtered_topic(self):
         page=HelpGuide();self.widgets.append(page)
@@ -61,6 +66,8 @@ class ReferenceWorkspaceTests(unittest.TestCase):
         page=LibraryPage(self.store);self.widgets.append(page)
         page.resize(1460,850);page.show();self.app.processEvents()
         self.assertTrue(page.plot.isVisible())
+        self.assertTrue(page.select_tool_tab('notes'))
+        self.app.processEvents()
         self.assertTrue(page.title_edit.isVisible())
         self.assertTrue(page.restore.isVisible())
         self.assertFalse(page.restore.isEnabled())
