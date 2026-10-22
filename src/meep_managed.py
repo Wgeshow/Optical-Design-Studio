@@ -59,7 +59,7 @@ def _decode(value):
 
 
 def _wsl(args, timeout=20):
-    process = subprocess.run(['wsl.exe', *args], capture_output=True,
+    process = subprocess.run([meep_runtime.wsl_executable(), *args], capture_output=True,
         timeout=timeout, **meep_runtime.process_options())
     return process.returncode, _decode(process.stdout), _decode(process.stderr)
 
@@ -70,10 +70,10 @@ def prerequisites(cancel=None):
     if sys.platform != 'win32' or platform.machine().lower() not in ('amd64', 'x86_64'):
         return dict(ready=False, available=False, needs_setup=False,
             message='The managed package supports Windows x64 with WSL2. Use Expert setup for a local Linux/macOS runtime.')
-    if shutil.which('wsl.exe') is None:
-        return dict(ready=False, available=False, needs_setup=True,
-            message='Windows Subsystem for Linux is not installed. Click Set up Windows support; administrator approval and a restart may be required.')
     try:
+        if shutil.which(meep_runtime.wsl_executable()) is None:
+            return dict(ready=False, available=False, needs_setup=True,
+                message='Windows Subsystem for Linux is not installed. Click Set up Windows support; administrator approval and a restart may be required.')
         version_code, version, version_error = _wsl(['--version'])
         _cancelled(cancel)
         status_code, status, status_error = _wsl(['--status'])
@@ -85,7 +85,7 @@ def prerequisites(cancel=None):
             wsl_version=version, status=status,
             message='WSL is installed. The engine will use WSL2; successful engine startup verifies virtualization.' if ready
                 else 'WSL2 is not ready. Complete Windows support setup, restart if requested, then check again. '+(status_error or status or version_error or list_error))
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
         return dict(ready=False, available=False, needs_setup=True, message='Could not check WSL: '+str(exc))
 
 
@@ -98,7 +98,7 @@ def setup_windows_support():
     if sys.platform != 'win32':
         raise RuntimeError('Windows support setup is available only on Windows.')
     import ctypes
-    wsl = str(Path(os.environ.get('WINDIR', r'C:\Windows'))/'System32'/'wsl.exe')
+    wsl = meep_runtime.wsl_executable()
     result = ctypes.windll.shell32.ShellExecuteW(None, 'runas', wsl,
         '--install --no-distribution --no-launch', None, 0)
     if result <= 32:
@@ -314,7 +314,7 @@ def import_pack(rootfs, manifest, release, *, root=None, cancel=None, progress=N
         sha256=release.sha256, meep_version=manifest['meep_version'], state='importing')
     write_json(root/'installation.json', saved)
     write_json(root/'addon.json', manifest)
-    argv = ['wsl.exe', '--import', distro_name(), str(destination.resolve()), str(Path(rootfs).resolve()), '--version', '2']
+    argv = [meep_runtime.wsl_executable(), '--import', distro_name(), str(destination.resolve()), str(Path(rootfs).resolve()), '--version', '2']
     process = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **meep_runtime.process_options())
     # Import is a Windows service operation. Cancelling its launcher mid-import
     # can leave a registered partial VHD. Once import begins, wait for completion

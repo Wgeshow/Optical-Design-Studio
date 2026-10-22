@@ -119,8 +119,6 @@ def upsert_bound(value, parameter, target, minimum, maximum, step, materials, la
             raise ValueError('Layer thickness cannot be negative.')
         if parameter not in ('thickness', 'center_x', 'center_y', 'rotation') and low <= 0:
             raise ValueError('Spacing, radius, and pattern sizes must be greater than zero.')
-        if parameter == 'r_over_a' and high >= .6:
-            raise ValueError('Every radius / lattice ratio must be below 0.6. Use a maximum such as 0.59.')
         row = dict(zip(BOUND_COLS, [parameter, target, low, high, delta, '']))
     result = rows(value, BOUND_COLS)
     existing = next((i for i, old in enumerate(result) if old['Parameter'] == parameter and str(old.get('Target') or '') == target), None)

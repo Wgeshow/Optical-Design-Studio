@@ -1,4 +1,4 @@
-"""All 27 design routes select models while preserving authored input drafts."""
+"""All 28 study/tool documents and the paper library preserve independent setups."""
 import os
 import copy
 import tempfile
@@ -6,90 +6,132 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QDialog
 from PyQt6.QtCore import QCoreApplication, QEvent
 from PyQt6.QtTest import QTest
 from qt_core import ProjectStore
 from data_library import DataLibrary
 from qt_app import OpticalStudio
 from qt_simulation_picker import SIMULATIONS
+from qt_study_transfer import StudyTransferDialog
+from simulation_documents import STUDY_IDS
 
 APP=QApplication.instance() or QApplication([])
 
 
 class ChooserPreservationTests(unittest.TestCase):
-    def test_all_design_choices_preserve_geometry_raw_drafts_and_reference_identity(self):
-        with tempfile.TemporaryDirectory(prefix='ods_27_routes_', dir=Path(__file__).resolve().parents[3]) as temporary:
-            store=ProjectStore(DataLibrary(Path(temporary)/'library'),restore=False)
-            window=OpticalStudio(store)
+    def test_choices_restore_own_geometry_incomplete_drafts_and_reference_identity(self):
+        with tempfile.TemporaryDirectory(prefix='ods_29_routes_', dir=Path(__file__).resolve().parents[3]) as temporary:
+            with patch.dict(os.environ,S4_LIBRARY_ROOT=str(Path(temporary)/'preferences')):
+                store=ProjectStore(DataLibrary(Path(temporary)/'library'),restore=False)
+                window=OpticalStudio(store)
             try:
-                before_device=copy.deepcopy(store.device)
-                bands=window.photonic_bands_page
-                bands.primitive_fields['radius'].setText('unfinished radius')
-                bands.executable.setText('authored-runtime')
-                bands._benchmark_request={'source':'authored-band-reference'}
-                original_bands=bands.draft()
                 chooser=window.research_studies_page
-                chooser.select_engine('sesame_transport')
-                sesame=chooser.stack.currentWidget()
-                sesame.y_nodes.setText('0, 0.13, 0.49, 1.2')
-                sesame.regions.item(0,2).setText('unfinished x range')
-                sesame._benchmark_request={'source':'authored-transport-reference'}
-                original_sesame=sesame.draft()
-                window.setup_state.set('search.electrical.biases_V',[0.,-.123,-.456])
-                self.assertEqual(len(SIMULATIONS),27)
-                self.assertEqual(len({r[0] for r in SIMULATIONS}),27)
+                original_width=store.device['width_um']
+                authored={};pages={};diagnostics={};widths={}
+                self.assertEqual(len(STUDY_IDS),28)
+                self.assertEqual(len(SIMULATIONS),29)
+                self.assertEqual({row[0] for row in SIMULATIONS},set(STUDY_IDS)|{'papers'})
+
+                def open_study(target):
+                    window._open_simulation_choice(target);APP.processEvents()
+                    self.assertEqual(store.active_study,target)
+                    if target.startswith('photonic_bands'):return window.photonic_bands_page
+                    if target.startswith('electrical'):return window.electrical_page
+                    if target.startswith(('sesame_transport','pcsel.')):return chooser.stack.currentWidget()
+                    return None
+
+                def raw_inputs(target,page):
+                    draft=page.draft()
+                    keys=(('lattice','geometry','object_ids','epsilons','kpoints','benchmark_request')
+                        if target.startswith('photonic_bands') else
+                        ('regions','materials','contacts','defects','benchmark_request')
+                        if target.startswith('sesame_transport') else ('structured','benchmark_request'))
+                    return {**{key:copy.deepcopy(draft.get(key)) for key in keys},
+                        'fields':copy.deepcopy(draft['fields'])}
+
                 with patch.object(store,'start_run') as start:
-                    for target,_,_,_ in SIMULATIONS:
-                        with self.subTest(target=target):
-                            window._open_simulation_choice(target)
+                    for index,target in enumerate(STUDY_IDS):
+                        with self.subTest(first_visit=target):
+                            page=open_study(target)
+                            # A new choice does not receive the preceding edited device.
+                            self.assertEqual(store.device['width_um'],original_width)
+                            widths[target]=20.+index
+                            store.update_settings(dict(ax_um=widths[target],wl_start_nm=1300.+index))
+                            if page is not None:
+                                self.assertNotIn(page,pages.values())
+                                pages[target]=page
+                                self.assertEqual(page.diagnostics.list.count(),0)
+                                diagnostics[target]=page.diagnostics
+                                self.assertEqual(len({id(value) for value in diagnostics.values()}),len(diagnostics))
                             if target.startswith('photonic_bands'):
                                 self.assertEqual(window.navigation.currentRow(),10)
-                                self.assertEqual(bands.dimension.currentData(),3 if target=='photonic_bands' else 2)
-                                self.assertEqual(bands.solver.currentData(),'legume' if target.endswith('.legume') else 'mpb')
-                                saved=bands.draft()
-                                for key in ('lattice','geometry','object_ids','epsilons','kpoints','benchmark_request'):
-                                    self.assertEqual(saved.get(key),original_bands.get(key),key)
-                                self.assertEqual(bands.executable.text(),'authored-runtime')
+                                self.assertEqual(page.dimension.currentData(),3 if target=='photonic_bands' else 2)
+                                self.assertEqual(page.solver.currentData(),'legume' if target.endswith('.legume') else 'mpb')
+                                page.primitive_fields['radius'].setText('unfinished radius '+target)
+                                page.executable.setText('authored-runtime-'+target)
                             elif target.startswith('sesame_transport'):
-                                self.assertIs(chooser.stack.currentWidget(),sesame)
-                                self.assertEqual(sesame.dimension.currentData(),2 if target.endswith('.2d') else 1)
-                                saved=sesame.draft()
-                                for key in ('regions','materials','contacts','defects','benchmark_request'):
-                                    self.assertEqual(saved.get(key),original_sesame.get(key),key)
-                                self.assertEqual(sesame.y_nodes.text(),'0, 0.13, 0.49, 1.2')
-                            elif target in ('electrical','electrical.iv','electrical.cv'):
-                                self.assertEqual(window.setup_state.get('ui.electrical.study'),{'electrical':'bias','electrical.iv':'iv','electrical.cv':'cv'}[target])
-                                self.assertEqual(window.setup_state.get('search.electrical.biases_V'),[0.,-.123,-.456])
-                                self.assertEqual(window.electrical_page.current_section,'electrical.study')
+                                self.assertEqual(page.dimension.currentData(),2 if target.endswith('.2d') else 1)
+                                page.y_nodes.setText('0, 0.13, 0.49, '+str(1.2+index))
+                                page.regions.item(0,2).setText('unfinished x range '+target)
                             elif target.startswith('pcsel.'):
-                                self.assertEqual(chooser.stack.currentWidget().fields['model'].currentData(),target.split('.')[1])
-                                if target=='pcsel.finite':
-                                    # Importing a paper opens the new build
-                                    # editor, not the emptied legacy Study tab.
-                                    from pcsel_research import paper_example
-                                    cfg=paper_example('hole','CC',.16);cfg['model']='finite'
-                                    page=chooser.stack.currentWidget();page.load_settings(cfg)
-                                    self.assertEqual(page.tabs.currentIndex(),page.sections['design'])
-                                    self.assertEqual(page.options()['settings']['layers'],cfg['layers'])
-                            elif target=='papers':self.assertEqual(chooser.library_page.tabs.currentIndex(),1)
-                            elif target in ('optical','coupled','fdtd','tools.fields','tools.index_shift'):
-                                self.assertEqual(window.navigation.currentRow(),2)
-                            else:self.assertEqual(chooser.selector.currentData(),target)
-                            self.assertEqual(store.device,before_device)
+                                self.assertEqual(page.fields['model'].currentData(),target.split('.')[1])
+                                page.fields['lattice_nm'].setText(str(400+index))
+                                page.fields['harmonics'].setText('unfinished harmonics '+target)
+                            elif target.startswith('electrical'):
+                                self.assertEqual(window.setup_state.get('ui.electrical.study'),
+                                    {'electrical':'bias','electrical.iv':'iv','electrical.cv':'cv'}[target])
+                                page.drafts['ui.electrical.bias_list_text']='0, unfinished '+target
+                                page.flush_draft()
+                                authored[target]=copy.deepcopy(page.drafts)
+                            if page is not None and not target.startswith('electrical'):
+                                page._benchmark_request={'source':'authored-reference-'+target}
+                                page.flush_draft()
+                                authored[target]=raw_inputs(target,page)
+                                page.diagnostics.set_diagnostics([dict(code='private',severity='error',
+                                    message='Only '+target,workspace=page.workspace_id)])
+
+                    for target in STUDY_IDS:
+                        with self.subTest(return_visit=target):
+                            page=open_study(target)
+                            self.assertEqual(store.device['width_um'],widths[target])
+                            if page is not None:
+                                self.assertIs(page,pages[target])
+                                if target.startswith('electrical'):
+                                    self.assertEqual(page.drafts,authored[target])
+                                else:
+                                    self.assertEqual(raw_inputs(target,page),authored[target])
+                                    self.assertEqual(page.diagnostics.list.count(),1)
+                                    self.assertIn('Only '+target,page.diagnostics.list.item(0).text())
+
+                    # Only explicit Transfer inputs copies a compatible structure.
+                    open_study('electrical.iv')
+                    store.update_settings(dict(wl_start_nm=1661.))
+                    window.setup_state.set('device.mesh.nx',17)
+                    dialog=StudyTransferDialog(store,window)
+                    self.assertGreaterEqual(dialog.source.findData('optical'),0)
+                    self.assertEqual(dialog.source.findData('photonic_bands'),-1)
+                    dialog.source.setCurrentIndex(dialog.source.findData('optical'))
+                    with patch('qt_study_transfer.StudyTransferDialog',return_value=dialog):
+                        with patch.object(dialog,'exec',return_value=QDialog.DialogCode.Accepted):
+                            window.transfer_inputs_button.click()
+                    self.assertEqual(store.device['width_um'],widths['optical'])
+                    self.assertEqual(store.settings['wl_start_nm'],1661.)
+                    self.assertEqual(store.device['mesh']['nx'],17)
+                    self.assertEqual(store.study_project('optical')['device']['width_um'],widths['optical'])
+                    current=copy.deepcopy(store.project())
+                    with self.assertRaisesRegex(ValueError,'compatible structure'):
+                        store.transfer_study_inputs('photonic_bands')
+                    self.assertEqual(store.project(),current)
+                    dialog.deleteLater()
+                    store.update_settings(dict(ax_um=99.))
+                    self.assertEqual(store.study_project('optical')['device']['width_um'],widths['optical'])
                     start.assert_not_called()
-                # A direct I-V/C-V choice cannot silently replace the legacy
-                # paper model or discard its explicitly authored sweep values.
-                from electrical_solver import DEFAULT_OPTIONS
-                legacy=copy.deepcopy(DEFAULT_OPTIONS);legacy['biases_V']=[0.,-.37]
-                store.save_search('electrical',legacy)
-                before=copy.deepcopy(store.search_state['electrical'])
-                for target in ('electrical.iv','electrical.cv'):
-                    window._open_simulation_choice(target)
-                    self.assertEqual(store.search_state['electrical'],before)
-                    self.assertEqual(window.electrical_page.current_section,'electrical.study')
-                    self.assertIn('editable',window.status.text().lower())
-                self.assertEqual(store.device,before_device)
+                # Papers is a library destination, not another simulation document.
+                active=store.active_study
+                window._open_simulation_choice('papers')
+                self.assertEqual(store.active_study,active)
+                self.assertEqual(chooser.library_page.tabs.currentIndex(),1)
                 # On a compact window the paper details and both launch
                 # actions remain reachable through the outer page scroll.
                 window._open_simulation_choice('papers')

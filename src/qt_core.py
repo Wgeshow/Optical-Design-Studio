@@ -315,7 +315,7 @@ def _prepare_job(kind, project, options, library):
         from peak_optimizer import parse_search
         from ml_optimizer import validate_ml
         stop=float(project['settings']['wl_stop_nm'])
-        if model['mode']=='Wavelength sweep' and model['points'][-1][1]<stop:
+        if options.get('search_options',{}).get('search_mode','Exhaustive grid')!='Exhaustive grid' and model['mode']=='Wavelength sweep' and model['points'][-1][1]<stop:
             model['points'].append([len(model['points']),stop,model['points'][0][2]])
         bounds=options.get('bounds',[])
         from linked_hole_sweep import shared_radius_bounds
@@ -391,7 +391,7 @@ def _prepare_job(kind, project, options, library):
 
 
 class BackendWorker(QThread):
-    event = pyqtSignal(dict)
+    progress_event = pyqtSignal(dict)
     completed = pyqtSignal(dict)
     failed = pyqtSignal(str)
 
@@ -426,7 +426,7 @@ class BackendWorker(QThread):
         failure=None
         status='interrupted'
         try:
-            self.event.emit(dict(kind='log',run_kind=self.kind,text='Validating the current project…'))
+            self.progress_event.emit(dict(kind='log',run_kind=self.kind,text='Validating the current project…'))
             project,spec=prepare_job(self.kind,self.project,self.options,self.library)
             if self.cancelled.is_set():
                 raise RuntimeError('Calculation cancelled before launch.')
@@ -484,10 +484,10 @@ class BackendWorker(QThread):
                         # exports need a separate bounded saving window, including
                         # after Stop; further events cannot extend that window.
                         finalization_deadline=time.monotonic()+300
-                        self.event.emit(dict(kind='log',directory=str(directory),run_kind=self.kind,
+                        self.progress_event.emit(dict(kind='log',directory=str(directory),run_kind=self.kind,
                                              text=event.get('text','Saving completed samples…')))
                     event.update(directory=str(directory),run_kind=self.kind)
-                    self.event.emit(event)
+                    self.progress_event.emit(event)
                     if event.get('kind') in ('complete','search_complete'):
                         terminal=event
                         status=event.get('summary',{}).get('status','complete')
@@ -540,6 +540,7 @@ class TaskWorker(QThread):
 
 class ProjectStore(QObject):
     changed=pyqtSignal(str)
+    study_requested=pyqtSignal(str)
     search_changed=pyqtSignal()
     library_changed=pyqtSignal()
     busy_changed=pyqtSignal(bool)
@@ -578,13 +579,18 @@ class ProjectStore(QObject):
         self.last_result=None
         self.session_path=self.library.data/'desktop_session.json'
         self.restore_error=''
+        self.active_study='optical'
+        self._study_documents={}
+        self._study_seed=self._project_payload()
+        self._switching_study=False
+        self.study_navigation_enabled=False
         if restore and self.session_path.exists():
             try:
                 self.load_project(read_json(self.session_path),autosave=False)
             except Exception as exc:
                 self.restore_error='Could not restore the previous desktop session: '+str(exc)
 
-    def project(self):
+    def _project_payload(self):
         result=dict(format_version=3,materials=legacy.records(self.materials,MAT_COLS),
             layers=legacy.records(self.layers,LAYER_COLS),patterns=legacy.records(self.patterns,PAT_COLS),
             settings=copy.deepcopy(self.settings),performance=copy.deepcopy(self.performance),
@@ -594,8 +600,53 @@ class ProjectStore(QObject):
             result['benchmark_request']=copy.deepcopy(self.benchmark_request)
         return result
 
+    def project(self):
+        result=self._project_payload()
+        documents=copy.deepcopy(self._study_documents)
+        documents[self.active_study]=copy.deepcopy(result)
+        result['simulation_documents']=dict(schema_version=1,active=self.active_study,documents=documents)
+        return result
+
+    def study_project(self,identifier):
+        from simulation_documents import study_id
+        study_id(identifier)
+        if identifier==self.active_study:return self._project_payload()
+        return copy.deepcopy(self._study_documents.get(identifier,self._study_seed))
+
+    def activate_study(self,identifier):
+        """Save the outgoing editable document and restore an independent one."""
+        from simulation_documents import study_id
+        study_id(identifier)
+        if identifier==self.active_study:return False
+        incoming=self.study_project(identifier)
+        documents=copy.deepcopy(self._study_documents)
+        try:documents[self.active_study]=self.library.snapshot(self._project_payload(),self.files)
+        except ValueError:documents[self.active_study]=self._project_payload()
+        incoming['simulation_documents']=dict(schema_version=1,active=identifier,documents=documents)
+        self._switching_study=True
+        try:self.load_project(incoming,change_reason='study')
+        finally:self._switching_study=False
+        return True
+
+    def transfer_study_inputs(self,source):
+        from simulation_documents import transfer_inputs
+        incoming=transfer_inputs(self.study_project(source),self._project_payload(),source,self.active_study)
+        incoming['simulation_documents']=dict(schema_version=1,active=self.active_study,documents=copy.deepcopy(self._study_documents))
+        self.load_project(incoming,change_reason='study')
+
+    def replace_active_study(self,project):
+        """Apply an imported design only here, preserving newer other studies."""
+        from simulation_documents import payload
+        incoming=payload(project)
+        incoming['simulation_documents']=copy.deepcopy(self.project()['simulation_documents'])
+        self.load_project(incoming,change_reason='study')
+
     def portable_project(self):
-        return self.library.snapshot(self.project(),self.files)
+        result=self.library.snapshot(self.project(),self.files)
+        bank=result['simulation_documents']
+        for key,document in bank['documents'].items():
+            bank['documents'][key]=self.library.snapshot(document,self.files if key==self.active_study else None)
+        return result
 
     def _autosave(self):
         try:
@@ -608,14 +659,16 @@ class ProjectStore(QObject):
         return (self.materials,self.layers,self.patterns,copy.deepcopy(self.settings),
                 copy.deepcopy(self.performance),list(self.files),copy.deepcopy(self.search_state),
                 copy.deepcopy(self.imported_search),list(self._undo),copy.deepcopy(self.appearance),
-                copy.deepcopy(self.device),copy.deepcopy(self.electrical_materials),copy.deepcopy(self.benchmark_request))
+                copy.deepcopy(self.device),copy.deepcopy(self.electrical_materials),copy.deepcopy(self.benchmark_request),
+                self.active_study,copy.deepcopy(self._study_documents))
 
     def _finish_change(self,previous,reason=None):
         try:
             self._autosave()
         except Exception:
             (self.materials,self.layers,self.patterns,self.settings,self.performance,self.files,
-             self.search_state,self.imported_search,self._undo,self.appearance,self.device,self.electrical_materials,self.benchmark_request)=previous
+             self.search_state,self.imported_search,self._undo,self.appearance,self.device,self.electrical_materials,self.benchmark_request,
+             self.active_study,self._study_documents)=previous
             raise
         if reason:
             self.changed.emit(reason)
@@ -738,11 +791,13 @@ class ProjectStore(QObject):
         project=device_project(model=model,ito_thickness_nm=ito_thickness_nm,
                                ito_density_cm3=ito_density_cm3)
         project['performance']=copy.deepcopy(self.performance)
-        self.load_project(project)
+        self.replace_active_study(project)
 
-    def load_project(self,project,autosave=True):
+    def load_project(self,project,autosave=True,*,change_reason='project'):
         project=read_json(project) if isinstance(project,(str,Path)) else copy.deepcopy(project)
         project=_mapping(project,'Project')
+        from simulation_documents import read_bank
+        active_study,documents=read_bank(project,self.active_study)
         settings=desktop_settings(project.get('settings',{}))
         selected_performance=desktop_performance(project.get('performance',{}))
         search_state=desktop_search(project.get('desktop_search',{}))
@@ -776,10 +831,12 @@ class ProjectStore(QObject):
         self.appearance=appearance
         self.electrical_materials=electrical_materials
         self.device=device
+        self.active_study=active_study
+        self._study_documents=documents
         self._undo.clear()
         if autosave:
             self._finish_change(previous)
-        self.changed.emit('project')
+        self.changed.emit(change_reason)
         self.notify_library()
 
     def save_project(self,path=None):
@@ -829,7 +886,7 @@ class ProjectStore(QObject):
             # keep that editor's independent manual-field sampling draft.
             saved_options=copy.deepcopy(self.search_state.get(kind,{}))
             saved_options.update(options)
-        self.save_search(kind,saved_options)
+        if project_snapshot is None:self.save_search(kind,saved_options)
         if project_snapshot is None:
             project['desktop_search']=copy.deepcopy(self.search_state)
         else:
@@ -842,7 +899,7 @@ class ProjectStore(QObject):
         else:
             worker=BackendWorker(kind,project,options,self.library,self)
         self._worker=worker
-        worker.event.connect(self.progress)
+        worker.progress_event.connect(self.progress)
         worker.completed.connect(self._completed)
         worker.failed.connect(self.run_failed)
         worker.finished.connect(self._finished)
@@ -886,4 +943,4 @@ class ProjectStore(QObject):
         else:
             identifier=directory.name
             project,_=self.library.project_for(identifier,int(design_id or 0))
-        self.load_project(project)
+        self.replace_active_study(project)

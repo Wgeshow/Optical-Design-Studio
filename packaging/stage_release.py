@@ -12,8 +12,8 @@ import shutil
 import zipfile
 
 ROOT = Path(__file__).resolve().parent
-VERSION = '1.4.0-alpha.1'
-BUILD_DATE = '2026-10-15'
+VERSION = '1.4.0-alpha.2'
+BUILD_DATE = '2026-10-21'
 PINNED_INPUTS = Path(os.environ.get('ODS_NATIVE_INPUTS', ROOT.parent/'local-windows-review-1.2.5-ui-review2'/'build_input'))
 SOURCE_SUFFIXES = {'.py', '.md', '.txt', '.yml', '.yaml', '.cmd', '.sh', '.ps1', '.ico', '.html'}
 EXCLUDED_PREFIXES = ('_', 'preview_', 'check_', 'profile_', 'debug_', 'capture_', 'illustrate_', 'replace_ui_')
@@ -33,7 +33,7 @@ REQUIRED_MODULES = ('qt_native_plot', 'qt_native_figure', 'qt_native_field_volum
                     'research_catalog','research_diagnostics','thermal_study','benchmark_registry',
                     'research_physics_runtime','research_physics_worker','sesame_transport',
                     'input_diagnostics','qt_input_diagnostics','qt_photonic_bands','qt_photonic_band_results','qt_photonic_crystal_3d','qt_photonic_runtime','qt_research_studies','qt_research_results','qt_thermal_setup',
-                    'qt_study_flow','qt_simulation_flow','qt_legacy_study_workbench','qt_study_fields','qt_study_library', 'qt_simulation_picker','qt_transport_research_setup','qt_high_field_results','qt_pcsel_research_setup','qt_research_runtime',
+                    'qt_study_flow','qt_simulation_flow','qt_legacy_study_workbench','qt_study_fields','qt_study_library', 'qt_simulation_picker','qt_transport_research_setup','qt_high_field_results','qt_pcsel_research_setup','qt_research_runtime','solver_environment','desktop_environment_probe','qt_solver_environment','simulation_documents','qt_study_transfer',
                     'qt_research_common','qt_sesame_setup','pcsel_research','pcsel_aperture','pcsel_optional','pcsel_physics_worker',
                     'advanced_transport','advanced_transport_graph','electrical_temperature','nonlocal_tunnelling','high_field_optics','bandgap_narrowing',
                     'pcsel_transport_study','pcsel_conformal_mesh','pcsel_conformal_solver','pcsel_transport_worker','pcsel_unitcell_transport',
@@ -277,27 +277,27 @@ def selected_s4_runtime(source):
 
 
 def validate_dependencies(source):
+    """Use installed pinned packages and explicit native inputs, never user data."""
     import importlib.metadata
     import importlib.util
-    official = Path(os.environ['ODS_OFFICIAL_RUNTIME'])
+    official = Path(os.environ.get('ODS_OFFICIAL_RUNTIME', ''))
+    dependency_root = Path(os.environ.get('ODS_RELEASE_DEPENDENCIES', source))
+    cad = Path(os.environ.get('ODS_CAD_RUNTIME', official/'cad_runtime' if os.environ.get('ODS_OFFICIAL_RUNTIME') else dependency_root/'cad_runtime'))
     pins = {'pyqtgraph': '0.14.0', 'colorama': '0.4.6'}
     versions = {}
-    for package in ('pyqtgraph', 'colorama', 'scikit-learn', 'scipy', 'shapely'):
+    for package in ('pyqtgraph', 'colorama', 'scikit-learn', 'scipy', 'shapely', 'PyYAML', 'devsim'):
         versions[package] = importlib.metadata.version(package)
         if package in pins and versions[package] != pins[package]:
             raise ValueError('Unexpected dependency version: ' + package)
-    for module in ('pyqtgraph', 'colorama', 'sklearn', 'scipy', 'shapely'):
-        if importlib.util.find_spec(module) is None:
-            raise ImportError(module)
-    required = [selected_s4_runtime(source)/'S4.cp312-win_amd64.pyd',
-                official/'cad_runtime'/'OCP'/'__init__.py']
-    required += [PINNED_INPUTS/'gpu'/name for name in
-                 ('cublas64_11.dll', 'cublasLt64_11.dll', 'cudart64_110.dll')]
+    for module in ('pyqtgraph', 'colorama', 'sklearn', 'scipy', 'shapely', 'yaml', 'devsim'):
+        if importlib.util.find_spec(module) is None:raise ImportError(module)
+    required = [selected_s4_runtime(source)/'S4.cp312-win_amd64.pyd', cad/'OCP'/'__init__.py']
+    required += [PINNED_INPUTS/'gpu'/name for name in ('cublas64_11.dll', 'cublasLt64_11.dll', 'cudart64_110.dll')]
     for path in required:
-        if not path.is_file():
-            raise FileNotFoundError(path)
-    return dict(installed_versions=versions, s4_runtime_override_used=True,
-                official_runtime_reused=True,
+        if not path.is_file():raise FileNotFoundError(path)
+    return dict(pyqtgraph=versions['pyqtgraph'], colorama=versions['colorama'], installed_versions=versions,
+                s4_runtime_override_used=bool(os.environ.get('ODS_S4_RUNTIME')),
+                official_runtime_reused=bool(os.environ.get('ODS_OFFICIAL_RUNTIME')),
                 pinned_native_inputs={path.name: {'size': path.stat().st_size, 'sha256': digest(path)}
                                       for path in required if path.suffix in ('.pyd', '.dll')})
 

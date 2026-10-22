@@ -147,11 +147,12 @@ class AISearchPage(_RunPage):
 
     def save(self,*_):
         if self._loading:return
+        if getattr(self.store,'study_navigation_enabled',False) and self.store.active_study!='tools.ai':return
         try:self.store.save_search('ai_search',self.options())
         except Exception as exc:self.status.setText(str(exc))
 
     def restore(self,reason):
-        if reason not in ('project','structure','undo'):return
+        if reason not in ('project','study','structure','undo'):return
         saved=self.store.search_state.get('ai_search',{});self._loading=True
         try:
             for k,w in self.controls.items():
@@ -159,7 +160,7 @@ class AISearchPage(_RunPage):
                 if isinstance(w,QLineEdit):w.setText(str(value))
                 else:_set_value(w,value)
             self.resume.setText(str(saved.get('resume_file','')));self.reference.setText(str(saved.get('reference_directory','')))
-            if saved.get('bounds'):self.bounds.set_records(saved['bounds'])
+            self.bounds.set_records(saved.get('bounds',[]))
         except Exception as exc:self.status.setText('Saved AI setup needs review: '+str(exc))
         finally:self._loading=False
 
@@ -304,6 +305,6 @@ class AISearchPage(_RunPage):
         r=self.selected()
         if not r or self.store.busy:return
         try:
-            project=self.store.library.from_model(r['model'],self.store.portable_project());self.store.load_project(project);self.status.setText('Selected simulated design applied to Structure.')
+            project=self.store.library.from_model(r['model'],self.store.portable_project());self.store.replace_active_study(project);self.status.setText('Selected simulated design applied to this simulation’s structure.')
         except Exception as exc:self.status.setText(str(exc))
 

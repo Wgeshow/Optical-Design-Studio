@@ -16,7 +16,7 @@ _import_library = tempfile.TemporaryDirectory(prefix='s4_qt_core_import_')
 os.environ.setdefault('S4_LIBRARY_ROOT', _import_library.name)
 
 import pandas as pd
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, QCoreApplication, QEvent
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication
 
@@ -69,13 +69,24 @@ class QtCoreTests(unittest.TestCase):
             QTest.qWait(20)
         self.assertTrue(predicate(), f'Qt task did not finish within {timeout} seconds.')
 
+    def test_worker_cleanup_preserves_qobject_event_handler(self):
+        from qt_fdtd import MeepWorker
+        errors = []
+        for worker_class in (BackendWorker, MeepWorker):
+            with self.subTest(worker=worker_class.__name__):
+                worker = worker_class('simulation', self.store.project(), {}, self.library)
+                with patch('sys.excepthook', side_effect=lambda kind, value, tb: errors.append(str(value))):
+                    worker.deleteLater()
+                    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+                self.assertEqual(errors, [])
+
     def worker(self, kind='simulation', project=None, options=None, cancel=False):
         worker = BackendWorker(kind, project or self.small_project(), options or {}, self.library)
         self.workers.append(worker)
         completed, failed, events = [], [], []
         worker.completed.connect(completed.append)
         worker.failed.connect(failed.append)
-        worker.event.connect(events.append)
+        worker.progress_event.connect(events.append)
         if cancel:
             worker.cancel()
         worker.start()
@@ -109,7 +120,7 @@ class QtCoreTests(unittest.TestCase):
                 def event_received(event):
                     events.append(event)
                     if event['kind']=='finalizing':clock[0]+=120.
-                worker.event.connect(event_received)
+                worker.progress_event.connect(event_received)
                 terminal=(dict(kind='cancelled',error='Canceled after completed samples were saved') if cancel
                           else dict(kind='complete',info={}))
                 class FinishedProcess:
@@ -136,7 +147,7 @@ class QtCoreTests(unittest.TestCase):
             if event['kind']=='finalizing':
                 finalizations.append(event)
                 clock[0]=399. if len(finalizations)==1 else 401.
-        worker.event.connect(event_received)
+        worker.progress_event.connect(event_received)
         class FinishedProcess:
             def __init__(self):
                 self.stdout=io.StringIO('\n'.join(json.dumps(event) for event in
@@ -329,10 +340,10 @@ class QtCoreTests(unittest.TestCase):
         self.assertEqual(spec['model']['layers'][1]['thickness'], .25)
         self.assertEqual(spec['model']['ax'], .77)
 
-    def test_peak_request_preserves_endpoint_and_all_design_constraints(self):
+    def test_optimizer_request_preserves_endpoint_and_design_constraints(self):
         project = self.small_project()
         project['settings'].update(wl_start_nm=1549, wl_stop_nm=1552, wl_step_nm=1.2)
-        options = {'bounds': [bound()], 'search_options': {'search_mode': 'Exhaustive grid',
+        options = {'bounds': [bound()], 'search_options': {'search_mode': 'ML assisted',
                                                           'ratio_limit': .55, 'absorption_target': .999}}
         original = copy.deepcopy(options)
         _, spec = prepare_job('peaks', project, options, self.library)
@@ -346,7 +357,7 @@ class QtCoreTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Unknown layer'):
             prepare_job('peaks', project, {'bounds': [bound(target='Removed layer')]}, self.library)
         with self.assertRaisesRegex(ValueError, 'Absorption target'):
-            prepare_job('peaks', project, {'bounds': [bound()], 'search_options': {'absorption_target': .9}}, self.library)
+            prepare_job('peaks', project, {'bounds': [bound()], 'search_options': {'search_mode': 'ML assisted', 'absorption_target': .9}}, self.library)
 
     def target_options(self):
         return dict(holes=[dict(Layer='Device', Shape='ellipse', MinX_um=.08, MaxX_um=.12,

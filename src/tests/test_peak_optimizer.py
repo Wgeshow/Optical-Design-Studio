@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 import numpy as np
 from peak_optimizer import (BOUND_COLS, parse_search, designs, geometry_error, grid_values,
-                            spectrum_peaks, execute_search)
+                            spectrum_peaks, execute_search, analyze_grid_results)
 from test_backend import sample
 from model import DEFAULT_PERFORMANCE
 
@@ -68,7 +68,7 @@ class PeakSearchTests(unittest.TestCase):
             parse_search(sample(), [bound('radius', '1', .01, .2, .001)], dict(design_budget=2))
         for options in (dict(absorption_target=.98), dict(absorption_target=1), dict(ratio_limit=.7)):
             with self.assertRaises(ValueError):
-                parse_search(sample(), [], options)
+                parse_search(sample(), [], dict(options, search_mode='ML assisted'))
 
     def test_ratio_lattice_material_product(self):
         base = sample()
@@ -108,7 +108,7 @@ class PeakSearchTests(unittest.TestCase):
             self.assertAlmostEqual(peaks[0]['absorption'], max(y))
 
     def test_all_peaks_and_q_ranking(self):
-        base = sample(wl_start_nm=1500, wl_stop_nm=1600, wl_step_nm=.5)
+        base = sample(wl_start_nm=1500, wl_stop_nm=1600, wl_step_nm=.01)
         cfg = parse_search(base, [bound('thickness', 'Device', .2, .3, .1)], dict(refinement_rounds=3))
         def executor(m, perf, emit, cancelled):
             x = np.array([r[1] for r in m['points']])
@@ -120,10 +120,7 @@ class PeakSearchTests(unittest.TestCase):
             summary = event['summary']
             self.assertEqual(summary['status'], 'complete')
             self.assertEqual(summary['evaluated'], 2)
-            self.assertEqual(summary['matching_designs'], 2)
-            self.assertGreater(summary['best_absorption'], .9994)
-            with (Path(directory)/'above_target_by_Q.csv').open() as f:
-                results = list(csv.DictReader(f))
+            results = analyze_grid_results(directory, 'Absorption', metric='Q factor')
             self.assertEqual(len(results), 4)
             self.assertAlmostEqual(float(results[0]['wavelength_nm']), 1570.037, delta=.01)
             self.assertIn('layer:Device:material', results[0])
@@ -138,7 +135,7 @@ class PeakSearchTests(unittest.TestCase):
             cfg = parse_search(base, [], dict(point_budget=3))
             event = execute_search(base, dict(DEFAULT_PERFORMANCE), cfg, directory, executor, lambda e: None, lambda: False)
             self.assertEqual(event['summary']['status'], 'partial')
-            self.assertIsNone(event['summary']['best_absorption'])
+            self.assertEqual(event['summary']['not_run'], 1)
         with tempfile.TemporaryDirectory() as directory:
             event = execute_search(base, dict(DEFAULT_PERFORMANCE), cfg, directory, executor, lambda e: None, lambda: True)
             self.assertEqual(event['summary']['status'], 'cancelled')
@@ -147,9 +144,9 @@ class PeakSearchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             cfg = parse_search(base, [], dict(refinement_rounds=0))
             event = execute_search(base, dict(DEFAULT_PERFORMANCE), cfg, directory, invalid, lambda e: None, lambda: False)
-            self.assertEqual(event['summary']['failed'], 1)
+            self.assertEqual(event['summary']['invalid'], 1)
             self.assertEqual(event['summary']['status'], 'partial')
-            self.assertIsNone(event['summary']['best_absorption'])
+            self.assertEqual(event['summary']['evaluated'], 0)
 
 
 if __name__ == '__main__':

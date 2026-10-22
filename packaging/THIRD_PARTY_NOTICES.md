@@ -1,4 +1,4 @@
-# Additional notices for Optical Design Studio 1.4.0-alpha.1
+# Additional notices for Optical Design Studio 1.4.0-alpha.2
 
 The native scientific plotting runtime includes PyQtGraph and its Colorama dependency. The following notices supplement the existing application, native S4, Qt/PyQt, numerical, geometry, machine-learning, and optional runtime notices supplied in **THIRD_PARTY_LICENSES** and the corresponding source.
 
@@ -13,7 +13,7 @@ The native scientific plotting runtime includes PyQtGraph and its Colorama depen
 
 The optional GPU payload also retains NVIDIA CUDA 13 component license texts under **THIRD_PARTY_LICENSES/GPU/nvidia_*.dist-info/licenses/**. The complete matching distribution metadata and license files remain beside the bundled GPU runtime. CUDA 11 runtime notices remain under **THIRD_PARTY_LICENSES/NVIDIA**. DEVSIM's NOTICE includes its AMD and UMFPACK notices; those components are used by permission under their supplied terms. Their copyright and source-availability notices are retained verbatim.
 
-MPB, Legume, Sesame and Gmsh workflows use separately configured external environments. Those engines and their licenses belong to their respective installations; selecting one in the user interface does not install it into this portable package.
+MPB, Meep, Legume, Sesame and Gmsh workflows use separately configured external environments. Those engines and their licenses belong to their respective installations; selecting one in the user interface does not install it into this portable package.
 
 The complete copyright, redistribution terms, and disclaimers are retained verbatim from the included distributions. The license texts apply to their respective components and do not grant rights to unrelated components.
 

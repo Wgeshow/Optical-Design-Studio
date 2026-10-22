@@ -687,10 +687,10 @@ class PcselGeometryEditor(QWidget):
 
 class PcselResearchWorkspace(StructuredStudyWorkspace):
     """Curated setup retaining canonical study schema, runtime and result routes."""
-    def __init__(self, store, capability, parent=None):
+    def __init__(self, store, capability, parent=None, *, document_id=None):
         self._friendly_ready = False
         self.shape_key = 'shapes' if capability['engine'] == 'pcsel' else 'inclusions'
-        super().__init__(store, capability, parent)
+        super().__init__(store, capability, parent, document_id=document_id)
         restored = store.search_state.get('research_workspaces', {}).get(self.state_key)
         restored_section = restored.get('section') if isinstance(restored, dict) else None
         self.heading.setText('PCSEL optics' if self.engine == 'pcsel' else 'PCSEL periodic transport')
@@ -816,6 +816,7 @@ class PcselResearchWorkspace(StructuredStudyWorkspace):
             self.friendly_hosts[key].layout().addWidget(button({'runtime': 'Set up Python runtime', 'mesh': 'Add mesh controls', 'materials': 'Add semiconductor material', 'aperture': 'Create required aperture inputs'}[key], lambda checked=False, name=key: self._create_fields(name)))
         from qt_research_runtime import ResearchRuntimeCheck
         self.runtime_check = ResearchRuntimeCheck(self._runtime_request, self)
+        self.runtime_check.runtimeReady.connect(self._apply_automatic_runtime)
         self.friendly_hosts['runtime'].layout().addWidget(self.runtime_check)
         actions = QHBoxLayout()
         actions.addWidget(button('Remember this installation', self._remember_runtime))
@@ -825,6 +826,13 @@ class PcselResearchWorkspace(StructuredStudyWorkspace):
 
     def _runtime_request(self):
         return dict(engine=self.engine, settings=dict(model=self.fields['model'].currentData() if self.engine == 'pcsel' else '', runtime=self.structured['runtime'].value()))
+
+    def _apply_automatic_runtime(self, runtime):
+        self.structured['runtime'].set_value(runtime)
+        self._refresh_friendly()
+        self._edited()
+        self._remember_runtime()
+        self.runtime_check.check()
 
     def _remember_runtime(self):
         from qt_research_runtime import remember_runtime
@@ -880,6 +888,9 @@ class PcselResearchWorkspace(StructuredStudyWorkspace):
 
     def _model_changed(self):
         if self.engine != 'pcsel' or not hasattr(self, 'model_note'): return
+        control=self.fields['model']
+        previous=getattr(self.store,'active_study','pcsel.vertical').split('.')[-1]
+        if self.switch_study_variant('pcsel.'+str(control.currentData()),control,previous):return
         model = self.fields['model'].currentData()
         self.heading.setText(MODEL_TITLES.get(model, 'PCSEL optics'))
         self.model_note.setText(MODEL_LABELS.get(model, ('', 'Choose a physical model.'))[1])

@@ -201,6 +201,51 @@ class NativeComputationTests(unittest.TestCase):
         self.assertNotEqual(page.holes.layer.findData('Renamed PCS'), -1)
         self.assertEqual(page.holes.layer.findData('PCS2'), -1)
 
+    def test_dedicated_sweep_stays_grid_after_loading_old_optimizer_settings(self):
+        page=self.widget(OptimizePage)
+        page.set_grid_workspace(True)
+        page._restore('peaks',dict(bounds=[],search_options={'search_mode':'ML assisted'},
+                                   resume_history_file='old-search.json'))
+        self.assertIs(page.tabs.currentWidget(),page.general_page)
+        self.assertFalse(page.tabs.isTabVisible(0))
+        self.assertTrue(page.search_controls['search_mode'].isHidden())
+        self.assertEqual(page.peak_options()['search_options']['search_mode'],'Exhaustive grid')
+        self.assertEqual(page.peak_options()['resume_history_file'],'')
+        self.assertFalse(page.general_detail_tabs.isTabVisible(0))
+        self.assertFalse(page.general_detail_tabs.isTabVisible(2))
+        with patch.object(self.store,'start_run') as start:
+            page.run_target()
+            start.assert_not_called()
+            page.run_peaks()
+        self.assertEqual(start.call_args.args[0],'peaks')
+        self.assertEqual(start.call_args.args[1]['search_options']['search_mode'],'Exhaustive grid')
+
+    def test_dedicated_sweep_results_cannot_reopen_target_optimization(self):
+        page=self.widget(OptimizePage)
+        page.set_grid_workspace(True)
+        self.assertFalse(page.select_tool_tab('target.fields'))
+        self.assertFalse(page.select_tool_tab('explore.constraints'))
+        self.assertFalse(page.select_tool_tab('explore.learning'))
+        self.assertIs(page.tabs.currentWidget(),page.general_page)
+        self.assertIs(page.general_result_tabs.currentWidget(),page.peak_results)
+        page.show_results()
+        self.assertEqual(page.general_result_tabs.tabText(1),'Q results')
+        self.assertEqual(page.general_result_tabs.tabText(2),'High / low response')
+
+    def test_compact_sweep_analysis_scrolls_instead_of_overlapping_controls(self):
+        page=self.widget(OptimizePage)
+        page.set_grid_workspace(True)
+        page.resize(780,620);page.show();APP.processEvents()
+        controls=(page.grid_metric,page.grid_response,page.grid_direction,page.grid_threshold)
+        for first,second in zip(controls,controls[1:]):
+            self.assertLessEqual(first.geometry().bottom(),second.geometry().top())
+        self.assertGreater(page.sweep_output_scroll.verticalScrollBar().maximum(),0)
+        page.sweep_output_scroll.ensureWidgetVisible(page.grid_analyze)
+        APP.processEvents()
+        viewport=page.sweep_output_scroll.viewport()
+        center=page.grid_analyze.mapTo(viewport,page.grid_analyze.rect().center())
+        self.assertTrue(viewport.rect().contains(center))
+
     def test_general_search_exposes_all_options_and_applies_selected_result(self):
         page = self.widget(OptimizePage)
         self.assertEqual(set(page.peak_options()['search_options']), set(SEARCH_KEYS + ML_KEYS + ['response']))

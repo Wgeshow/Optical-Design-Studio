@@ -121,8 +121,11 @@ class NativeMaterialLibraryTests(unittest.TestCase):
             page.plot.canvas.draw()
             self.assertEqual(len(page.plot.figure.axes), 2)
 
-    def test_saved_design_selector_uses_actual_id_and_restores_shared_structure(self):
+    def test_saved_design_selector_restores_active_structure_and_preserves_other_studies(self):
         project = self.store.portable_project()
+        self.store.activate_study('electrical')
+        self.store.update_settings(dict(ax_um=99))
+        self.store.activate_study('optical')
         model = prepare(project['materials'], project['layers'], project['patterns'], [], project['settings'])
         model['layers'][1]['thickness'] = .333
         directory = self.store.library.runs / 'optimization_a'
@@ -138,6 +141,8 @@ class NativeMaterialLibraryTests(unittest.TestCase):
         page.design.setCurrentIndex(page.design.findData(7))
         page.restore_project()
         self.assertAlmostEqual(self.store.layers.iloc[1].Thickness_um, .333)
+        self.assertEqual(self.store.active_study, 'optical')
+        self.assertEqual(self.store.study_project('electrical')['device']['width_um'], 99)
         page.query.setText('no matching run')
         self.assertIsNone(page.selection.currentData())
         self.assertFalse(page.restore.isEnabled())

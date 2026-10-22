@@ -15,7 +15,7 @@ from PyQt6.QtCore import Qt, QSignalBlocker, QUrl, QSize, QAbstractListModel, QT
 from PyQt6.QtGui import QDesktopServices, QStandardItemModel
 from PyQt6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox,
     QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QProgressBar, QPushButton,
-    QScrollArea, QSplitter, QTabWidget, QVBoxLayout, QWidget, QListWidget, QListWidgetItem)
+    QScrollArea, QSplitter, QTabWidget, QVBoxLayout, QWidget, QListWidget, QListWidgetItem, QLayout)
 
 from model import MODES, MAX_SWEEP_POINTS
 from field_storage import field_data_exists, load_field_frame, export_field_csv
@@ -669,7 +669,7 @@ class SimulationPage(_RunPage):
         self.refresh()
 
     def refresh(self, reason=None):
-        if reason not in (None,'project','settings','undo'):return
+        if reason not in (None,'project','study','settings','undo'):return
         for key, widget in self.controls.items():
             if key in self.store.settings:
                 _set_value(widget, self.store.settings[key])
@@ -757,7 +757,7 @@ class SimulationPage(_RunPage):
         try:
             project,search=self.store.library.project_for(identifier,0)
             if search:project['search']=search
-            self.store.load_project(project)
+            self.store.replace_active_study(project)
             self.status.setText('Loaded the selected run’s structure, materials and simulation settings.')
         except Exception as exc:self.status.setText('Could not load setup: '+str(exc))
 
@@ -1082,6 +1082,7 @@ class OptimizePage(_RunPage):
     def __init__(self, store, parent=None):
         super().__init__(store, 'Simulation Sweep', 'Design for absorption, transmission or reflection at your wavelength, with optional field-guided learning.', {'target', 'peaks'}, parent)
         self.result_directories = {}
+        self._grid_workspace = False
         self._restored = {}
         self._loading = True
         self.tabs = QTabWidget()
@@ -1123,8 +1124,34 @@ class OptimizePage(_RunPage):
         polish_tool_workspace(self)
 
     def select_tool_tab(self,route):
+        key=route.split('/')[-1]
+        if self._grid_workspace and (key.startswith('target') or key in ('explore.constraints','explore.learning')):
+            self.tabs.setCurrentWidget(self.general_page)
+            if route.endswith(('.fields','.designs')):self.show_results()
+            return False
         from qt_tool_workspace import select_tool_tab
         return select_tool_tab(self,route)
+
+    def set_grid_workspace(self, enabled=True):
+        """Expose the exact sweep workflow in the dedicated sweep document."""
+        self._grid_workspace=bool(enabled)
+        self.tabs.setTabVisible(0,not enabled)
+        self.tabs.tabBar().setVisible(not enabled)
+        self.tabs.setTabText(1,'Parameter sweep' if enabled else 'Explore designs')
+        method=self.search_controls['search_mode']
+        method.parentWidget().layout().setRowVisible(method,not enabled)
+        if enabled:
+            with QSignalBlocker(method):method.setCurrentIndex(method.findData('Exhaustive grid'))
+            self.tabs.setCurrentWidget(self.general_page)
+            for index,title in enumerate(('Selected spectrum','Q results','High / low response','All designs')):
+                self.general_result_tabs.setTabText(index,title)
+            self.starts[1].setText('Run parameter sweep')
+        self._search_enabling()
+
+    def show_results(self):
+        self.tabs.setCurrentWidget(self.general_page)
+        self.general_result_tabs.setCurrentWidget(self.peak_results)
+        self.peak_results.setFocus()
 
     def _target_page(self):
         left, right = QWidget(), QWidget()
@@ -1252,23 +1279,23 @@ class OptimizePage(_RunPage):
         left, right = QWidget(), QWidget()
         controls, output = QVBoxLayout(left), QVBoxLayout(right)
         self.search_controls = {
-            'search_mode': _combo(SEARCH_MODES, 'Hybrid verified'), 'design_budget': integer(500, 1, 10000),
+            'search_mode': _combo(SEARCH_MODES, 'Exhaustive grid'), 'design_budget': integer(500, 1, 10000),
             'ratio_limit': number(.6, .000001, .6), 'min_bridge_um': number(0, 0),
             'separate_circles': _check('Keep circular regions separate, including periodic neighbors'),
             'response': _combo(['Absorption', 'Reflection', 'Transmission']),
             'absorption_target': number(.99, 0, .999999999, 9), 'tie_tolerance': number(.0001, 0, 1, 8),
             'prominence': number(.00001, 0, 1, 8), 'refinement_rounds': integer(3, 0, 6),
-            'point_budget': integer(200000, 3, MAX_SWEEP_POINTS), 'initial_designs': integer(24, 2, 10000),
+            'point_budget': integer(200000, 1, MAX_SWEEP_POINTS), 'initial_designs': integer(24, 2, 10000),
             'ml_trials': integer(60, 2, 10000), 'candidate_pool': integer(1024, 32, 10000),
             'random_seed': integer(42, 0, 2147483647), 'finalists': integer(2, 1, 10),
             'verification_basis_factor': number(1.5, 1.01, 4), 'verification_step_divisor': integer(2, 2, 10),
             'absorption_agreement': number(.001, 0, 1), 'q_agreement': number(.05, 0, 1),
             'patience': integer(0, 0, 10000),
         }
-        method, _ = _group('Search method', [('Method', self.search_controls['search_mode']), ('Maximum designs', self.search_controls['design_budget'])])
+        method, _ = _group('Sweep size', [('Method', self.search_controls['search_mode']), ('Maximum designs', self.search_controls['design_budget'])])
         controls.addWidget(method)
-        controls.addWidget(_label('Uses the wavelength range and incident-light settings in Simulation. Empty bounds evaluate the current design only.', True))
-        controls.addWidget(_button('Edit shared optical sampling',lambda:self.routeRequested.emit('optical.sweep')))
+        controls.addWidget(_label('Grid evaluates each selected combination at exactly the input wavelength/angle samples. All other parameters stay fixed. Empty bounds evaluate the current design once. Save every spectrum, then filter results below.', True))
+        controls.addWidget(_button('Edit optical sampling',lambda:self.routeRequested.emit('optical.sweep')))
         self.bounds = BoundsEditor(self.store)
         from linked_hole_sweep import make_widget
         self.shared_hole = make_widget(self.store)
@@ -1296,13 +1323,32 @@ class OptimizePage(_RunPage):
         self.resume_file = QLineEdit()
         self.resume_file.setPlaceholderText('Optional optimization_history.json')
         resume, form = _group('Continue a previous search', [('History file', self.resume_file)])
+        self.search_resume_group = resume
         form.addRow(_button('Choose history JSON…', self.choose_resume))
         controls.addWidget(resume)
         run_actions = self.actions('Start design search', self.run_peaks)
         controls.addWidget(self._setup_actions('peaks'))
         controls.addStretch()
-        self.peak_summary = _label('Find peak locations first, then compare all designs matching the best selected response and the highest qualifying Q.')
+        self.peak_summary = _label('Run the sweep to collect all designs and all R/T/A samples. Q and high/low response analysis uses saved data only.')
         output.addWidget(self.peak_summary)
+        self.grid_result = False
+        self.grid_metric = _combo(['Response', 'Q factor'])
+        self.grid_response = _combo(['Reflection', 'Transmission', 'Absorption'])
+        self.grid_direction = _combo(['High', 'Low'])
+        self.grid_use_threshold = _check('Apply threshold', False)
+        self.grid_threshold = number(.9, 0, 1, 8)
+        self.grid_analysis_group, query_form = _group('Analyze saved sweep', [
+            ('Find', self.grid_metric), ('Response', self.grid_response),
+            ('Order', self.grid_direction), ('Threshold', self.grid_threshold)])
+        query_form.addRow(self.grid_use_threshold)
+        self.grid_analyze = _button('Find in saved data', self.analyze_sweep)
+        query_form.addRow(self.grid_analyze)
+        query_form.addRow(_button('Export filtered data…', self.export_sweep_analysis))
+        self.grid_analysis_status = _label('Run a grid sweep first. No extra simulations are started by analysis.', True)
+        query_form.addRow(self.grid_analysis_status)
+        self.grid_analysis_group.setEnabled(False)
+        self.grid_metric.currentIndexChanged.connect(self._grid_metric_changed)
+        output.addWidget(self.grid_analysis_group)
         self.peak_plot = PlotWidget()
         self.peak_plot.setMinimumHeight(360)
         self.peak_results, self.peak_matches, self.peak_feasible = table([]), table([]), table([])
@@ -1314,6 +1360,7 @@ class OptimizePage(_RunPage):
         tabs.addTab(self.peak_results, 'All designs')
         output.addWidget(tabs, 1)
         self.design = QComboBox()
+        self.design.currentIndexChanged.connect(self.draw_sweep_design)
         self.design.setMinimumContentsLength(16)
         self.design.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.apply_peak = _button('Use design in Structure', self.use_peak, True)
@@ -1327,20 +1374,83 @@ class OptimizePage(_RunPage):
             widget.itemSelectionChanged.connect(lambda current=widget: self._select_result(current))
         self.search_controls['search_mode'].currentIndexChanged.connect(self._search_enabling)
         self._search_enabling()
-        return _split(left, right, run_actions)
+        # The compact splitter stacks setup and output. Keep the saved-data
+        # analysis controls at their usable size inside their own viewport.
+        output.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        self.sweep_output_scroll=_scroll(right)
+        return _split(left, self.sweep_output_scroll, run_actions)
 
     def _search_enabling(self, *_):
-        self.ml_settings.setEnabled(self.search_controls['search_mode'].currentData() != 'Exhaustive grid')
+        grid = self.search_controls['search_mode'].currentData() == 'Exhaustive grid'
+        self.ml_settings.setEnabled(not grid)
+        self.general_detail_tabs.setTabVisible(0, not grid)
+        self.general_detail_tabs.setTabVisible(2, not grid)
+        self.search_resume_group.setVisible(not grid)
+        for key in ('prominence', 'refinement_rounds'):
+            widget = self.search_controls[key]
+            form = widget.parentWidget().layout()
+            form.setRowVisible(widget, not grid)
+        self.general_detail_tabs.setTabText(1, 'Sweep budget' if grid else 'Detection')
+        self.grid_analysis_group.setVisible(grid or self.grid_result)
+
+    def _grid_metric_changed(self):
+        q = self.grid_metric.currentData() == 'Q factor'
+        self.grid_threshold.setMaximum(1e12 if q else 1.)
+        self.grid_threshold.setValue(1000. if q else .9)
+
+    def analyze_sweep(self):
+        from peak_optimizer import analyze_grid_results
+        path = self.result_directories.get('peaks')
+        if not self.grid_result or path is None:
+            return
+        try:
+            q = self.grid_metric.currentData() == 'Q factor'
+            matches = analyze_grid_results(path, response=self.grid_response.currentData(),
+                direction=self.grid_direction.currentData(), metric=self.grid_metric.currentData(),
+                threshold=self.grid_threshold.value() if self.grid_use_threshold.isChecked() else None)
+            self.grid_analysis_frame = pd.DataFrame(matches)
+            fill_table(self.peak_feasible if q else self.peak_matches, self.grid_analysis_frame)
+            self.general_result_tabs.setCurrentIndex(1 if q else 2)
+            self.grid_analysis_status.setText(f'{len(matches):,} matches in saved data. ' +
+                ('Q includes resolved peaks and dips; unresolved linewidths have no Q. Check wavelength/basis convergence.' if q else
+                 'Each row is the selected high/low sample of that design. All raw spectra are retained.'))
+        except Exception as exc:
+            self.grid_analysis_status.setText(str(exc))
+
+    def export_sweep_analysis(self):
+        frame = getattr(self, 'grid_analysis_frame', None)
+        if frame is None:
+            self.grid_analysis_status.setText('Run Find in saved data before exporting a filtered table.')
+            return
+        path, _ = QFileDialog.getSaveFileName(self, 'Export filtered sweep data', 'sweep-filter.csv', 'CSV (*.csv)')
+        if path:
+            try:
+                frame.to_csv(path, index=False)
+                self.grid_analysis_status.setText(f'Filtered table exported to {path}. Full sweep data is unchanged.')
+            except OSError as exc:
+                self.grid_analysis_status.setText(str(exc))
+
+    def draw_sweep_design(self):
+        path = self.result_directories.get('peaks')
+        identifier = self.design.currentData()
+        if self.grid_result and path is not None and identifier is not None:
+            frame = _read_csv(path/f'design_{int(identifier)}_spectrum.csv')
+            self.peak_plot.draw_figure(spectrum_figure(frame, title=f'Design {identifier} · saved sweep'))
 
     def target_options(self):
         return dict(holes=self.holes.records(), hole_sync=self.holes.sync_state(), linked_hole=self.holes.linked.isChecked() and not self.target_controls['use_structure_patterns'].isChecked(), bounds=self.target_bounds.records(),
                     **{key: _value(widget) for key, widget in self.target_controls.items()})
 
     def peak_options(self):
-        return dict(bounds=self.bounds.records(), shared_hole=self.shared_hole.options(), search_options={key: _value(widget) for key, widget in self.search_controls.items()},
-                    resume_history_file=self.resume_file.text().strip())
+        options={key: _value(widget) for key, widget in self.search_controls.items()}
+        if self._grid_workspace:options['search_mode']='Exhaustive grid'
+        return dict(bounds=self.bounds.records(), shared_hole=self.shared_hole.options(), search_options=options,
+                    resume_history_file='' if options['search_mode'] == 'Exhaustive grid' else self.resume_file.text().strip())
 
     def run_target(self):
+        if self._grid_workspace:
+            self.status.setText('This workspace runs the selected parameter grid. Use Run parameter sweep.')
+            return
         self._start('target', self.target_options())
 
     def run_peaks(self):
@@ -1412,10 +1522,15 @@ class OptimizePage(_RunPage):
                 if key in options.get('search_options', {}):
                     _set_value(widget, options['search_options'][key])
             self.resume_file.setText(options.get('resume_history_file', ''))
+            if self._grid_workspace:
+                method=self.search_controls['search_mode']
+                with QSignalBlocker(method):method.setCurrentIndex(method.findData('Exhaustive grid'))
             self._search_enabling()
 
     def persist_setup(self, kind):
         if self._loading:
+            return
+        if getattr(self.store,'study_navigation_enabled',False) and self.store.active_study!='tools.sweep':
             return
         try:
             self.store.save_search(kind, self.target_options() if kind == 'target' else self.peak_options())
@@ -1423,14 +1538,14 @@ class OptimizePage(_RunPage):
             self.status.setText(f'Could not save the search setup: {exc}')
 
     def restore_saved(self, reason=None):
-        if reason not in (None, 'project'):
+        if reason not in (None, 'project', 'study'):
             return
         previous = self._loading
         self._loading = True
         try:
             for kind in ('target', 'peaks'):
                 options = getattr(self.store, 'search_state', {}).get(kind)
-                if not options and reason == 'project':
+                if not options and reason in ('project', 'study'):
                     if kind == 'target':
                         from structure_sync import initial_hole_sync
                         data, state = initial_hole_sync(self.store.materials, self.store.layers, self.store.patterns)
@@ -1471,6 +1586,27 @@ class OptimizePage(_RunPage):
         else:
             frame = _read_csv(self.directory / 'design_results.csv')
             fill_table(self.peak_results, frame.rename(columns={'absorption': 'response_value'}))
+            self.grid_result = summary.get('search_mode') == 'Exhaustive grid'
+            self.grid_analysis_group.setEnabled(self.grid_result)
+            self.grid_analysis_group.setVisible(self.grid_result)
+            self.general_result_tabs.setTabText(0, 'Selected spectrum' if self.grid_result else 'Best spectrum')
+            self.general_result_tabs.setTabText(1, 'Q results' if self.grid_result else 'Highest Q')
+            self.general_result_tabs.setTabText(2, 'High / low response' if self.grid_result else 'Best response matches')
+            if self.grid_result:
+                fill_table(self.peak_matches, pd.DataFrame())
+                fill_table(self.peak_feasible, pd.DataFrame())
+                self.grid_analysis_frame = None
+                self.grid_analysis_status.setText('Choose Q or high/low R/T/A, then Find in saved data. No new solver runs.')
+                choices = [(f"Design {int(row['design_id'])} · {row['status']}", int(row['design_id']))
+                           for row in frame.to_dict('records') if pd.notna(row.get('design_id'))]
+                _choices(self.design, choices)
+                self.apply_peak.setEnabled(bool(choices))
+                self.draw_sweep_design()
+                self.general_result_tabs.setCurrentIndex(3)
+                self.peak_summary.setText(f"{summary.get('evaluated', 0)} of {summary.get('grid_designs', 0)} designs completed; "
+                    f"{summary.get('spectral_points', 0):,} saved samples. Every design and raw result is retained, including failed/incomplete statuses.")
+                self.status.setText(f"{str(summary.get('status', 'complete')).title()}. {summary.get('reason', '')} Saved to {self.directory}")
+                return
             fill_table(self.peak_matches, _read_csv(self.directory / 'matching_best.csv').rename(columns={'absorption':'response_value'}))
             fill_table(self.peak_feasible, _read_csv(self.directory / 'above_target_by_Q.csv').rename(columns={'absorption':'response_value'}))
             spectrum = _read_csv(self.directory / 'best_spectrum.csv')
@@ -1519,7 +1655,7 @@ class OptimizePage(_RunPage):
         if path:
             try:
                 self.store.apply_design(path, recommended=True)
-                self.status.setText('Verified design applied to Structure. Every page now uses this design.')
+                self.status.setText('Verified design applied to the active study structure.')
             except Exception as exc:
                 self.status.setText(str(exc))
 
@@ -1529,7 +1665,7 @@ class OptimizePage(_RunPage):
         if path and identifier is not None:
             try:
                 self.store.apply_design(path, design_id=int(identifier))
-                self.status.setText(f'Design {identifier} applied to Structure. Every page now uses this design.')
+                self.status.setText(f'Design {identifier} applied to the active study structure.')
             except Exception as exc:
                 self.status.setText(str(exc))
 
@@ -1589,7 +1725,7 @@ class FieldsPage(_RunPage):
         form.addRow(self.arrows)
         form.addRow(self.actions('Calculate field maps', self.run))
         self.setup_layout.addWidget(inputs)
-        self.setup_layout.addWidget(_button('Edit shared optical excitation',lambda:self.routeRequested.emit('optical.incident')))
+        self.setup_layout.addWidget(_button('Edit optical excitation',lambda:self.routeRequested.emit('optical.incident')))
         status_box = QGroupBox('Run status')
         status_body = QVBoxLayout(status_box)
         self.run_log = QPlainTextEdit()
@@ -1722,7 +1858,7 @@ class FieldsPage(_RunPage):
     def refresh(self, reason=None):
         choices = [('Automatic · first patterned layer', '')] + [(row['Name'], row['Name']) for row in self.store.layers.to_dict('records')[1:-1]]
         _choices(self.layer, choices, self.layer.currentData())
-        if reason == 'project':
+        if reason in ('project', 'study'):
             saved = getattr(self.store, 'search_state', {}).get('fields', {})
             for key, widget, default in [('wavelength_nm', self.wavelength, 1550), ('layer', self.layer, ''), ('grid', self.grid, 25), ('depth_samples', self.depth, 3)]:
                 _set_value(widget, saved.get(key, default))

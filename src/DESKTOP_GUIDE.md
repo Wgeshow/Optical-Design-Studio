@@ -1,6 +1,6 @@
 # S4 Optical Studio — native desktop guide
 
-The PyQt6 application uses one shared structure, the existing S4 solver and machine-learning backends, and the established saved-data format. Native controls, material selectors, scientific plots, and file dialogs operate in the desktop window. The 1.3.2 Windows x64 portable release includes its runtime; extract the complete ZIP and run Optical Design Studio.exe. Source setup is described below.
+The PyQt6 application keeps an independent editable structure and parameter set for each simulation and search tool. Select a simulation at startup, build its device, and use **Transfer inputs** when you want compatible structure data from another simulation. A portable project saves all of these setups. Native controls, material selectors, scientific plots and file dialogs operate in the desktop window. Packaged releases include their runtime; source setup is described below.
 
 ## Choose a workspace
 
@@ -12,13 +12,13 @@ Original Optical Studio retains the original optical layer/region tables, lattic
 
 ## Start on Windows
 
-Use the same 64-bit Python 3.12 environment that runs this S4 code set. On the original workstation, the launchers select `anaconda3\envs\s4_updated\python.exe` when it is available.
+Double-click `launch_qt_gui.cmd` (or `launch_peak_gui.cmd`). On first use, `setup_windows.ps1` downloads a checksum-verified environment manager, creates an isolated 64-bit Python 3.12 environment, and installs the complete desktop, numerical, DEVSIM, and MKL dependencies. It constructs the full application in an isolated temporary library and verifies the native solver against a Fresnel interface (R=0.04, T=0.96) before launching. Subsequent launches reuse the verified environment.
 
-1. Run `install_desktop_dependencies.cmd` once to install the desktop interface dependencies into that environment.
-2. Run `launch_qt_gui.cmd` to open the desktop application. `launch_peak_gui.cmd` also opens the native desktop interface.
-3. Keep the application source and required scientific runtime together. qt_app.py is the desktop entry point; app.py supplies shared application/backend code.
+The first setup requires internet access and space for the packages. Files are stored in `%LOCALAPPDATA%\OpticalDesignStudio\SolverEnvironments`; existing Python installations are unchanged. `install_desktop_dependencies.cmd` performs the same setup without launching. Keep `pcs_s4_runtime` and the application source together. An explicit `S4_PYTHON` environment variable still selects your own compatible interpreter and bypasses managed setup.
 
-If your Python environment is elsewhere, set `S4_PYTHON` to its `python.exe` before running either installer or launcher. The desktop dependency installer adds the Qt and plotting packages; it does not replace the existing S4, numerical, or machine-learning environment. Keep `pcs_s4_runtime`, `ml_dependencies`, and the application source together.
+For optional solvers, open **Solver setup → Set up automatically** in Photonic Bands, Sesame, or PCSEL. Setup finds an existing working installation or creates a separate environment and fills in the executable for the current study. Progress, cancellation and retry are available. Meep uses **Settings → Add-ons → Install FDTD engine**. MPB and Meep require WSL on Windows; their installer uses a dedicated research distribution, and **Set up Windows support** handles the Windows prerequisite when needed. No optional-engine download starts when merely opening a study.
+
+If Windows' WSL launcher needs repair, an administrator can set `ODS_WSL_EXECUTABLE` to the absolute path of a verified Microsoft WSL executable before starting the application. All solver checks, jobs, path conversion and cancellation use that launcher. This override does not repair Windows or alter existing Linux distributions; the normal Windows installation can be repaired separately.
 
 The desktop dependency set is pinned to:
 
@@ -30,7 +30,7 @@ pyqtgraph==0.14.0
 colorama==0.4.6
 ```
 
-These versions were exercised in the workstation's Conda environment. The pins also avoid the Qt 6.11 loader incompatibility observed in that environment. If Qt cannot load, rerun the desktop installer using the same Python interpreter as the launcher.
+The pins avoid the Qt 6.11 loader incompatibility observed in the earlier workstation environment. If setup fails, its error remains visible; rerun the launcher or setup script to retry. A failed candidate never replaces the previously verified environment.
 
 ## Start on Linux
 
@@ -128,7 +128,7 @@ The desktop interface does not make every computation GPU-only. The native solve
 
 Applied structures, material changes, calculation settings, and saved search options are autosaved to `data_library/desktop_session.json`. Opening the desktop app restores that session when it is readable. Material tables referenced by the session are retained in the library. Use **Save project** to create an explicit portable project version with its optical constants; this also creates a Saved results entry.
 
-The native interface reads the existing saved-work format directly. Previously saved browser projects, optimization design IDs, CSV data, field snapshots, and material presets do not require migration. In **Simulation → Saved results**, choose a saved run and then its original setup or an actual saved design to reopen it in the shared Structure. CSV previews show up to 5,000 rows; **Save complete CSV as…** copies the full result.
+The native interface reads the existing saved-work format directly. Previously saved browser projects, optimization design IDs, CSV data, field snapshots, and material presets do not require migration. In **Simulation → Saved results**, choose a saved run and then its original setup or an actual saved design to reopen it in the active simulation. Other simulation documents stay independent; explicitly opening a complete project restores that project's saved documents. CSV previews show up to 5,000 rows; **Save complete CSV as…** copies the full result.
 
 **Export whole library…** automatically saves a portable snapshot of the current applied structure before creating the ZIP. The backup includes all saved runs, material presets, and optical-constant tables. With **Include application source and bundled runtime** selected, it also contains the code set, platform launchers, requirement files, and supplied runtime/source folders. Extract the bundle before launching it, then install or build the dependencies needed by the destination system.
 

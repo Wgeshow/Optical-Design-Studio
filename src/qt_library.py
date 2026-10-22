@@ -75,7 +75,7 @@ class LibraryPage(QWidget):
         restore = QVBoxLayout()
         self.design = QComboBox()
         self.design.setAccessibleName('Saved setup to reopen')
-        self.restore = QPushButton('Reopen in Structure')
+        self.restore = QPushButton('Load into this simulation')
         self.restore.setProperty('primary', True)
         restore.addWidget(self.design, 1)
         restore.addWidget(self.restore)
@@ -365,8 +365,8 @@ class LibraryPage(QWidget):
             project, search = self.store.library.project_for(identifier, int(design))
             if search:
                 project['search'] = search
-            self.store.load_project(project)
-            self.status.setText('Loaded the saved materials, structure, and settings. Every calculation page now uses this structure.')
+            self.store.replace_active_study(project)
+            self.status.setText('Loaded the saved materials, structure and settings into this simulation.')
         except Exception as exc:
             self.status.setText('Unable to reopen setup: ' + str(exc))
 
@@ -386,7 +386,7 @@ class LibraryPage(QWidget):
         if path:
             try:
                 self.store.load_project(path)
-                self.status.setText('Project loaded into the shared Structure editor.')
+                self.status.setText('Project loaded with its saved simulation setups.')
             except Exception as exc:
                 self.status.setText('Unable to load project: ' + str(exc))
 

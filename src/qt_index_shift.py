@@ -54,6 +54,7 @@ class IndexShiftPage(_RunPage):
         self.controls=dict(start=number(0,-10,10,6),stop=number(.02,-10,10,6),samples=integer(3,1,101),
             response=_combo(['Reflection','Transmission','Absorption']),feature=_combo(['Peak','Dip']),
             reference_nm=number(1550,.000001),tracking_window_nm=number(30,.000001))
+        self._control_defaults={key:widget.currentText() if hasattr(widget,'currentText') else widget.value() for key,widget in self.controls.items()}
         box,form=_group('Material and coupling',[('Material',self.material)])
         form.addRow('Index model',self.sweep_mode)
         form.addRow(self.carrier_button)
@@ -63,11 +64,11 @@ class IndexShiftPage(_RunPage):
         controls.addWidget(self.shared)
         controls.addWidget(_label('Only occurrences of this material in checked layers are shifted, including patterned regions. Unchecked layers keep their original index.',True))
         tracking,_=_group('Sampled resonance tracking',[(label,self.controls[key]) for label,key in [('Response','response'),('Feature','feature'),('Reference λ (nm)','reference_nm'),('Search radius (nm)','tracking_window_nm')]])
-        tracking.setToolTip('Track the nearest sampled peak or dip inside the search radius. Wavelength range, incident light, basis and performance are shared with S4 · RCWA. A zero-shift baseline is included.')
+        tracking.setToolTip('Track the nearest sampled peak or dip inside the search radius. Wavelength range, incident light, basis and performance belong to this sweep. A zero-shift baseline is included.')
         controls.addWidget(tracking)
-        controls.addWidget(_button('Edit shared optical sampling',lambda:self.routeRequested.emit('optical.sweep')))
+        controls.addWidget(_button('Edit optical sampling',lambda:self.routeRequested.emit('optical.sweep')))
         self.window_label=_label('',True);controls.addWidget(self.window_label)
-        controls.addWidget(_label('Set the wavelength range and incident light on the S4 · RCWA tab. A Δn=0 baseline is always included. Basis and performance settings are shared.',True))
+        controls.addWidget(_label('Edit optical sampling to set this sweep’s wavelength range and incident light. A Δn=0 baseline is always included.',True))
         controls.addStretch()
         actions=self.actions('Run Δn sweep',self.run)
         layers=QGroupBox('Layers to shift')
@@ -129,6 +130,7 @@ class IndexShiftPage(_RunPage):
         self.workspace_splitter.setStretchFactor(1,1)
         self.layout_.addWidget(self.workspace_splitter,1);self.footer()
         self.material.currentIndexChanged.connect(self.rebuild_layers)
+        self.material.currentIndexChanged.connect(self.changed)
         self.equal.toggled.connect(self.changed)
         self.sweep_mode.currentIndexChanged.connect(self.changed)
         for widget in self.controls.values(): _on_edit(widget,self.changed)
@@ -143,7 +145,7 @@ class IndexShiftPage(_RunPage):
         self.workbench = StudyWorkbench(store, 'Refractive-index sweep',
             ['Material & layers', 'Index change', 'Calculate'], left, right,
             edit_geometry=lambda: self.routeRequested.emit('structure.original'),
-            preview_note='Shared optical layers and patterns. Checked material occurrences are shifted; the original material data stays unchanged.')
+            preview_note='This simulation’s optical layers and patterns. Checked material occurrences are shifted; the original material data stays unchanged.')
         self.workbench.add_parameter_tab(details, 'Layers & files')
         self.workbench.set_step_targets([
             lambda: self.workbench.input_tabs.setCurrentIndex(1), self.shared, tracking])
@@ -181,14 +183,14 @@ class IndexShiftPage(_RunPage):
         if self.loading:return
         saved=self.store.search_state.get('index_shift',{})
         self.loading=True
-        selected=saved.get('material',self.material.currentData())
         names=[str(n) for n in self.store.materials['Name'] if str(n).strip()]
+        selected=saved.get('material',names[0] if names else None)
         _choices(self.material,[(n,n) for n in names],selected)
         self.equal.setChecked(saved.get('equal',True))
         self.sweep_mode.setCurrentIndex(1 if saved.get('sweep_mode')=='carrier' else 0)
         self.carrier_configuration=saved.get('carrier',{})
         for k,w in self.controls.items():
-            if k in saved:_set_value(w,saved[k])
+            _set_value(w,saved.get(k,self._control_defaults[k]))
         self.loading=False
         self.rebuild_layers(saved=saved)
         s=self.store.settings
@@ -250,6 +252,7 @@ class IndexShiftPage(_RunPage):
 
     def changed(self,*_):
         if self.loading:return
+        if getattr(self.store,'study_navigation_enabled',False) and self.store.active_study!='tools.index_shift':return
         self.update_coupling()
         try:self.store.save_search('index_shift',self.options())
         except Exception as exc:self.status.setText(str(exc))

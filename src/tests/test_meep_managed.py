@@ -6,6 +6,7 @@ import tempfile
 import threading
 from types import SimpleNamespace
 import unittest
+from meep_runtime import wsl_executable
 from unittest.mock import patch
 import zipfile
 
@@ -100,7 +101,7 @@ class ImportTests(unittest.TestCase):
                  patch.object(managed, 'verify_installed', return_value=dict(available=True, version='1.30.0', message='Ready')):
                 result = managed.import_pack(path, manifest, release, root=root)
             argv = spawn.call_args.args[0]
-            self.assertEqual(argv, ['wsl.exe', '--import', managed.distro_name(), str((root/'distro').resolve()), str(path.resolve()), '--version', '2'])
+            self.assertEqual(argv, [wsl_executable(), '--import', managed.distro_name(), str((root/'distro').resolve()), str(path.resolve()), '--version', '2'])
             self.assertTrue(result['available'])
             self.assertEqual(managed.receipt(root)['state'], 'imported')
             self.assertTrue((root/'addon.json').exists())

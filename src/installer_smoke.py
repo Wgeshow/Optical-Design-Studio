@@ -14,6 +14,24 @@ import time
 import traceback
 
 
+def observe_top_level_shows(application):
+    """Observe transient windows before construction can reparent them away."""
+    from PyQt6.QtCore import QObject, QEvent
+    from PyQt6.QtWidgets import QWidget
+    class Observer(QObject):
+        def __init__(self):
+            super().__init__()
+            self.events = []
+        def eventFilter(self, widget, event):
+            if event.type() == QEvent.Type.Show and isinstance(widget, QWidget) and widget.isWindow():
+                self.events.append(dict(type=type(widget).__name__, object=widget.objectName(),
+                    title=widget.windowTitle(), parent=type(widget.parentWidget()).__name__ if widget.parentWidget() else None))
+            return False
+    observer = Observer()
+    application.installEventFilter(observer)
+    return observer
+
+
 def inspect_window_chrome(window):
     """Check the shipped title bar at its actual laid-out size."""
     from PyQt6.QtCore import Qt
@@ -91,10 +109,10 @@ def settle_window_layout(application, window):
     application.processEvents()
 
 
-def inspect_simulation_choices(window, store, application, output):
+def inspect_simulation_choices(window, store, application, output, capture=True):
     """Open every shipped model through the launcher without starting a job."""
     import copy
-    from PyQt6.QtWidgets import QLineEdit, QAbstractSpinBox, QComboBox, QTableWidget, QPushButton
+    from PyQt6.QtWidgets import QLineEdit, QAbstractSpinBox, QComboBox, QTableWidget, QPushButton, QStackedWidget, QTabWidget
     from qt_simulation_picker import SIMULATIONS
     from qt_workspace_start import WorkspaceStartDialog
     from qt_common import theme_manager
@@ -105,9 +123,10 @@ def inspect_simulation_choices(window, store, application, output):
     records = []
     attempts = []
     original_start = store.start_run
-    before_device = copy.deepcopy(store.device)
-    before_tables = {key: copy.deepcopy(getattr(store,key).to_dict('records'))
-                     for key in ('layers','patterns','materials')}
+    from simulation_documents import STUDY_IDS
+    saved = store.portable_project()
+    pages = {}
+    observer = observe_top_level_shows(application)
     launcher = WorkspaceStartDialog()
 
     def forbidden_run(*args, **kwargs):
@@ -119,14 +138,25 @@ def inspect_simulation_choices(window, store, application, output):
 
     store.start_run = forbidden_run
     try:
-        assert len(SIMULATIONS)==27 and len({row[0] for row in SIMULATIONS})==27
+        assert len(SIMULATIONS)==29 and len({row[0] for row in SIMULATIONS})==29
+        assert {row[0] for row in SIMULATIONS} == set(STUDY_IDS) | {'papers'}
         assert set(launcher.simulations.buttons)=={row[0] for row in SIMULATIONS}
-        theme_manager().apply_look('light',persist=False)
+        if theme_manager().look!='light':theme_manager().apply_look('light',persist=False)
         launcher.resize(1180,820); launcher.show(); application.processEvents()
         launcher_image=output/'00-simulation-launcher.png'
         assert launcher.grab().save(str(launcher_image))
         assert launcher.simulations.scroll.horizontalScrollBar().maximum()==0
         assert all(not button.icon().isNull() for button in launcher.simulations.buttons.values())
+        for width in (800, 1440):
+            launcher.resize(width,820); application.processEvents()
+            launcher.simulations.search.setText('no-simulation-matches-release-audit')
+            application.processEvents()
+            assert launcher.simulations.empty.isVisible() and not launcher.simulations.empty.isWindow()
+            launcher.simulations.search.clear()
+            launcher.simulations.family.setCurrentIndex(launcher.simulations.family.findData('PCSEL'))
+            application.processEvents()
+            launcher.simulations.family.setCurrentIndex(0)
+            assert all(not card.isWindow() for card in launcher.simulations.cards.values())
         launcher.hide()
         # Startup acceptance intentionally disables the chooser after one pick.
         # Exercise its same choice signals against the live window repeatedly.
@@ -165,6 +195,14 @@ def inspect_simulation_choices(window, store, application, output):
                 assert page.solver.currentData()==('legume' if target.endswith('.legume') else 'mpb')
                 preview=page.scene_stack.currentWidget()
                 record.update(dimension=page.dimension.currentData(),solver=page.solver.currentData())
+            elif target in ('tools.sweep','tools.ai'):
+                page=window.pages['Optimize' if target=='tools.sweep' else 'AI Search']
+                assert window.navigation.currentRow()==(3 if target=='tools.sweep' else 8)
+                if target=='tools.sweep':
+                    assert page._grid_workspace and page.peak_options()['search_options']['search_mode']=='Exhaustive grid'
+                    assert not page.select_tool_tab('explore.constraints')
+                    assert not page.select_tool_tab('explore.learning')
+                    record['dedicated_grid']=True
             elif target=='papers':
                 page=window.research_studies_page.library_page
                 assert window.navigation.currentRow()==11 and page.tabs.currentIndex()==1
@@ -187,7 +225,16 @@ def inspect_simulation_choices(window, store, application, output):
                     preview=page.domain_preview
                     record['dimension']=page.dimension.currentData()
                 elif engine=='thermal':preview=page.layer_preview
-                elif engine in ('advanced_transport','pcsel_unitcell_transport'):preview=page.device_preview
+                elif engine in ('advanced_transport','pcsel_unitcell_transport'):
+                    # Bias is a valid restored first section. Open the owning
+                    # device section before testing its separately reachable view.
+                    page.select_section('device_context');page.study_flow.show_stage(0)
+                    application.processEvents()
+                    if page.device_panel.compact_choice.isVisible():
+                        page.device_panel.compact_choice.setCurrentIndex(1)
+                        application.processEvents()
+                    preview=page.device_preview
+                    record['preview_navigation']='Device & assignments; Device preview when compact'
                 elif engine=='high_field_optics':
                     preview=page.input_forms['material'].band_preview
                     record['preview_scope']='Illustrative bands; no solved device or field is implied'
@@ -207,21 +254,80 @@ def inspect_simulation_choices(window, store, application, output):
             record['visible_editable_control_count']=sum(control.isVisible() for control in controls)
             record['page_class']=type(page).__name__
             if preview is not None:
+                # Navigate the real owning tabs instead of requiring the last
+                # selected input section to contain a preview. Never force-show
+                # a hidden widget: the normal tab/compact selectors own it.
+                ancestor=preview;preview_tabs=[]
+                while ancestor is not page and ancestor.parentWidget() is not None:
+                    parent=ancestor.parentWidget()
+                    if isinstance(parent,QStackedWidget) and isinstance(parent.parentWidget(),QTabWidget):
+                        tabs=parent.parentWidget();index=tabs.indexOf(ancestor)
+                        if index>=0:preview_tabs.append((tabs,index,tabs.tabText(index)))
+                    ancestor=parent
+                for tabs,index,title in reversed(preview_tabs):
+                    tabs.setCurrentIndex(index);application.processEvents()
+                if target=='high_field_optics' and page.input_forms['material'].preview_choice.isVisible():
+                    page.input_forms['material'].preview_choice.setCurrentIndex(1);application.processEvents()
+                record['preview_owning_tabs']=[title for _,_,title in preview_tabs]
                 assert preview.isVisible(),target+' preview is hidden'
                 assert preview.width()>=120 and preview.height()>=120,(target,preview.size())
                 record['preview']=dict(widget=type(preview).__name__,size=[preview.width(),preview.height()],visible=True)
-            assert store.device==before_device,target+' replaced the shared device'
-            assert all(getattr(store,key).to_dict('records')==value for key,value in before_tables.items()),target+' replaced optical tables'
+            if target!='papers':
+                assert store.active_study==target,(target,store.active_study)
+                assert page is window._active_setup_page(),target+' has the wrong owning page'
+                assert page not in pages.values(),target+' reuses another simulation setup widget'
+                pages[target]=page
+                marker=.8+number*.001
+                store.update_settings(dict(ax_um=marker,wl_start_nm=1200.+number))
+                record['draft_marker']=dict(width_um=marker,wl_start_nm=1200.+number)
+            else:
+                assert window.windowTitle()=='Optical Design Studio · Paper comparisons'
+                assert not window.transfer_inputs_button.isEnabled()
             assert not attempts and not store.busy,target+' started a job'
             filename=output/(f'{number:02d}-'+target.replace('.','-')+'.png')
-            assert window.grab().save(str(filename))
-            record.update(passed=True,screenshot=str(filename));save_progress()
+            if capture:assert window.grab().save(str(filename))
+            record.update(passed=True,screenshot=str(filename) if capture else None);save_progress()
+        for record in records:
+            if record['target']=='papers':continue
+            launcher.simulations.buttons[record['target']].click();application.processEvents()
+            marker=record['draft_marker']
+            assert math.isclose(store.device['width_um'],marker['width_um']),record
+            assert store.settings['wl_start_nm']==marker['wl_start_nm'],record
+            assert window._active_setup_page() is pages[record['target']],record
+        portable=store.portable_project()
+        restored=type(store)(store.library,restore=False)
+        restored.load_project(portable,autosave=False)
+        for record in records:
+            if record['target']=='papers':continue
+            restored.activate_study(record['target'])
+            marker=record['draft_marker']
+            assert math.isclose(restored.device['width_um'],marker['width_um']),record
+            assert restored.settings['wl_start_nm']==marker['wl_start_nm'],record
+        restored.activate_study('electrical.iv')
+        wavelength=restored.settings['wl_start_nm']
+        restored.transfer_study_inputs('optical')
+        assert restored.device['width_um']==restored.study_project('optical')['device']['width_um']
+        assert restored.settings['wl_start_nm']==wavelength
+        restored.update_settings(dict(ax_um=2.345))
+        assert restored.study_project('optical')['device']['width_um']!=2.345
+        for _ in range(2):
+            repeated=WorkspaceStartDialog()
+            repeated.simulations.search.setText('release-audit-no-match')
+            repeated.show();application.processEvents()
+            repeated.simulations.search.clear();application.processEvents()
+            repeated.hide();repeated.deleteLater();application.processEvents()
+        unexpected=[event for event in observer.events if event['type']!='WorkspaceStartDialog']
+        assert not unexpected,unexpected
         return dict(choices_checked=len(records),choices=records,launcher_screenshot=str(launcher_image),
             progress_report=str(progress),editable_models_verified=True,correct_model_routes_verified=True,
-            physical_geometry_preserved=True,automatic_jobs_started=0)
+            independent_documents_verified=True,portable_drafts_verified=True,selective_transfer_verified=True,
+            unique_setup_pages=len(pages),no_unintended_windows=True,top_level_shows=observer.events,automatic_jobs_started=0)
     finally:
         store.start_run=original_start
         launcher.hide();launcher.deleteLater();application.processEvents()
+        application.removeEventFilter(observer)
+        store.load_project(saved,autosave=False)
+        window._open_simulation_choice(store.active_study)
 
 
 def inspect_busy_close_guard(window, application):
@@ -424,12 +530,22 @@ def run(report_path):
         library_root=os.environ.get('S4_LIBRARY_ROOT'),
         checks={},
     )
+    critical=os.environ.get('ODS_RELEASE_CRITICAL_SMOKE')=='1'
+    report['validation_profile']='critical_release' if critical else 'full_installer'
+    report['omitted_checks']=[]
+    critical_checks={'bundled_library','desktop_pages_and_themes','simulation_launcher_and_model_screens',
+        'no_transient_panel_windows','exact_parameter_grid','native_cpu_spectrum','dependency_origins',
+        'automatic_environment_resources'}
 
     def save():
         report['elapsed_seconds'] = round(time.monotonic()-started, 3)
         report_path.write_text(json.dumps(report, indent=2, allow_nan=False), encoding='utf-8')
 
     def check(name, function):
+        if critical and name not in critical_checks:
+            report['omitted_checks'].append(name)
+            save()
+            return True
         before = time.monotonic()
         try:
             detail = function()
@@ -461,6 +577,7 @@ def run(report_path):
         application.setQuitOnLastWindowClosed(False)
         application.setApplicationName('Optical Design Studio')
         application.setOrganizationName('ZhouGroup')
+        startup_observer=observe_top_level_shows(application)
         library = DataLibrary(os.environ['S4_LIBRARY_ROOT'])
         store = ProjectStore(library, restore=False)
 
@@ -492,8 +609,19 @@ def run(report_path):
                         'AI Search', 'Results', 'Photonic Bands', 'More studies']
             if list(window.pages) != expected:
                 raise AssertionError('Some desktop pages are missing.')
-            if window.windowTitle() != 'Optical Design Studio · Device Studio':
+            if window.windowTitle() != 'Optical Design Studio · '+window._study_title():
                 raise AssertionError('Unexpected application title.')
+            if critical:
+                theme_manager().apply_look('light',persist=False)
+                layouts=[];images=[]
+                for width,height in ((800,800),(1440,960)):
+                    window.resize(width,height);settle_window_layout(application,window)
+                    layouts.append(inspect_window_chrome(window))
+                    filename=report_path.parent/('critical-light-'+str(width)+'.png')
+                    assert window.grab().save(str(filename));images.append(str(filename))
+                return dict(pages=expected,themes=['light'],screenshots=images,integrated_title_bar=layouts,
+                    title=window.windowTitle(),window_icon_present=not window.windowIcon().isNull(),
+                    scope='Light appearance at800/1440; all29 simulation setups checked separately; full theme matrix omitted')
             screenshots = []
             chrome_layouts = []
             looks=('dark','light','glass_dark','glass_light')
@@ -504,6 +632,7 @@ def run(report_path):
                     settle_window_layout(application, window)
                     chrome_layouts.append(dict(theme=mode, **inspect_window_chrome(window)))
                 for index, name in enumerate(expected):
+                    window._open_simulation_choice('optical')
                     window._navigate_route(index)
                     application.processEvents()
                     if window.stack.currentIndex() != (2 if index in (4,5) else index) or window.sidebar.isVisible() or window.workspace_tabs.isVisible():
@@ -518,7 +647,13 @@ def run(report_path):
                         title=window.windowTitle(), window_icon_present=not window.windowIcon().isNull())
 
         check('desktop_pages_and_themes', render_interface)
-        check('simulation_launcher_and_model_screens', lambda: inspect_simulation_choices(window,store,application,report_path.parent))
+        check('simulation_launcher_and_model_screens', lambda: inspect_simulation_choices(window,store,application,report_path.parent,capture=not critical))
+        def no_stray_windows():
+            unexpected=[event for event in startup_observer.events if event['type'] not in ('OpticalStudio','WorkspaceStartDialog')]
+            application.removeEventFilter(startup_observer)
+            assert not unexpected,unexpected
+            return dict(unintended_count=0,events=startup_observer.events,observed_before_main_construction=True)
+        check('no_transient_panel_windows',no_stray_windows)
         check('maximize_restore_painting', lambda: inspect_maximize_painting(window, application, report_path.parent))
         def original_reference_controls():
             previous=window.workspace_profile
@@ -607,7 +742,7 @@ def run(report_path):
                 timed_out.append(True)
                 worker.cancel()
 
-            worker.event.connect(events.append)
+            worker.progress_event.connect(events.append)
             worker.completed.connect(completed.append)
             worker.failed.connect(errors.append)
             worker.finished.connect(loop.quit)
@@ -625,6 +760,61 @@ def run(report_path):
             terminal['self_test_event_count'] = len(events)
             terminal['self_test_points'] = len(spec['model']['points'])
             return terminal
+
+        def exact_parameter_grid():
+            import copy, hashlib, zipfile
+            from model import MAT_COLS, LAYER_COLS, PAT_COLS
+            from peak_optimizer import analyze_grid_results
+            saved=store.portable_project()
+            source=store.optical_geometry_source
+            try:
+                project=copy.deepcopy(saved)
+                project['materials']=[dict(zip(MAT_COLS,row)) for row in (
+                    ['Air','constant_nk',1.,0.,'','nm'],['Film','constant_nk',3.4,.015,'','nm'],
+                    ['Glass','constant_nk',1.5,0.,'','nm'])]
+                project['layers']=[dict(zip(LAYER_COLS,row)) for row in (
+                    ['Top',0.,'Air'],['Device',.25,'Film'],['Bottom',0.,'Glass'])]
+                project['patterns']=[dict(zip(PAT_COLS,['circle','Device','Air',0.,0.,.1,0.,0.]))]
+                project['settings'].update(ax_um=.77,ay_um=.77,NumG=9,mode='Wavelength sweep',
+                    wl_start_nm=1500.,wl_stop_nm=1553.,wl_step_nm=10.,theta_deg=0.,phi_deg=0.,polarization='p')
+                project['settings'].pop('optical_unit_cell',None)
+                store.load_project(project,autosave=False)
+                store.optical_geometry_source='original_tables'
+                options=dict(bounds=[dict(Parameter='thickness',Target='Device',Min=.25,Max=.35,Step=.1,Choices=''),
+                    dict(Parameter='radius',Target='1',Min=.1,Max=.15,Step=.05,Choices='')],
+                    search_options=dict(search_mode='Exhaustive grid',design_budget=4,point_budget=100))
+                result=backend_job('peaks',options)
+                directory=Path(result['directory'])
+                summary=json.loads((directory/'search_summary.json').read_text())
+                assert summary['evaluated']==4 and summary['grid_designs']==4,summary
+                base=json.loads((directory/'search_config.json').read_text())['base_model']
+                models=[json.loads(line) for line in (directory/'design_models.jsonl').read_text().splitlines()]
+                pairs={(round(row['model']['layers'][1]['thickness'],8),round(row['model']['patterns'][0]['sx'],8)) for row in models}
+                assert pairs=={(t,r) for t in (.25,.35) for r in (.1,.15)},pairs
+                for row in models:
+                    model=copy.deepcopy(row['model'])
+                    model['layers'][1]['thickness']=base['layers'][1]['thickness']
+                    model['patterns'][0]['sx']=base['patterns'][0]['sx']
+                    assert model==base,'Unselected input changed during exhaustive sweep'
+                with (directory/'all_spectra.csv').open() as handle:rows=list(csv.DictReader(handle))
+                assert len(rows)==24==summary['spectral_points'],summary
+                assert sorted({float(row['wavelength_nm']) for row in rows})==[1500.,1510.,1520.,1530.,1540.,1550.]
+                immutable=lambda:{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in directory.iterdir() if p.is_file()}
+                before=immutable();filters={}
+                for response,direction,metric in [('Reflection','Low','Response'),('Transmission','High','Response'),
+                    ('Absorption','High','Response'),('Reflection','High','Q factor')]:
+                    filters[direction+' '+response+' '+metric]=len(analyze_grid_results(directory,response,direction,metric=metric))
+                assert immutable()==before,'Post-analysis modified raw simulation data'
+                with zipfile.ZipFile(directory/'grid_sweep_results.zip') as archive:
+                    for name in ('all_spectra.csv','design_results.csv','design_models.jsonl','search_config.json','search_summary.json'):
+                        assert archive.read(name)==(directory/name).read_bytes(),name
+                return dict(directory=str(directory),designs=4,spectral_rows=24,unselected_inputs_unchanged=True,
+                    exact_requested_wavelengths=True,archive_raw_bytes_verified=True,post_analysis_immutable=True,
+                    filters=filters,scope='Native CPU backend via desktop prepare_job; no scientific resonance accuracy claim')
+            finally:
+                store.load_project(saved,autosave=False);store.optical_geometry_source=source
+
+        check('exact_parameter_grid',exact_parameter_grid)
 
         def exact_cutoff_and_phase():
             import copy
@@ -959,9 +1149,13 @@ def run(report_path):
             import matplotlib
             import pyqtgraph,qt_native_figure,qt_native_field_volume,qt_native_plot
             import field_sampling, field_storage, scan_storage, simulation_fields
+            import solver_environment,desktop_environment_probe,qt_solver_environment,simulation_documents,qt_study_transfer
+            import meep_bootstrap,meep_runtime,meep_managed,yaml
             modules = [numpy, scipy, sklearn, PyQt6.QtCore, matplotlib,pyqtgraph,
                        qt_native_figure,qt_native_field_volume,qt_native_plot,
-                       field_sampling,field_storage,scan_storage,simulation_fields]
+                       field_sampling,field_storage,scan_storage,simulation_fields,
+                       solver_environment,desktop_environment_probe,qt_solver_environment,simulation_documents,qt_study_transfer,
+                       meep_bootstrap,meep_runtime,meep_managed,yaml]
             origins = {module.__name__: str(module.__file__) for module in modules}
             if report['frozen']:
                 root = Path(sys.executable).resolve().parent
@@ -972,6 +1166,17 @@ def run(report_path):
             return origins
 
         check('dependency_origins', runtime_origins)
+        def environment_setup_resources():
+            from solver_environment import PACKAGES,WSL_PACKAGES,PROBES
+            root=Path(getattr(sys,'_MEIPASS',Path(__file__).parent))
+            workers=['meep_runner.py','research_physics_worker.py','pcsel_physics_worker.py','pcsel_transport_worker.py']
+            assert all((root/name).is_file() for name in workers),str(root)
+            assert set(PACKAGES)|set(WSL_PACKAGES)=={'legume','gmsh','sesame','mpb','meep'}
+            assert set(PROBES)=={'legume','gmsh','sesame','meep'}
+            return dict(providers=sorted(set(PACKAGES)|set(WSL_PACKAGES)),workers=workers,
+                setup_modules_imported=True,downloads_started=False,optional_solvers_bundled=False,
+                limitation='Installer resources and imports checked; optional solver downloads and paper physics were not repeated.')
+        check('automatic_environment_resources',environment_setup_resources)
     except Exception:
         report['checks']['initialization'] = dict(passed=False, traceback=traceback.format_exc())
     finally:

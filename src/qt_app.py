@@ -42,7 +42,7 @@ class StructureNotice(QFrame):
         layout.setContentsMargins(14,10,12,12)
         layout.setSpacing(4)
         heading=QHBoxLayout()
-        title=QLabel('Shared Structure updated')
+        title=QLabel('Simulation structure updated')
         self.title_label=title
         title.setObjectName('noticeTitle')
         heading.addWidget(title,1)
@@ -93,6 +93,12 @@ class OpticalStudio(QMainWindow):
     def _initialize(self,store,workspace_profile):
         self.workspace_profile='device'
         self.store=store or ProjectStore()
+        self._opening_study=False
+        self._routing=False
+        self._opened_studies=set()
+        self._setup_views={}
+        self._result_navigation_bound=set()
+        self._header_results_study=None
         self.preferences=preferences()
         self.project_path=None
         self._saved_project=None if self.store.session_path.exists() else copy.deepcopy(self.store.project())
@@ -140,7 +146,7 @@ class OpticalStudio(QMainWindow):
         self.project_select.setMaximumWidth(200)
         self.project_select.hide()
         project_layout.addWidget(self.project_select)
-        self.workspace_context=QLabel('Shared builder + Canvas tools')
+        self.workspace_context=QLabel('Simulation device + Canvas tools')
         self.workspace_context.setObjectName('referenceWorkspaceContext')
         project_layout.addWidget(self.workspace_context)
         project_layout.addStretch(1)
@@ -162,7 +168,7 @@ class OpticalStudio(QMainWindow):
         self.save_as_action.setShortcut(QKeySequence.StandardKey.SaveAs)
         self.addAction(self.save_as_action)
         menu.addSeparator()
-        menu.addAction('Export geometry…', self._open_export_menu)
+        self.export_geometry_action=menu.addAction('Export geometry…', self._open_export_menu)
         menu.addAction('Saved work library…',lambda:self._navigate_route(5))
         self.switch_workspace_action=menu.addAction('Switch workspace…',self.choose_workspace)
         menu.addAction('Choose simulation…',self.choose_workspace)
@@ -194,11 +200,21 @@ class OpticalStudio(QMainWindow):
         self.optical_routes=[0,1,2,3,8,6,7]
         for label in ['Structure','Materials','Simulation','Simulation Sweep','AI Search','Settings','Help']:
             self.optical_workflow.addTab(label)
-        self.optical_workflow.currentChanged.connect(lambda i:self._navigate_route(self.optical_routes[i]) if 0<=i<len(self.optical_routes) else None)
+        self.optical_workflow.currentChanged.connect(self._navigate_header)
         navigation_bar=QFrame();self.navigation_bar=navigation_bar;navigation_bar.setObjectName('projectHeader');navigation_bar.setFixedHeight(42)
         navigation_layout=QHBoxLayout(navigation_bar)
         self.navigation_layout=navigation_layout
         navigation_layout.setContentsMargins(14,0,10,0);navigation_layout.setSpacing(8)
+        self.simulation_picker_button=QPushButton('Choose simulation…')
+        self.simulation_picker_button.setObjectName('chooseActiveSimulation')
+        self.simulation_picker_button.setIcon(reference_icon('simulation',COLORS[theme_manager().mode]['text']))
+        self.simulation_picker_button.clicked.connect(self.choose_workspace)
+        navigation_layout.addWidget(self.simulation_picker_button)
+        self.active_simulation_label=QLabel()
+        self.active_simulation_label.setObjectName('activeSimulationTitle')
+        self.active_simulation_label.setMinimumWidth(0)
+        self.active_simulation_label.setAccessibleName('Active simulation workspace')
+        navigation_layout.addWidget(self.active_simulation_label,1)
         self.optical_workflow.setMaximumWidth(1040)
         navigation_layout.addWidget(self.optical_workflow,1)
         navigation_layout.addStretch(0)
@@ -206,6 +222,12 @@ class OpticalStudio(QMainWindow):
         self.diagnostic_back_button.clicked.connect(self._return_from_diagnostic)
         self.diagnostic_back_button.hide()
         navigation_layout.addWidget(self.diagnostic_back_button)
+        self.transfer_inputs_button=QPushButton('Transfer inputs…')
+        self.transfer_inputs_button.setObjectName('transferStudyInputs')
+        self.transfer_inputs_button.setIcon(reference_icon('import',COLORS[theme_manager().mode]['text']))
+        self.transfer_inputs_button.setToolTip('Copy compatible structure inputs from another simulation. Each simulation keeps its own editable device and settings.')
+        self.transfer_inputs_button.clicked.connect(self._transfer_study_inputs)
+        navigation_layout.addWidget(self.transfer_inputs_button)
         self._diagnostic_origin=None
         self.project_button=QToolButton()
         self.project_button.setObjectName('projectPicker')
@@ -230,6 +252,13 @@ class OpticalStudio(QMainWindow):
         self.chrome.file_button.setText('⋮')
         navigation_layout.addWidget(self.chrome.file_button)
         root.addWidget(navigation_bar)
+        self.workflow_navigation=QFrame()
+        self.workflow_navigation.setObjectName('simulationSectionNavigation')
+        self.workflow_navigation_layout=QHBoxLayout(self.workflow_navigation)
+        self.workflow_navigation_layout.setContentsMargins(14,0,10,0)
+        self.workflow_navigation.setFixedHeight(40)
+        self.workflow_navigation.hide()
+        root.addWidget(self.workflow_navigation)
         body=QHBoxLayout()
         body.setContentsMargins(0,0,0,0)
         body.setSpacing(0)
@@ -290,6 +319,7 @@ class OpticalStudio(QMainWindow):
         self.workspace=workspace
         body.addWidget(workspace,1)
         content=QVBoxLayout(workspace)
+        self.content_layout=content
         content.setContentsMargins(0,0,0,0)
         content.setSpacing(0)
         self.stack=QStackedWidget(workspace)
@@ -337,10 +367,13 @@ class OpticalStudio(QMainWindow):
         from simulation_setup_state import SimulationSetupState
         from qt_simulation_setup import SimulationSetupWorkspace
         self.setup_state=SimulationSetupState(self.store,self)
-        self.electrical_page=SimulationSetupWorkspace(self.store,self.simulation_engines,mode='electrical',state=self.setup_state)
-        self.simulation_engines.addTab(self.electrical_page,'Electrical')
+        self.electrical_stack=QStackedWidget()
+        self.electrical_page=SimulationSetupWorkspace(self.store,self.electrical_stack,mode='electrical',state=self.setup_state,document_id='electrical')
+        self.electrical_pages={'electrical':self.electrical_page}
+        self.electrical_stack.addWidget(self.electrical_page)
+        self.simulation_engines.addTab(self.electrical_stack,'Electrical')
         yield 'Prepared electrical simulation setup'
-        self.coupled_page=SimulationSetupWorkspace(self.store,self.simulation_engines,mode='coupled',state=self.setup_state)
+        self.coupled_page=SimulationSetupWorkspace(self.store,self.simulation_engines,mode='coupled',state=self.setup_state,document_id='coupled')
         self.simulation_engines.addTab(self.coupled_page,'Coupled')
         yield 'Prepared coupled simulation setup'
         self.optical_setup=SimulationSetupWorkspace(self.store,self.simulation_engines,mode='optical',state=self.setup_state)
@@ -365,12 +398,16 @@ class OpticalStudio(QMainWindow):
         self.store.busy_changed.connect(self._setup_busy_changed)
         from qt_results_workspace import ResultsWorkspace
         self.results_page=ResultsWorkspace(self.store)
+        self.result_pages={'optical':self.results_page}
         self.results_page.setProperty('referenceWorkspace',True)
         self.navigation.addItem('Results');self.stack.addWidget(self.results_page)
         self.pages['Results']=self.results_page
         from qt_photonic_bands import PhotonicBandsWorkspace
         from qt_research_studies import ResearchStudiesWorkspace
-        self.photonic_bands_page=PhotonicBandsWorkspace(self.store,self.stack)
+        self.photonic_bands_stack=QStackedWidget()
+        self.photonic_bands_page=PhotonicBandsWorkspace(self.store,self.photonic_bands_stack,document_id='photonic_bands')
+        self.photonic_bands_pages={'photonic_bands':self.photonic_bands_page}
+        self.photonic_bands_stack.addWidget(self.photonic_bands_page)
         self.research_studies_page=ResearchStudiesWorkspace(self.store,self.stack)
         self.research_studies_page.projectReplacementRequested.connect(self._open_research_reference)
         self.research_studies_page.independentBenchmarkRequested.connect(self._open_band_reference)
@@ -379,7 +416,7 @@ class OpticalStudio(QMainWindow):
         for label,page in (('Photonic Bands',self.photonic_bands_page),('More studies',self.research_studies_page)):
             page.set_embedded(True)
             self.navigation.addItem(label)
-            self.stack.addWidget(page)
+            self.stack.addWidget(self.photonic_bands_stack if label=='Photonic Bands' else page)
             self.pages[label]=page
             page.diagnosticRequested.connect(lambda target,p=page:self._open_input_diagnostic(target,p))
             if hasattr(page,'routeRequested'):page.routeRequested.connect(self._route_setup_action)
@@ -416,7 +453,9 @@ class OpticalStudio(QMainWindow):
             else:simulation_page.layout().insertWidget(0,bar)
             bar.currentChanged.connect(lambda index,bar=bar:self._navigate_route(2,bar.tabData(index)) if index>=0 else None)
             self.simulation_local_bars.append(bar)
-            if simulation_page in (self.pages['Simulate'],self.electrical_page,self.coupled_page):bar.hide()
+            # Simulation switching belongs to the chooser, not a sibling tool
+            # strip inside another simulation's editable workspace.
+            bar.hide()
         self.simulation_engines.currentChanged.connect(self._sync_simulation_local_bars)
         self._sync_simulation_local_bars(self.simulation_engines.currentIndex())
         self.pages['Structure'].continue_requested.connect(lambda:self._navigate_route(1))
@@ -504,11 +543,189 @@ class OpticalStudio(QMainWindow):
         self.store.search_changed.connect(self._refresh_project_file)
         self._refresh_project_file()
         self._sync_run_actions()
+        self._construction_complete=True
+        self._ensure_study_workspace(self.store.active_study)
         self.set_workspace_profile(workspace_profile)
         self.store.changed.connect(self._refresh_original_geometry_label)
         self._refresh_original_geometry_label()
-        self._construction_complete=True
+        self.store.study_requested.connect(self._open_simulation_choice)
+        self.store.study_navigation_enabled=True
         self.setUpdatesEnabled(True)
+
+    def _activate_study(self,target):
+        if not self._construction_complete:return
+        if self.store.active_study==target:
+            self._ensure_study_workspace(target)
+            return
+        self._flush_research_drafts()
+        self.store.activate_study(target)
+        self._ensure_study_workspace(target)
+        self._diagnostic_origin=None
+        self.diagnostic_back_button.hide()
+
+    def _ensure_study_workspace(self,target):
+        if target.startswith('electrical'):
+            if target not in self.electrical_pages:
+                from qt_simulation_setup import SimulationSetupWorkspace
+                page=SimulationSetupWorkspace(self.store,self.electrical_stack,mode='electrical',state=self.setup_state,document_id=target)
+                page.setProperty('referenceWorkspace',True)
+                page.selectWorkflow.connect(self._select_simulation_workflow)
+                page.routeRequested.connect(self._route_setup_action)
+                page.runRequested.connect(self._run_setup_mode)
+                page.editDeviceRequested.connect(lambda:self._navigate_route(0))
+                page.resultsRequested.connect(lambda record:self._open_simulation_result(record.get('directory'),record.get('summary',{})))
+                page.diagnosticRequested.connect(lambda issue,p=page:self._open_input_diagnostic(issue,p))
+                for action in getattr(page,'starts',[])+getattr(page,'stops',[]):action.hide()
+                self.electrical_pages[target]=page
+                self.electrical_stack.addWidget(page)
+            self.electrical_page=self.electrical_pages[target]
+            self.electrical_stack.setCurrentWidget(self.electrical_page)
+        elif target.startswith('photonic_bands'):
+            if target not in self.photonic_bands_pages:
+                from qt_photonic_bands import PhotonicBandsWorkspace
+                page=PhotonicBandsWorkspace(self.store,self.photonic_bands_stack,document_id=target)
+                page.set_embedded(True)
+                page.diagnosticRequested.connect(lambda issue,p=page:self._open_input_diagnostic(issue,p))
+                if hasattr(page,'routeRequested'):page.routeRequested.connect(self._route_setup_action)
+                self.photonic_bands_pages[target]=page
+                self.photonic_bands_stack.addWidget(page)
+            self.photonic_bands_page=self.photonic_bands_pages[target]
+            self.photonic_bands_stack.setCurrentWidget(self.photonic_bands_page)
+            self.pages['Photonic Bands']=self.photonic_bands_page
+
+    def _study_title(self):
+        from qt_simulation_picker import SIMULATIONS
+        return next((title for identifier,title,*_ in SIMULATIONS if identifier==self.store.active_study), 'Simulation')
+
+    def _study_location(self):
+        """The active document owns navigation; hidden tabs are never authority."""
+        active=self.store.active_study
+        if active.startswith('photonic_bands'):return 10,None
+        if active=='tools.sweep':return 3,None
+        if active=='tools.ai':return 8,None
+        engine={'optical':7 if self.workspace_profile=='original' else 0,'fdtd':1,
+            'tools.index_shift':2,'tools.fields':3,'electrical':5,'electrical.iv':5,
+            'electrical.cv':5,'coupled':6}.get(active)
+        return (2,engine) if engine is not None else (11,None)
+
+    def _open_active_setup(self):
+        route,engine=self._study_location()
+        self._navigate_route(route,engine)
+        if route==11:
+            active=self.store.active_study
+            owner='pcsel' if active.startswith('pcsel.') else 'sesame_transport' if active.startswith('sesame_transport') else active
+            self.research_studies_page.select_engine(owner)
+
+    def _sync_study_context(self):
+        if not hasattr(self,'active_simulation_label'):return
+        library=self.navigation.currentRow()==11 and self.research_studies_page.stack.currentWidget() is self.research_studies_page.library_page
+        title='Paper comparisons' if library else self._study_title()
+        self.active_simulation_label.setText(self.active_simulation_label.fontMetrics().elidedText(title,Qt.TextElideMode.ElideRight,max(120,min(480,self.width()-390))))
+        self.active_simulation_label.setToolTip('Open a reference as an editable simulation.' if library else title+' · independent device and parameters')
+        self.setWindowTitle('Optical Design Studio · '+title)
+        self.simulation_picker_button.setEnabled(not self.store.busy)
+        self.transfer_inputs_button.setEnabled(not self.store.busy and not library)
+        from simulation_documents import FINITE
+        self.export_geometry_action.setEnabled(self.store.active_study in FINITE)
+        active=self.store.active_study
+        page=self.electrical_page if active.startswith('electrical') else self.coupled_page if active=='coupled' else self.optical_setup if active in ('optical','fdtd','tools.index_shift','tools.fields','tools.sweep','tools.ai') else None
+        if page is not None and getattr(page,'_bound_study_id',None) in (None,active) and hasattr(page,'set_simulation_context'):
+            page.set_simulation_context(active)
+
+    def _navigate_header(self,index):
+        if not 0<=index<len(self.optical_routes):return
+        route=self.optical_routes[index]
+        if route==9:self._open_active_results()
+        elif route==2:
+            self._open_active_setup()
+            page=self._active_setup_page()
+            navigation=self._embedded_result_navigation(page)
+            if navigation is not None:
+                tabs,is_result=navigation
+                if is_result(tabs.currentIndex()):
+                    previous=self._setup_views.get(page)
+                    if previous is not None and tabs.indexOf(previous)>=0:tabs.setCurrentWidget(previous)
+                    else:
+                        first=next((i for i in range(tabs.count()) if not is_result(i)),None)
+                        if first is not None:tabs.setCurrentIndex(first)
+            self._header_results_study=None
+            self._sync_workspace_tabs(self.navigation.currentRow())
+        else:self._navigate_route(route)
+
+    def _active_setup_page(self):
+        route,engine=self._study_location()
+        if route==10:return self.photonic_bands_page
+        if route==11:return self.research_studies_page.stack.currentWidget()
+        if route in (3,8):return self.pages['Optimize' if route==3 else 'AI Search']
+        return {0:self.optical_setup,1:self.fdtd_page,2:self.index_shift_page,3:self.pages['Fields'],
+            5:self.electrical_page,6:self.coupled_page,7:self.pages['Simulate']}.get(engine)
+
+    def _embedded_result_navigation(self,page):
+        if hasattr(page,'workbench'):
+            return page.workbench.views,lambda index:index>0
+        if hasattr(page,'tabs') and hasattr(page,'results') and page.tabs.indexOf(page.results)>=0:
+            return page.tabs,lambda index:page.tabs.widget(index) is page.results
+        return None
+
+    def _bind_result_navigation(self,page):
+        navigation=self._embedded_result_navigation(page)
+        if navigation is None:return
+        tabs,is_result=navigation
+        if not is_result(tabs.currentIndex()):self._setup_views[page]=tabs.currentWidget()
+        if page in self._result_navigation_bound:return
+        self._result_navigation_bound.add(page)
+        def changed(index):
+            if not is_result(index):self._setup_views[page]=tabs.widget(index)
+            if not self._construction_complete or self._opening_study or self._routing:return
+            route,_=self._study_location()
+            if self.navigation.currentRow()!=route or self._active_setup_page() is not page:return
+            self._header_results_study=self.store.active_study if is_result(index) else None
+            self._sync_workspace_tabs(route)
+        tabs.currentChanged.connect(changed)
+
+    def _visible_header_route(self,page_index):
+        route,_=self._study_location()
+        if page_index==route:
+            page=self._active_setup_page()
+            self._bind_result_navigation(page)
+            navigation=self._embedded_result_navigation(page)
+            if navigation is not None:return 9 if navigation[1](navigation[0].currentIndex()) else 2
+            if self._header_results_study==self.store.active_study:return 9
+        return 2 if page_index in (3,8,10,11) else page_index
+
+    def _open_active_results(self):
+        route,engine=self._study_location()
+        if route in (10,11):
+            self._open_active_setup()
+            page=self.photonic_bands_page if route==10 else self.research_studies_page.stack.currentWidget()
+            if hasattr(page,'select_section'):page.select_section('Results')
+            elif hasattr(page,'tabs'):
+                for index in range(page.tabs.count()):
+                    if 'result' in page.tabs.tabText(index).lower():page.tabs.setCurrentIndex(index);break
+            if hasattr(page,'workbench'):page.workbench.show_results()
+            self._header_results_study=self.store.active_study
+            self._sync_workspace_tabs(route)
+            return
+        if route in (3,8) or engine in (1,2,3,7):
+            self._open_active_setup()
+            page={3:self.pages['Optimize'],8:self.pages['AI Search']}.get(route) if route!=2 else {1:self.fdtd_page,2:self.index_shift_page,3:self.pages['Fields'],7:self.pages['Simulate']}[engine]
+            if hasattr(page,'show_results'):page.show_results()
+            elif hasattr(page,'workbench'):page.workbench.show_results()
+            self._header_results_study=self.store.active_study
+            self._sync_workspace_tabs(route)
+            return
+        self._navigate_route(9)
+
+    def _transfer_study_inputs(self):
+        from qt_study_transfer import StudyTransferDialog
+        from PyQt6.QtWidgets import QDialog
+        self._flush_research_drafts()
+        dialog=StudyTransferDialog(self.store,self)
+        if dialog.exec()==QDialog.DialogCode.Accepted:
+            try:
+                self.store.transfer_study_inputs(dialog.source.currentData())
+                self.status.setText('Compatible structure inputs copied. Review this simulation’s inputs before running.')
+            except (ValueError,OSError) as exc:self.show_error(str(exc))
 
     def _refresh_original_geometry_label(self,*_):
         from optical_unit_cell import pc_unit_cell
@@ -552,7 +769,7 @@ class OpticalStudio(QMainWindow):
                 while bar.count():bar.removeTab(0)
                 for engine,text in choices:
                     index=bar.addTab(text);bar.setTabData(index,engine)
-            bar.setVisible(profile=='original' or bar is not self.simulation_local_bars[0])
+            bar.hide()
         index=self.simulation_engines.currentIndex()
         for engine in (0,5,6):self.simulation_engines.setTabEnabled(engine,profile!='original')
         self.simulation_engines.setTabEnabled(7,profile=='original')
@@ -562,32 +779,48 @@ class OpticalStudio(QMainWindow):
         self._reference_navigation_mode=None
         if profile=='original' and self.navigation.currentRow()==9:
             self._navigate_route(2,7)
-        else:self._sync_workspace_tabs(self.navigation.currentRow())
+        else:self._navigate_route(self.navigation.currentRow())
         self.status.setText(self._idle_workspace_description())
 
         if simulation_target:self._open_simulation_choice(simulation_target)
 
     def _open_simulation_choice(self,target):
         """Open the selected editable model without starting or replacing a project."""
+        if self._opening_study:return
+        self._opening_study=True
+        try:
+            if target!='papers':self._activate_study(target)
+            self._open_simulation_choice_page(target)
+        finally:
+            self._opening_study=False
+            self._sync_workspace_tabs(self.navigation.currentRow())
+
+    def _open_simulation_choice_page(self,target):
+        first_visit=target not in self._opened_studies
+        self._opened_studies.add(target)
         if target.startswith('photonic_bands'):
             self._navigate_route(10)
             page=self.photonic_bands_page
             dimension=3 if target=='photonic_bands' else 2
             solver='legume' if target.endswith('.legume') else 'mpb'
+            if dimension==2 and 'bands' not in self.store.search_state.get('research_workspaces',{}):
+                page.initialize_2d_document(solver)
             page.dimension.setCurrentIndex(page.dimension.findData(dimension))
             page.solver.setCurrentIndex(page.solver.findData(solver))
-            page.show_stage('unit');page.flush_draft()
+            if first_visit:page.show_stage('unit')
+            page.flush_draft()
         elif target.startswith('sesame_transport'):
             self._navigate_route(11);self.research_studies_page.select_engine('sesame_transport')
             page=self.research_studies_page._pages['sesame_transport']
             page.dimension.setCurrentIndex(page.dimension.findData(2 if target.endswith('.2d') else 1))
-            page.study_flow.show_stage(0);page.flush_draft()
+            if first_visit:page.study_flow.show_stage(0)
+            page.flush_draft()
         elif target in ('electrical','electrical.iv','electrical.cv'):
             self._select_simulation_workflow('electrical')
             choice={'electrical':'bias','electrical.iv':'iv','electrical.cv':'cv'}[target]
             try:self.setup_state.set('ui.electrical.study',choice)
             except ValueError:pass
-            self.electrical_page.select_section('electrical.study')
+            if first_visit:self.electrical_page.select_section('electrical.study')
             if self.setup_state.get('ui.electrical.study')!=choice:
                 self.status.setText('Select the editable-device model to use this study. Your existing settings are preserved.')
         elif target=='papers':
@@ -595,31 +828,33 @@ class OpticalStudio(QMainWindow):
         elif target.startswith('pcsel.'):
             self._navigate_route(11)
             self.research_studies_page.select_engine('pcsel')
-            self.research_studies_page._pages['pcsel'].select_model(target.split('.',1)[1])
+            page=self.research_studies_page._pages['pcsel']
+            model=target.split('.',1)[1]
+            if first_visit or page.fields['model'].currentData()!=model:page.select_model(model)
         elif target=='lumped_laser':
             self._navigate_route(11);self.research_studies_page.select_engine(target)
         elif target=='fdtd':self._navigate_route(2,1)
+        elif target=='optical':
+            self._select_simulation_workflow('optical')
+            self.setup_state.set('ui.optical.engine','s4')
         else:self._route_setup_action(target)
 
     def _run_active_workspace(self):
+        if self.store.busy:return
         route=self.navigation.currentRow()
         if route==2:
+            owning_route,owning_engine=self._study_location()
+            if self.simulation_engines.currentIndex()!=4 and (owning_route!=2 or owning_engine!=self.simulation_engines.currentIndex()):
+                self._open_active_setup()
+                return self._run_active_workspace()
             index=self.simulation_engines.currentIndex()
             page=(self.pages['Simulate'],self.fdtd_page,self.index_shift_page,self.pages['Fields'],None,self.electrical_page,self.coupled_page,self.pages['Simulate'])[index]
             if index in (0,5,6):
                 (self.optical_setup,self.electrical_page,self.coupled_page)[(0,5,6).index(index)].run()
             elif page is not None:page.run()
         elif route==0:
-            if self.workspace_profile=='original':
-                self._navigate_route(2,7)
-                self.pages['Simulate'].run()
-                return
-            # The shared builder runs the selected simulation workflow. An
-            # optical cell must not require a resolved full electrical mesh.
-            if not self.pages['Structure'].apply_inspector():return
-            engine=self.simulation_engines.currentIndex()
-            if engine in (3,4):engine=0
-            self._navigate_route(2,engine)
+            if self.workspace_profile!='original' and not self.pages['Structure'].apply_inspector():return
+            self._open_active_setup()
             self._run_active_workspace()
         elif route==3:
             page=self.pages['Optimize']
@@ -630,19 +865,34 @@ class OpticalStudio(QMainWindow):
         elif route==11:self.research_studies_page.run()
 
     def _select_simulation_workflow(self,workflow):
+        if not self._opening_study:
+            current=self.store.active_study
+            self._activate_study(current if workflow=='electrical' and current.startswith('electrical') else workflow)
         if self.workspace_profile!='device':self.set_workspace_profile('device')
         {'optical':self.optical_setup,'electrical':self.electrical_page,'coupled':self.coupled_page}[workflow].set_mode(workflow)
         self._navigate_route(2,{'optical':0,'electrical':5,'coupled':6}[workflow])
 
     def _open_optical_engine(self,engine):
+        if engine=='meep':
+            self._open_simulation_choice('fdtd')
+            return
         if self.workspace_profile=='original':
             self._navigate_route(2,7 if engine=='s4' else 1)
             return
-        self.setup_state.set('ui.optical.engine',engine)
         self._select_simulation_workflow('optical')
+        self.setup_state.set('ui.optical.engine',engine)
         self.optical_setup.select_section('optical.domain')
 
     def _route_setup_action(self,target):
+        target=str(target)
+        pending=getattr(self,'_pending_setup_routes',set())
+        if target in pending:return
+        self._pending_setup_routes=pending
+        pending.add(target)
+        try:self._dispatch_setup_action(target)
+        finally:pending.discard(target)
+
+    def _dispatch_setup_action(self,target):
         """Use named destinations so new section tabs cannot shift old routes."""
         target=str(target)
         head=target.split('.')[0].lower()
@@ -657,9 +907,20 @@ class OpticalStudio(QMainWindow):
             if hasattr(page,'select_section'):page.select_section(target)
             return
         if head in ('optical','electrical','coupled'):
+            if head=='optical' and target!='optical' and self.store.active_study in ('tools.index_shift','tools.fields','tools.sweep','tools.ai','fdtd'):
+                previous=self._opening_study;self._opening_study=True
+                try:
+                    self._select_simulation_workflow('optical')
+                    self.optical_setup.select_section(target)
+                finally:self._opening_study=previous
+                return
             self._select_simulation_workflow(head)
             page={'optical':self.optical_setup,'electrical':self.electrical_page,'coupled':self.coupled_page}[head]
-            page.select_section(head+'.overview' if target==head else target)
+            section=head+'.overview' if target==head else target
+            if section not in page.pages:
+                self.status.setText('The requested section is unavailable. Showing '+head+' setup.')
+                section=head+'.overview'
+            page.select_section(section)
             return
         if head in ('structure','device'):
             if target=='structure.original':
@@ -800,6 +1061,9 @@ class OpticalStudio(QMainWindow):
 
     def _setup_run_finished(self,event):
         directory=event.get('directory')
+        if event.get('run_kind')=='fdtd' and self.store.active_study=='fdtd':
+            QTimer.singleShot(0,self._open_active_results)
+            return
         if self.workspace_profile=='original' and event.get('run_kind') in ('simulation','simulation_fields','fields','fdtd'):
             return
         if self._pending_setup_fields and event.get('run_kind')=='simulation':
@@ -827,9 +1091,34 @@ class OpticalStudio(QMainWindow):
     def _open_simulation_result(self,directory,summary=None):
         if directory:
             try:
+                self._ensure_result_workspace()
                 self.results_page.load_run(directory)
                 self._navigate_route(9)
             except Exception as exc:self.show_error('Could not open results: '+str(exc))
+
+    def _ensure_result_workspace(self):
+        """Do not carry a different simulation's cached plots into Results."""
+        target=self.store.active_study
+        if target not in self.result_pages:
+            from qt_results_workspace import ResultsWorkspace
+            page=ResultsWorkspace(self.store)
+            page.setProperty('referenceWorkspace',True)
+            page.openRunRequested.connect(self._choose_simulation_result)
+            page.rerunRequested.connect(self._rerun_simulation_result)
+            page.layout().removeWidget(page.footer_widget)
+            self.content_layout.addWidget(page.footer_widget)
+            page.footer_widget.hide()
+            self.result_pages[target]=page
+        page=self.result_pages[target]
+        if page is self.results_page:return
+        previous=self.results_page
+        previous.footer_widget.hide()
+        index=self.stack.indexOf(previous)
+        self.stack.removeWidget(previous)
+        previous.hide()
+        self.stack.insertWidget(index,page)
+        self.results_page=page
+        self.pages['Results']=page
 
     def _choose_simulation_result(self):
         path=QFileDialog.getExistingDirectory(self,'Open simulation results',str(self.store.library.runs))
@@ -878,10 +1167,11 @@ class OpticalStudio(QMainWindow):
         if self.navigation.currentRow()==11:
             return 'Simulation studies · editable setup and paper comparisons'
         return ('Original optical tables · periodic S4 geometry' if self.workspace_profile=='original'
-            else 'Device Studio · shared optical and electrical structure')
+            else 'Device Studio · independent simulation structures')
 
     def _sync_run_actions(self):
         if not hasattr(self,'run_button'):return
+        self._sync_study_context()
         route=self.navigation.currentRow()
         self.workspace_footer.setVisible(route!=9)
         self.results_page.footer_widget.setVisible(route==9)
@@ -905,7 +1195,7 @@ class OpticalStudio(QMainWindow):
             'Run the active workspace' if runnable else 'Select a simulation or search workspace')
         if not self.store.busy and self.status.text() in (
                 'Original optical tables · periodic S4 geometry',
-                'Device Studio · shared optical and electrical structure',
+                'Device Studio · independent simulation structures',
                 'Simulation studies · editable setup and paper comparisons',
                 'Photonic Bands · independent periodic crystal'):
             self.status.setText(self._idle_workspace_description())
@@ -918,31 +1208,75 @@ class OpticalStudio(QMainWindow):
         self.adapt_interface()
 
     def _display_route(self,page_index):
-        if page_index in (4,5):
+        if not self._routing:
             self._navigate_route(page_index)
-        else:
-            if self.workspace_profile=='original' and page_index==0 and hasattr(self,'pages') and 'Structure' in self.pages:
-                self.pages['Structure'].tabs.setCurrentIndex(1)
-                self.pages['Structure'].advanced_return.hide()
-            if self.workspace_profile=='original' and page_index==2 and self.simulation_engines.currentIndex() in (0,5,6):
-                self.simulation_engines.setCurrentIndex(7)
-            self.stack.setCurrentIndex(page_index)
-            if hasattr(self,'appearance_timer'):self.appearance_timer.start(0)
+            return
+        self.stack.setCurrentIndex(page_index)
+        if hasattr(self,'appearance_timer'):self.appearance_timer.start(0)
 
     def _navigate_route(self,page_index,engine_index=None):
         """Open a real workspace, optionally selecting its simulation engine."""
+        self._header_results_study=None
+        page_index=int(page_index)
+        owning_setup=False
+        if page_index==2 and engine_index is None and self._construction_complete:
+            page_index,engine_index=self._study_location()
+            owning_setup=True
+        if page_index==1 and self._construction_complete:
+            from simulation_documents import FINITE
+            if self.store.active_study not in FINITE:
+                self._open_active_setup()
+                page=self.photonic_bands_page if self.store.active_study.startswith('photonic_bands') else self.research_studies_page.stack.currentWidget()
+                if hasattr(page,'select_section'):page.select_section('Materials')
+                return
+        if page_index==0 and self._construction_complete:
+            active=self.store.active_study
+            if active.startswith('photonic_bands'):
+                self._navigate_route(10);self.photonic_bands_page.show_stage('build');return
+            if active.startswith(('pcsel.','sesame_transport')) or active in ('pcsel_transport','high_field_optics','lumped_laser'):
+                self._navigate_route(11)
+                engine='pcsel' if active.startswith('pcsel.') else 'sesame_transport' if active.startswith('sesame_transport') else active
+                self.research_studies_page.select_engine(engine)
+                page=self.research_studies_page._pages[engine]
+                if hasattr(page,'study_flow'):page.study_flow.show_stage(0)
+                elif engine=='lumped_laser':page._edit_laser_structure()
+                return
         if int(page_index) in (4,5):
             engine_index=3 if int(page_index)==4 else 4
             page_index=2
+        if page_index==9 and self._construction_complete:
+            self._ensure_result_workspace()
+        if self._construction_complete and not self._opening_study:
+            target={0:'optical',7:'optical',1:'fdtd',2:'tools.index_shift',3:'tools.fields',5:'electrical',6:'coupled'}.get(engine_index) if page_index==2 else None
+            if target=='electrical' and self.store.active_study.startswith('electrical'):target=self.store.active_study
+            if page_index==10:target=self.store.active_study if self.store.active_study.startswith('photonic_bands') else 'photonic_bands'
+            if page_index in (3,8):target='tools.sweep' if page_index==3 else 'tools.ai'
+            if target:self._activate_study(target)
         if self.workspace_profile=='original' and page_index==2:
             if engine_index in (5,6):self.set_workspace_profile('device')
             elif engine_index==0 or engine_index is None and self.simulation_engines.currentIndex() in (0,5,6):engine_index=7
-        self.navigation.setCurrentRow(int(page_index))
-        if page_index == 2 and engine_index is not None and hasattr(self,'simulation_engines'):
-            self.simulation_engines.setCurrentIndex(int(engine_index))
+        previous_routing=self._routing;self._routing=True
+        try:
+            self.navigation.setCurrentRow(int(page_index))
+            if page_index == 2 and engine_index is not None and hasattr(self,'simulation_engines'):
+                self.simulation_engines.setCurrentIndex(int(engine_index))
+            self.stack.setCurrentIndex(page_index)
+        finally:self._routing=previous_routing
         if page_index==2 and hasattr(self,'optical_setup'):
             entry={0:('optical',self.optical_setup),5:('electrical',self.electrical_page),6:('coupled',self.coupled_page)}.get(self.simulation_engines.currentIndex())
             if entry:entry[1].set_mode(entry[0])
+        if page_index==3 and self.store.active_study=='tools.sweep' and hasattr(self.pages['Optimize'],'set_grid_workspace'):
+            self.pages['Optimize'].set_grid_workspace(True)
+        if page_index==0 and self.workspace_profile=='original':
+            self.pages['Structure'].tabs.setCurrentIndex(1)
+            self.pages['Structure'].advanced_return.hide()
+        if page_index==1:
+            from simulation_documents import OPTICAL
+            self.pages['Materials'].workspace_tabs.setCurrentIndex(0 if self.store.active_study in OPTICAL else 1)
+        if owning_setup and page_index==11:
+            active=self.store.active_study
+            owner='pcsel' if active.startswith('pcsel.') else 'sesame_transport' if active.startswith('sesame_transport') else active
+            self.research_studies_page.select_engine(owner)
         self._sync_workspace_tabs(int(page_index))
         self._sync_tool_navigation(int(page_index))
 
@@ -972,6 +1306,10 @@ class OpticalStudio(QMainWindow):
 
     def _open_export_menu(self):
         """Route the global Export action to the existing structure exporters."""
+        from simulation_documents import FINITE
+        if self.store.active_study not in FINITE:
+            self.status.setText('Use this simulation’s Save project action to export its editable setup.')
+            return
         self._navigate_route(0)
         page=self.pages.get('Structure')
         if self.workspace_profile=='original':page=page._legacy
@@ -981,6 +1319,9 @@ class OpticalStudio(QMainWindow):
 
     def _simulation_engine_changed(self,engine_index):
         if self.navigation.currentRow() == 2:
+            if self._construction_complete and not self._routing and not self._opening_study:
+                self._navigate_route(2,engine_index)
+                return
             self._sync_tool_navigation(2)
             self._sync_workspace_tabs(2)
             if hasattr(self,'appearance_timer'):self.appearance_timer.start(0)
@@ -989,6 +1330,7 @@ class OpticalStudio(QMainWindow):
         for bar in self.simulation_local_bars:
             selected=next((i for i in range(bar.count()) if bar.tabData(i)==index),-1)
             with QSignalBlocker(bar):bar.setCurrentIndex(selected)
+            bar.hide()
         self._sync_run_actions()
 
     def _sync_workspace_tabs(self, page_index):
@@ -1003,52 +1345,47 @@ class OpticalStudio(QMainWindow):
         self._sync_sidebar_visibility(page_index)
         self._reference_navigation(page_index)
         self.optical_workflow.setVisible(True)
-        visible_route = 2 if self.workspace_profile=='device' and page_index in (3,8) else page_index
+        visible_route = self._visible_header_route(page_index)
         if visible_route in self.optical_routes:
             with QSignalBlocker(self.optical_workflow):
                 self.optical_workflow.setCurrentIndex(self.optical_routes.index(visible_route))
 
     def _reference_navigation(self,page_index):
-        workflow=page_index==2 and self.simulation_engines.currentIndex() in (0,5,6)
-        results=page_index==9
-        mode='workflow' if workflow else 'results' if results else 'builder'
-        mode=self.workspace_profile+':'+mode
-        labels=['Structure','Materials','Simulation','Results','Settings','Help']
-        routes=[0,1,2,9,6,7]
-        if self.workspace_profile=='original':
-            labels=['Structure','Materials','Simulation','Simulation Sweep','AI Search','Settings','Help']
-            routes=[0,1,2,3,8,6,7]
-        labels.append('Photonic Bands')
-        routes.append(10)
+        from simulation_documents import FINITE
+        finite=self.store.active_study in FINITE
+        labels=(['Structure','Materials'] if finite else [])+['Simulation','Results','Settings','Help']
+        routes=([0,1] if finite else [])+[2,9,6,7]
         compact=self.width()<1150
+        mode=(self.workspace_profile,self.store.active_study,tuple(routes))
         if getattr(self,'_reference_navigation_mode',None)!=mode or getattr(self,'_reference_header_compact',None)!=compact:
             with QSignalBlocker(self.optical_workflow):
                 while self.optical_workflow.count():self.optical_workflow.removeTab(0)
                 for label in labels:self.optical_workflow.addTab(label)
             self.optical_routes=routes
             self.navigation_layout.removeWidget(self.optical_workflow)
+            self.workflow_navigation_layout.removeWidget(self.optical_workflow)
             self.chrome.layout().removeWidget(self.optical_workflow)
             self.navigation_layout.removeWidget(self.chrome.file_button)
             self.chrome.layout().removeWidget(self.chrome.file_button)
-            if compact:self.navigation_layout.insertWidget(0,self.optical_workflow,1)
+            if compact:self.workflow_navigation_layout.addWidget(self.optical_workflow)
             else:self.chrome.layout().insertWidget(4,self.optical_workflow)
             self.chrome.layout().insertWidget(4 if compact else 5,self.chrome.file_button)
             self._reference_navigation_mode=mode
             self._reference_header_compact=compact
-        self.navigation_bar.setVisible(compact or self._diagnostic_origin is not None)
-        self.project_header.setVisible(False)
-        self.chrome.title.setText('Original Optical Studio' if self.workspace_profile=='original' else 'Optical Design Studio')
-        self.workspace_context.setText('Simulation results · Electrical + Optical' if results else 'Shared builder + Canvas tools' if page_index==0 else '')
-        icon_names={'Structure':'structure','Materials':'materials','Simulation':'simulation','Results':'results',
-            'Simulation Sweep':'sweep','AI Search':'search','Settings':'settings','Help':'help','Photonic Bands':'simulation'}
+        self.workflow_navigation.setVisible(compact)
+        self.navigation_bar.show()
+        self.project_header.hide()
+        self.chrome.title.setText('Optical Design Studio')
+        self.workspace_context.setText('')
+        icon_names={'Structure':'structure','Materials':'materials','Simulation':'simulation',
+            'Results':'results','Settings':'settings','Help':'help'}
         for index,label in enumerate(labels):self.optical_workflow.setTabIcon(index,reference_icon(icon_names[label],COLORS[theme_manager().mode]['text']))
         self.optical_workflow.setIconSize(QSize(18,18))
-        # Resize can rebuild the compact header without a route-change signal.
-        # Keep its selection aligned with the page that is already displayed.
-        visible_route=2 if page_index==11 or self.workspace_profile=='device' and page_index in (3,8) else page_index
+        visible_route=self._visible_header_route(page_index)
         if visible_route in self.optical_routes:
             with QSignalBlocker(self.optical_workflow):
                 self.optical_workflow.setCurrentIndex(self.optical_routes.index(visible_route))
+        self._sync_study_context()
 
     def _sync_sidebar_visibility(self, page_index=None):
         """All pages own the full canvas; navigation lives in the top tab row."""
@@ -1179,7 +1516,7 @@ class OpticalStudio(QMainWindow):
         visible=' → '.join(names[:7])
         if len(names)>7:
             visible+=f' → +{len(names)-7} layers'
-        self.structure_notice.title_label.setText('Shared Structure updated')
+        self.structure_notice.title_label.setText('Simulation structure updated')
         self.structure_notice.summary.show()
         self.structure_notice.summary.setText(
             f'{max(0,len(names)-2)} finite layers · {len(self.store.patterns)} regions · '
@@ -1353,7 +1690,7 @@ class OpticalStudio(QMainWindow):
         if hasattr(self,'footer_project'):
             self.footer_project.setText(self.footer_project.fontMetrics().elidedText(label,Qt.TextElideMode.ElideMiddle,138)+'\nUnits: µm')
         self.chrome.title.setToolTip(detail)
-        self.setWindowTitle('Optical Design Studio · '+('Original Optical Studio' if self.workspace_profile=='original' else 'Device Studio'))
+        self._sync_study_context()
 
     def _confirm_project_replace(self):
         self._flush_research_drafts()
@@ -1366,12 +1703,18 @@ class OpticalStudio(QMainWindow):
         return self.save_project() if answer==QMessageBox.StandardButton.Save else answer==QMessageBox.StandardButton.Discard
 
     def _flush_research_drafts(self):
+        # Commit only the active editor. Hidden panels may show other domains
+        # and must never write their stale controls into the current document.
+        for page in (self.optical_setup,self.electrical_page,self.coupled_page):page.flush_draft()
         for page in (self.photonic_bands_page,self.research_studies_page):
             page.flush_draft()
 
     def _open_band_reference(self,identity,run=False):
         """Paper library opens the independent editor without replacing a device."""
-        self._navigate_route(10)
+        from benchmark_registry import load_benchmark
+        settings=load_benchmark(identity)['options']['settings']
+        target='photonic_bands.legume' if settings.get('solver','mpb')=='legume' else 'photonic_bands' if settings.get('dimension',2)==3 else 'photonic_bands.2d'
+        self._open_simulation_choice(target)
         page=self.photonic_bands_page
         index=page.benchmark_picker.findData(identity)
         if index<0:return
@@ -1390,6 +1733,10 @@ class OpticalStudio(QMainWindow):
         if not self._confirm_project_replace():return False
         try:
             project=copy.deepcopy(case['project']);kind=case['kind'];options=copy.deepcopy(case['options'])
+            target={'simulation':'optical','fields':'tools.fields','simulation_fields':'tools.fields',
+                'index_shift':'tools.index_shift','electrical':'electrical','coupled':'coupled'}.get(kind,self.store.active_study)
+            self._activate_study(target)
+            project['simulation_documents']=copy.deepcopy(self.store.project()['simulation_documents'])
             project.setdefault('desktop_search',{})[kind]=options
             self.store.load_project(project)
             if kind in ('electrical','coupled'):
@@ -1447,6 +1794,13 @@ class OpticalStudio(QMainWindow):
             self.status.setText('Ready')
 
     def closeEvent(self,event):
+        from qt_solver_environment import setup_in_progress,cancel_all_setups
+        if setup_in_progress():
+            cancel_all_setups()
+            self.status.setText('Stopping solver environment setup safely before closing…')
+            QTimer.singleShot(200,self.close)
+            event.ignore()
+            return
         for page in (self.pages['About'], self.pages['Settings'].addons_panel):
             if not page.shutdown():
                 self._updates_closing=True

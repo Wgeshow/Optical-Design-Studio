@@ -40,14 +40,17 @@ GROUPS = {
         'tests.test_qt_photonic_band_results',
         'tests.test_qt_photonic_crystal_3d',
         'tests.test_qt_photonic_runtime',
+        'tests.test_simulation_documents',
     ],
     'release-and-data': [
         'tests.test_app_version', 'tests.test_desktop_runtime',
         'tests.test_startup_helpers', 'tests.test_update_client',
+        'tests.test_solver_environment',
         'tests.test_update_install', 'tests.test_update_credentials',
     ],
     'simulation-performance': [
         'tests.test_compute_speed', 'tests.test_scan_scaling',
+        'tests.test_grid_sweep', 'tests.test_peak_optimizer', 'tests.test_spectral_features',
         'tests.test_scan_scaling_ui', 'tests.test_backend',
         'tests.test_simulation_fields', 'tests.test_contour_sweep',
         'tests.test_field_tracking',
@@ -324,7 +327,7 @@ def main():
             print((output / (name + '.log')).read_text(encoding='utf-8', errors='replace')[-7000:], flush=True)
             break
     check_source(inventory)
-    summary = dict(version='1.4.0-alpha.1', source_tree_sha256=source_tree_sha256,
+    summary = dict(version='1.4.0-alpha.2', source_tree_sha256=source_tree_sha256,
                    tests_run=sum(result['tests_run'] for result in results.values()),
                    failures=sum(result['failures'] for result in results.values()),
                    errors=sum(result['errors'] for result in results.values()),

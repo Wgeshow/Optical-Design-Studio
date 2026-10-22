@@ -65,6 +65,7 @@ class StudyIntegrationTests(unittest.TestCase):
                 chooser.benchmarks.setCurrentIndex(chooser.benchmarks.findData(identity))
                 self.assertEqual(chooser.benchmarks.currentData(), identity)
                 before_device = copy.deepcopy(self.store.device)
+                before_study = self.store.active_study
                 with patch.object(self.window, '_confirm_project_replace', return_value=True):
                     chooser.library_page.edit_button.click()
                 APP.processEvents()
@@ -77,7 +78,7 @@ class StudyIntegrationTests(unittest.TestCase):
                     request = page.options()
                     self.assertEqual(input_fingerprint(case['project'], case['kind'], request),
                         input_fingerprint(case['project'], case['kind'], case['options']))
-                    self.assertEqual(self.store.device, before_device)
+                    self.assertEqual(self.store.study_project(before_study)['device'], before_device)
                     self.assertEqual(page._benchmark_request['id'], identity)
                     page.flush_draft()
                     state = copy.deepcopy(self.store.search_state['research_workspaces'][page.state_key])

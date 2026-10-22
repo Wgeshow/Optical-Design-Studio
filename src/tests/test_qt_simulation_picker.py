@@ -5,11 +5,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
-from PyQt6.QtCore import QSettings, QTimer
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QSettings, QTimer, QObject, QEvent
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout
 from qt_workspace_start import (WorkspaceStartDialog, WorkspaceSelection,
     choose_startup_workspace, STARTUP_SIMULATION_KEY)
-from qt_simulation_picker import SIMULATIONS
+from qt_simulation_picker import SIMULATIONS, SimulationPicker
 from qt_core import ProjectStore
 from data_library import DataLibrary
 from qt_app import OpticalStudio
@@ -18,6 +18,39 @@ APP=QApplication.instance() or QApplication([])
 
 
 class SimulationPickerTests(unittest.TestCase):
+    def test_chooser_cards_never_show_as_separate_windows_even_briefly(self):
+        shown=[]
+        class WindowObserver(QObject):
+            def eventFilter(self,watched,event):
+                if event.type()==QEvent.Type.Show and isinstance(watched,QWidget) and watched.isWindow():
+                    shown.append((type(watched).__name__,watched.objectName()))
+                return False
+        observer=WindowObserver()
+        APP.installEventFilter(observer)
+        host=QWidget();host.setObjectName('expectedChooserHost')
+        layout=QVBoxLayout(host)
+        try:
+            for _ in range(3):
+                picker=SimulationPicker(host)
+                layout.addWidget(picker)
+                host.show()
+                for width in (1440,800):
+                    host.resize(width,800);APP.processEvents()
+                    picker.search.setText('no-matching-simulation-xyz')
+                    APP.processEvents()
+                    self.assertFalse(picker.empty.isHidden())
+                    self.assertFalse(picker.empty.isWindow())
+                    picker.search.clear()
+                    picker.family.setCurrentIndex(picker.family.findData('PCSEL'))
+                    APP.processEvents()
+                    picker.family.setCurrentIndex(0)
+                    self.assertTrue(all(not card.isWindow() for card in picker.cards.values()))
+                picker.hide();picker.deleteLater();APP.processEvents()
+            self.assertEqual(shown,[('QWidget','expectedChooserHost')])
+        finally:
+            APP.removeEventFilter(observer)
+            host.hide();host.deleteLater();APP.processEvents()
+
     def test_start_choices_are_visible_searchable_and_persist_selected_model(self):
         with tempfile.TemporaryDirectory() as temporary:
             settings=QSettings(str(Path(temporary)/'choice.ini'),QSettings.Format.IniFormat)
@@ -57,11 +90,12 @@ class SimulationPickerTests(unittest.TestCase):
                             elif target.startswith('photonic_bands'):self.assertEqual(window.navigation.currentRow(),10)
                             elif target.startswith('sesame_transport'):self.assertEqual(window.research_studies_page.selector.currentData(),'sesame_transport')
                             elif target=='papers':self.assertEqual(window.research_studies_page.library_page.tabs.currentIndex(),1)
+                            elif target in ('tools.sweep','tools.ai'):self.assertEqual(window.navigation.currentRow(),3 if target=='tools.sweep' else 8)
                             elif target in {'optical','electrical','electrical.iv','electrical.cv','coupled','fdtd','tools.fields','tools.index_shift'}:
                                 self.assertEqual(window.navigation.currentRow(),2)
                             else:self.assertEqual(window.research_studies_page.selector.currentData(),target)
                     start.assert_not_called()
-                self.assertEqual(store.portable_project()['device'],before)
+                self.assertEqual(store.study_project('optical')['device'],before)
                 window.set_workspace_profile(WorkspaceSelection('device','pcsel.gme'))
                 self.assertEqual(window.research_studies_page._pages['pcsel'].fields['model'].currentData(),'gme')
             finally:

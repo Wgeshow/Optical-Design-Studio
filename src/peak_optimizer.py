@@ -1,4 +1,4 @@
-"""Finite design-grid search, adaptive peak detection, and complete design reporting."""
+"""Exact parameter sweeps, saved-result analysis, and optimizer helpers."""
 import copy
 import csv
 import itertools
@@ -39,10 +39,17 @@ def grid_values(lo, hi, step, max_values=MAX_DESIGN_BOUND_VALUES):
 
 
 def parse_search(model, bounds, options):
-    if model['mode'] != 'Wavelength sweep' or len(model['points']) < 3:
+    exhaustive = options.get('search_mode', 'Exhaustive grid') == 'Exhaustive grid'
+    if not exhaustive and (model['mode'] != 'Wavelength sweep' or len(model['points']) < 3):
         raise ValueError('Choose Wavelength sweep with at least three spectral points')
     cfg = dict(zip(SEARCH_KEYS, SEARCH_DEFAULTS))
     cfg.update(options)
+    # Old saved grid setups contain optimizer controls. They must never change
+    # the requested sampling, reject geometry, or qualify the recorded data.
+    if exhaustive:
+        cfg.update(ratio_limit=.6, min_bridge_um=0., separate_circles=False,
+                   absorption_target=.99, tie_tolerance=.0001, prominence=.00001,
+                   refinement_rounds=0)
     response_name(cfg)
     for key in ('ratio_limit', 'min_bridge_um', 'absorption_target', 'tie_tolerance', 'prominence'):
         cfg[key] = number(cfg[key], key, minimum=0)
@@ -55,7 +62,7 @@ def parse_search(model, bounds, options):
         raise ValueError('Tie tolerance and prominence must be fractions between 0 and 1')
     if not isinstance(cfg['separate_circles'], bool):
         raise ValueError('Separate circles must be true or false')
-    for key, low, high in (('refinement_rounds', 0, 6), ('design_budget', 1, 10000), ('point_budget', 3, MAX_SWEEP_POINTS)):
+    for key, low, high in (('refinement_rounds', 0, 6), ('design_budget', 1, 10000), ('point_budget', 1 if exhaustive else 3, MAX_SWEEP_POINTS)):
         cfg[key] = integer(cfg[key], key, low)
         if cfg[key] > high:
             raise ValueError(f'{key} must be <= {high}')
@@ -292,104 +299,185 @@ def write_csv(path, records):
 
 
 def execute_search(base, perf, cfg, directory, executor, emit, cancelled):
+    """Evaluate the exact requested Cartesian grid, without optimization.
+
+    No geometry acceptance limits, response targets, early winner selection or
+    adaptive sampling are applied. Invalid solver results remain in the raw
+    files and are explicitly flagged. Every requested design gets a status.
+    """
     from backend import Cancelled
+    from scan_storage import json_default
+    from optical_objective import valid_spectrum
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
-    total_points = completed = failed = skipped = errors_in_row = 0
-    results, all_peaks, best_rows = [], [], []
-    status, reason, best_absorption = 'complete', '', -1.
-    (directory/'search_config.json').write_text(json.dumps(dict(options=cfg, base_model=base, performance=perf), indent=2, allow_nan=False), encoding='utf-8')
-    try:
-        with (directory/'design_models.jsonl').open('w', encoding='utf-8') as models:
-            for design_id, model in enumerate(designs(base, cfg), 1):
+    records, total_points, attempted = [], 0, 0
+    status, reason = 'complete', ''
+    stopped = False
+    finalizing = False
+    def begin_finalizing():
+        nonlocal finalizing
+        if not finalizing:
+            finalizing = True
+            emit(dict(kind='finalizing', points=total_points,
+                      text='Saving all sweep samples, design statuses and archive…'))
+    def finite_row(row):
+        try:
+            return len(row) == 6 and all(math.isfinite(float(v)) for v in row)
+        except (TypeError, ValueError, OverflowError):
+            return False
+    def checkpoint_value(value):
+        if value is None or value == '':
+            return None
+        try:
+            return float(value)
+        except (ValueError, OverflowError):
+            return value
+    def save_json(path, data):
+        path.write_text(json.dumps(data, indent=2, allow_nan=False, default=json_default), encoding='utf-8')
+    save_json(directory/'search_config.json', dict(options=cfg, base_model=base, performance=perf,
+              semantics='Exact grid and input samples; analysis never changes sampling.'))
+    columns = ['point_index', 'wavelength_nm', 'angle_deg', 'R', 'T', 'A']
+    with (directory/'design_models.jsonl').open('w', encoding='utf-8') as models, \
+            (directory/'all_spectra.csv').open('w', newline='', encoding='utf-8') as spectra:
+        writer = csv.writer(spectra)
+        writer.writerow(['design_id']+columns)
+        for design_id, model in enumerate(designs(base, cfg), 1):
+            record = dict(design_id=design_id, **conditions(model))
+            models.write(json.dumps(dict(design_id=design_id, model=model), allow_nan=False, default=json_default)+'\n')
+            models.flush()
+            if not stopped:
                 if cancelled():
-                    raise Cancelled('Search cancelled by user')
-                if time.monotonic()-started >= perf['timeout_seconds']:
-                    raise TimeoutError('Whole-search timeout reached')
-                record = dict(design_id=design_id, **conditions(model))
-                models.write(json.dumps(dict(design_id=design_id, model=model), allow_nan=False)+'\n')
-                models.flush()
-                invalid = geometry_error(model, cfg)
-                emit(dict(kind='search_progress', design=design_id, total=cfg['design_count'], points=total_points, text=invalid or 'Evaluating design'))
-                if invalid:
-                    results.append(dict(record, status='excluded', reason=invalid))
-                    skipped += 1
-                    continue
-                rows_by_wavelength = {}
-                try:
-                    wavelengths = [p[1] for p in base['points']]
-                    for round_id in range(cfg['refinement_rounds']+1):
-                        if cancelled():
-                            raise Cancelled('Search cancelled by user')
-                        if not wavelengths:
-                            break
-                        if total_points+len(wavelengths) > cfg['point_budget']:
-                            raise TimeoutError('Spectral point budget reached; increase it to finish the grid')
-                        remaining = perf['timeout_seconds']-(time.monotonic()-started)
-                        if remaining < 1:
-                            raise TimeoutError('Whole-search timeout reached')
-                        evaluation = dict(model, points=[[i, wl, base['points'][0][2]] for i, wl in enumerate(wavelengths)])
-                        def progress(event):
-                            if event['kind'] in ('started', 'progress'):
-                                emit(dict(kind='search_progress', design=design_id, total=cfg['design_count'], points=total_points,
-                                          text=f"Refinement {round_id}/{cfg['refinement_rounds']}; {event.get('done', 0)}/{len(wavelengths)} spectral points"))
-                        rows, info = executor(evaluation, dict(perf, timeout_seconds=max(1, int(remaining))), progress, cancelled)
-                        total_points += len(rows)
-                        if any(not all(math.isfinite(float(v)) for v in row) or row[5] < -1e-8 or row[5] > 1 for row in rows):
-                            raise ValueError('Nonphysical absorptance; check material loss and Fourier convergence. Values were not clipped.')
-                        rows_by_wavelength.update({row[1]: row for row in rows})
-                        (directory/f'design_{design_id}_round_{round_id}_diagnostics.json').write_text(json.dumps(info, indent=2, allow_nan=False), encoding='utf-8')
-                        wavelengths = refinement_points(response_rows(list(rows_by_wavelength.values()), cfg), cfg['prominence'])
-                    rows = sorted(rows_by_wavelength.values(), key=lambda r: r[1])
-                    peaks, _ = spectrum_peaks(response_rows(rows, cfg), cfg['prominence'])
-                    for p in peaks:
-                        p.pop('index', None)
-                        all_peaks.append(dict(record, **p))
-                    top = peaks[0]
-                    results.append(dict(record, status='evaluated', reason='', **top, spectral_points=len(rows)))
-                    write_csv(directory/f'design_{design_id}_spectrum.csv', [dict(zip(['wavelength_nm', 'angle_deg', 'R', 'T', 'A'], r[1:])) for r in rows])
-                    if top['absorption'] > best_absorption:
-                        best_absorption, best_rows = top['absorption'], rows
-                    completed += 1
-                    errors_in_row = 0
-                except (Cancelled, TimeoutError):
-                    results.append(dict(record, status='incomplete', reason='Stopped before refinement finished'))
-                    raise
-                except Exception as exc:
-                    failed += 1
-                    errors_in_row += 1
-                    results.append(dict(record, status='failed', reason=str(exc)))
-                    if errors_in_row >= 3:
-                        raise RuntimeError('Three consecutive design evaluations failed: '+str(exc)) from exc
-    except Cancelled as exc:
-        status, reason = 'cancelled', str(exc)
-    except Exception as exc:
-        status, reason = 'partial', str(exc)
-    if failed and status == 'complete':
-        status, reason = 'partial', 'One or more designs failed; grid coverage is incomplete'
-    for row in results+all_peaks:
-        a = row.get('absorption')
-        row['above_target'] = a is not None and a > cfg['absorption_target']
-        row['matches_best'] = a is not None and best_absorption-a <= cfg['tie_tolerance']+1e-15
-    feasible = [p for p in all_peaks if p['above_target']]
-    feasible.sort(key=lambda p: (p['Q_estimate'] is not None, p['Q_estimate'] or 0., p['absorption']), reverse=True)
-    ties = [r for r in results if r['matches_best']]
-    evaluated = sorted((r for r in results if r.get('status') == 'evaluated'), key=lambda r: -r['absorption'])
-    results = evaluated+[r for r in results if r.get('status') != 'evaluated']
-    summary = dict(response=response_name(cfg), status=status, reason=reason, grid_designs=cfg['design_count'], evaluated=completed, excluded=skipped, failed=failed,
+                    status, reason, stopped = 'cancelled', 'Sweep cancelled by user', True
+                elif time.monotonic()-started >= perf['timeout_seconds']:
+                    status, reason, stopped = 'partial', 'Whole-sweep timeout reached', True
+                elif total_points+len(model['points']) > cfg['point_budget']:
+                    status, reason, stopped = 'partial', 'Sample budget reached; remaining designs were not run', True
+            if stopped:
+                begin_finalizing()
+                records.append(dict(record, status='not_run', reason=reason, spectral_points=0))
+                continue
+            attempted += 1
+            emit(dict(kind='search_progress', design=design_id, total=cfg['design_count'],
+                      points=total_points, text='Sweeping requested samples'))
+            rows, info = [], {}
+            evaluation_status, evaluation_reason = 'evaluated', ''
+            try:
+                remaining = max(1, int(perf['timeout_seconds']-(time.monotonic()-started)))
+                def progress(event):
+                    if event.get('kind') in ('started', 'progress'):
+                        emit(dict(kind='search_progress', design=design_id, total=cfg['design_count'],
+                                  points=total_points+event.get('done', 0), text='Sweeping requested samples'))
+                rows, info = executor(model, dict(perf, timeout_seconds=remaining), progress, cancelled)
+                rows = list(rows)
+                if len(rows) != len(model['points']):
+                    evaluation_status, evaluation_reason = 'incomplete', 'Solver did not return every requested sample'
+                elif not all(finite_row(row) for row in rows) or not valid_spectrum(rows):
+                    evaluation_status, evaluation_reason = 'invalid', 'Nonphysical or nonfinite R/T/A; raw values retained without clipping'
+            except Exception as exc:
+                evaluation_status, evaluation_reason = 'failed', str(exc)
+                # backend.py also runs as __main__; its Cancelled class then
+                # has a different module identity from imported backend.Cancelled.
+                was_cancelled = cancelled() or isinstance(exc, Cancelled)
+                if was_cancelled or isinstance(exc, TimeoutError):
+                    status = 'cancelled' if was_cancelled else 'partial'
+                    reason, stopped, evaluation_status = str(exc), True, 'incomplete'
+                    begin_finalizing()
+                # The real backend checkpoints each worker batch. Recover it
+                # when an evaluation stops so even its partial spectrum is visible.
+                if hasattr(executor, 'directory') and hasattr(executor, 'index'):
+                    checkpoint = Path(executor.directory)/'evaluations'/f'{executor.index:06d}'/'batch_results.csv'
+                    if checkpoint.is_file():
+                        with checkpoint.open(encoding='utf-8') as stream:
+                            rows = [[checkpoint_value(row.get(k)) for k in columns] for row in csv.DictReader(stream)]
+                info = dict(error=str(exc))
+            if design_id == cfg['design_count']:
+                begin_finalizing()
+            total_points += len(rows)
+            # Persist before deriving summaries: failed/invalid data is evidence.
+            with (directory/f'design_{design_id}_spectrum.csv').open('w', newline='', encoding='utf-8') as stream:
+                per_design = csv.writer(stream)
+                per_design.writerow(columns)
+                per_design.writerows(rows)
+            writer.writerows([design_id]+list(row) for row in rows)
+            spectra.flush()
+            save_json(directory/f'design_{design_id}_diagnostics.json', info)
+            record.update(status=evaluation_status, reason=evaluation_reason, spectral_points=len(rows))
+            finite = [r for r in rows if finite_row(r)]
+            for index, key in ((3, 'R'), (4, 'T'), (5, 'A')):
+                for direction, selector in (('min', min), ('max', max)):
+                    if finite:
+                        row = selector(finite, key=lambda r: r[index])
+                        record.update({f'{key}_{direction}': row[index], f'{key}_{direction}_wavelength_nm': row[1],
+                                       f'{key}_{direction}_angle_deg': row[2]})
+            records.append(record)
+            write_csv(directory/'design_results.csv', records)
+    begin_finalizing()
+    evaluated = sum(r['status'] == 'evaluated' for r in records)
+    if status == 'complete' and evaluated != cfg['design_count']:
+        status, reason = 'partial', 'Some designs failed or returned incomplete/invalid data; see each design status'
+    summary = dict(search_mode='Exhaustive grid', status=status, reason=reason, grid_designs=cfg['design_count'],
+                   evaluated=evaluated, attempted=attempted, failed=sum(r['status'] == 'failed' for r in records),
+                   invalid=sum(r['status'] == 'invalid' for r in records),
+                   incomplete=sum(r['status'] == 'incomplete' for r in records),
+                   not_run=sum(r['status'] == 'not_run' for r in records), excluded=0,
                    spectral_points=total_points, elapsed_seconds=time.monotonic()-started,
-                   best_absorption=best_absorption if completed else None, matching_designs=len(ties),
-                   above_target_designs=len({p['design_id'] for p in feasible}),
-                   highest_Q_estimate=next((p['Q_estimate'] for p in feasible if p['Q_estimate'] is not None), None),
-                   scope='Best found on the finite design grid and sampled wavelength range; not a continuous global maximum. Q is a baseline-relative FWHM estimate, not a modal fit or convergence certification.')
-    for name, data in (('design_results.csv', results), ('all_peaks.csv', all_peaks), ('matching_best.csv', ties), ('above_target_by_Q.csv', feasible)):
-        write_csv(directory/name, [dict(row, response=response_name(cfg)) for row in data])
-    write_csv(directory/'best_spectrum.csv', [dict(zip(['wavelength_nm', 'angle_deg', 'R', 'T', 'A'], r[1:])) for r in best_rows])
-    (directory/'search_summary.json').write_text(json.dumps(summary, indent=2, allow_nan=False), encoding='utf-8')
-    archive = directory/'peak_search_results.zip'
+                   scope='Exact requested parameter grid and samples. All data retained. Q is a sampled, baseline-relative linewidth estimate, not a modal fit or convergence certification.')
+    write_csv(directory/'design_results.csv', records)
+    save_json(directory/'search_summary.json', summary)
+    archive = directory/'grid_sweep_results.zip'
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as bundle:
-        for path in sorted(directory.iterdir()):
-            if path.suffix in ('.csv', '.json', '.jsonl'):
-                bundle.write(path, path.name)
+        for path in sorted(directory.rglob('*')):
+            if path.is_file() and path.suffix in ('.csv', '.json', '.jsonl', '.sqlite', '.npz'):
+                bundle.write(path, str(path.relative_to(directory)))
     return dict(kind='search_complete', summary=summary, directory=str(directory), archive=str(archive))
+
+
+def analyze_grid_results(directory, response='Reflection', direction='High', threshold=None, metric='Response'):
+    """Query saved data only; never run/refine the solver or discard source data."""
+    from optical_objective import RESPONSES
+    response_name(dict(response=response))
+    if direction not in ('High', 'Low') or metric not in ('Response', 'Q factor'):
+        raise ValueError('Choose high/low response or Q factor')
+    if threshold is not None:
+        threshold = number(threshold, 'Threshold', minimum=0)
+        if metric == 'Response' and threshold > 1:
+            raise ValueError('Response threshold must be between 0 and 1')
+    directory = Path(directory)
+    with (directory/'design_results.csv').open(encoding='utf-8') as stream:
+        designs_data = list(csv.DictReader(stream))
+    matches = []
+    column = RESPONSES[response]
+    for design in designs_data:
+        # Invalid/incomplete results remain available under All designs/raw data,
+        # but cannot silently qualify as physical candidates.
+        if design['status'] != 'evaluated':
+            continue
+        with (directory/f"design_{design['design_id']}_spectrum.csv").open(encoding='utf-8') as stream:
+            data = list(csv.DictReader(stream))
+        rows = [[i, float(r['wavelength_nm']), float(r['angle_deg']), float(r['R']), float(r['T']), float(r['A'])]
+                for i, r in enumerate(data)]
+        if metric == 'Response':
+            selected = (max if direction == 'High' else min)(rows, key=lambda r: r[column])
+            value = selected[column]
+            if threshold is None or (value >= threshold if direction == 'High' else value <= threshold):
+                matches.append(dict(design, response=response, response_value=value,
+                                    wavelength_nm=selected[1], angle_deg=selected[2]))
+        else:
+            for theta in sorted({r[2] for r in rows}):
+                spectrum = sorted((r for r in rows if r[2] == theta), key=lambda r: r[1])
+                if len(spectrum) < 3 or len({r[1] for r in spectrum}) != len(spectrum):
+                    continue
+                x = np.array([r[1] for r in spectrum])
+                for feature, sign in (('peak', 1), ('dip', -1)):
+                    y = sign*np.array([r[column] for r in spectrum])
+                    minima = local_maxima(-y)
+                    for i in local_maxima(y):
+                        peak = peak_info(x, y, i, minima)
+                        q = peak['Q_estimate']
+                        if q is not None and (threshold is None or (q >= threshold if direction == 'High' else q <= threshold)):
+                            peak.pop('index'); peak.pop('absorption')
+                            matches.append(dict(design, response=response, feature=feature,
+                                                response_value=spectrum[i][column], angle_deg=theta, **peak))
+    key = 'Q_estimate' if metric == 'Q factor' else 'response_value'
+    return sorted(matches, key=lambda r: float(r[key]), reverse=direction == 'High')

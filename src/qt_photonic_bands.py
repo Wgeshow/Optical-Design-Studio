@@ -133,8 +133,8 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
     state_key = 'bands'
     geometry_columns = ('name', 'shape', 'center', 'radius', 'size', 'height', 'axis', 'axes')
 
-    def __init__(self, store, parent=None):
-        super().__init__(store, parent)
+    def __init__(self, store, parent=None, *, document_id=None):
+        super().__init__(store, parent, document_id=document_id)
         self._object_ids = []
         self._epsilons = {}
         self._sweep_targets = []
@@ -321,6 +321,13 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         self._build_guided_editor()
         self._build_crystal_workflow()
         self.finish_build()
+        if document_id:
+            self.bind_study_document(document_id)
+            self._form_row_visible(self.unit_form, self.dimension, False)
+            self._form_row_visible(self.solver_form, self.solver, False)
+            self.heading.setText({'photonic_bands':'3D Photonic Bands',
+                'photonic_bands.2d':'2D Photonic Bands',
+                'photonic_bands.legume':'2D bands · Legume'}[document_id])
         self.refresh_benchmarks()
         self._refresh_inspector()
         self._queue_preview()
@@ -794,6 +801,7 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         runtime_group = QGroupBox('3. Connect your solver'); runtime_box = QVBoxLayout(runtime_group)
         from qt_photonic_runtime import PhotonicRuntimeCheck
         self.runtime_check = PhotonicRuntimeCheck(lambda: dict(solver=self.solver.currentData(), runtime=self.runtime_settings()), self)
+        self.runtime_check.runtimeReady.connect(self._apply_automatic_runtime)
         runtime_box.addWidget(self.runtime_check)
         self.runtime_setup_toggle = QCheckBox('Set up or change the solver installation')
         runtime_box.addWidget(self.runtime_setup_toggle)
@@ -840,6 +848,28 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         self.tabs.setCurrentIndex(4 if stage == 'calculate' else 1)
         self._update_workflow()
         if stage == 'calculate': self._refresh_calculation_summary()
+        self._edited()
+
+    def initialize_2d_document(self,solver='mpb'):
+        """A fresh 2D document starts with a 2D motif, not a hidden 3D sphere."""
+        loading=self._loading;self._loading=True
+        try:
+            self.dimension.setCurrentIndex(self.dimension.findData(2))
+            self.solver.setCurrentIndex(self.solver.findData(solver))
+            if solver=='legume':
+                self.runtime_mode.setCurrentIndex(self.runtime_mode.findData('local'))
+                self.executable.setText('')
+                self.module_paths.setText('');self.library_paths.setText('')
+            self._restore_remembered_runtime()
+            self.lattice_preset.setCurrentIndex(self.lattice_preset.findData('square'))
+            self.apply_lattice_preset()
+            identity=uuid.uuid4().hex
+            _fill(self.geometry,[['Circle 1','circle','0, 0','.25','.4, .4','.4','0, 0, 1','1, 0; 0, 1']])
+            self._object_ids=[identity];self._epsilons={identity:'12'}
+            self.background.setText('1')
+            self._sync_materials();self.geometry.setCurrentCell(0,0)
+            self._refresh_inspector();self._queue_preview()
+        finally:self._loading=loading
         self._edited()
 
     def _update_workflow(self):
@@ -956,6 +986,14 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         except ValueError:
             text = 'Dimensions are Cartesian multiples of a. Set a physical scale in Unit cell to see dimensions in nm.'
         self.physical_dimensions.setText(text)
+
+    def _apply_automatic_runtime(self, runtime):
+        for key, value in runtime.items():
+            control = self.fields.get('runtime.'+key)
+            if isinstance(control, QLineEdit): control.setText('; '.join(map(str, value)) if isinstance(value, list) else str(value))
+            elif isinstance(control, QComboBox): control.setCurrentIndex(max(0, control.findData(value)))
+        self.remember_runtime()
+        self.runtime_check.check()
 
     def remember_runtime(self):
         try:
@@ -1228,6 +1266,9 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         self._edited()
 
     def _dimension_changed(self, *args):
+        active=getattr(self.store,'active_study','photonic_bands')
+        target='photonic_bands' if self.dimension.currentData()==3 else 'photonic_bands.legume' if self.solver.currentData()=='legume' else 'photonic_bands.2d'
+        if self.switch_study_variant(target,self.dimension,3 if active=='photonic_bands' else 2):return
         dim = self.dimension.currentData()
         self.lattice.setRowHidden(2, dim == 2)
         self.lattice.setColumnHidden(2, dim == 2)
@@ -1254,6 +1295,9 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
             self._mark_custom_crystal()
 
     def _solver_changed(self, *args):
+        active=getattr(self.store,'active_study','photonic_bands')
+        target='photonic_bands.legume' if self.solver.currentData()=='legume' else 'photonic_bands' if self.dimension.currentData()==3 else 'photonic_bands.2d'
+        if self.switch_study_variant(target,self.solver,'legume' if active.endswith('.legume') else 'mpb'):return
         mpb = self.solver.currentData() == 'mpb'
         for widget in (self.resolution, self.tolerance, self.mesh_size):
             widget.setEnabled(mpb)
@@ -1687,7 +1731,13 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
     def load_settings(self, cfg):
         """Load explicit canonical settings into editable fields; never infer device geometry."""
         from photonic_bands import prepare
-        prepare({}, cfg)
+        prepared = prepare({}, cfg)
+        bound = getattr(self, '_bound_study_id', None)
+        if bound:
+            dimension = 3 if bound == 'photonic_bands' else 2
+            solver = 'legume' if bound.endswith('.legume') else 'mpb'
+            if prepared['dimension'] != dimension or prepared['solver'] != solver:
+                raise ValueError('This setup uses a different band simulation. Use Choose simulation to open its dimension and solver before importing it.')
         self._loading = True
         try:
             self.restore_draft(self._default_draft)
@@ -1698,7 +1748,9 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
             for key in ('background_epsilon', 'num_bands', 'resolution', 'gmax', 'tolerance', 'mesh_size', 'points_per_segment', 'reference_length_um'):
                 if key in cfg:
                     self.fields[key].setText(str(cfg[key]))
-            runtime = cfg.get('runtime', {})
+            # Canonical defaults belong to this imported setup. A remembered
+            # runtime for another engine must not fill omitted runtime fields.
+            runtime = prepared['runtime']
             for key in ('distro', 'executable', 'timeout_s'):
                 if key in runtime:
                     self.fields['runtime.'+key].setText(str(runtime[key]))

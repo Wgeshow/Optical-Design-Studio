@@ -217,7 +217,7 @@ class BoundsEditor(QWidget):
         self.changed.emit()
 
     def refresh(self, reason=None):
-        if reason not in (None,'project','structure','undo'):return
+        if reason not in (None,'project','study','structure','undo'):return
         patterns = rows(self.store.patterns, PAT_COLS)
         data, removed = prune_bounds(self._rows, self.store.materials, self.store.layers,
             self.store.patterns, patterns_changed=patterns != self._patterns)
@@ -227,7 +227,7 @@ class BoundsEditor(QWidget):
         self._draw()
         if removed:
             self.status.setText(f'{removed} range(s) removed after a Structure edit. Select the current layer or region to set its limits.')
-            if reason != 'project':
+            if reason not in ('project','study'):
                 self.changed.emit()
 
     def populate_current(self):
@@ -427,5 +427,5 @@ class HoleEditor(QWidget):
         _choices(self.layer, [(name, name) for name in finite_layers(self.store.layers)], self.layer.currentData())
         self.add.setEnabled(self.layer.count() > 0)
         self._draw()
-        if previous != self._rows and reason != 'project':
+        if previous != self._rows and reason not in ('project','study'):
             self.changed.emit()

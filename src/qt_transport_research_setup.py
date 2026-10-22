@@ -16,7 +16,7 @@ from qt_reference_style import reference_icon
 
 
 class TransportDevicePanel(QWidget):
-    """Select the actual shared device; all edits route to its owning inspector."""
+    """Select the actual simulation device; all edits route to its owning inspector."""
     def __init__(self, workspace):
         super().__init__()
         self.workspace = workspace
@@ -38,7 +38,7 @@ class TransportDevicePanel(QWidget):
         left.addWidget(self.add_button)
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
-        self.tree.setAccessibleName('Shared device objects')
+        self.tree.setAccessibleName('This simulation’s device objects')
         self.tree.currentItemChanged.connect(self._selected)
         self.tree.setMinimumWidth(120)
         left.addWidget(self.tree, 1)
@@ -89,7 +89,7 @@ class TransportDevicePanel(QWidget):
         right.addWidget(label('Bias sequence (V)'))
         self.bias = SequenceField(workspace.structured['biases_V'], 'Enter explicit voltages, separated by commas')
         right.addWidget(self.bias)
-        right.addWidget(label('Other contact voltages and doping come from the shared device.'))
+        right.addWidget(label('Other contact voltages and doping come from the simulation device.'))
         self.material_button = button('Edit material properties', lambda: workspace.diagnosticRequested.emit(
             dict(workspace='materials', section='electrical', field='electrical_materials',
                  message='Edit the material properties used by this transport study.')))
@@ -158,9 +158,9 @@ class TransportDevicePanel(QWidget):
                  ('donor_cm3', 'Donors', ' cm⁻³'), ('acceptor_cm3', 'Acceptors', ' cm⁻³')]
         lines = [f'{title}: {obj[key]}{unit}' for key, title, unit in props if key in obj]
         if identity == 'device':
-            lines = ['Geometry, layers and contacts are shared with Structure.']
+            lines = ['Edit this simulation’s geometry, layers and contacts in Structure.']
         elif identity == 'mesh':
-            lines = ['Edit the shared spatial grid and refinement settings in Structure.']
+            lines = ['Edit the simulation spatial grid and refinement settings in Structure.']
         self.object_summary.setText('\n'.join(lines) or 'Select Edit selected object for all geometry and assignment fields.')
         layer = identity if group == 'layers' else obj.get('layer_id', '')
         self.canvas.set_device(self.device, selected=identity, selected_layer=layer)
@@ -170,7 +170,7 @@ class TransportDevicePanel(QWidget):
 
     def edit_object(self, identity):
         self.workspace.diagnosticRequested.emit(dict(workspace='structure', section='device', field='device',
-            object_id=identity, message='Edit this shared device object; return to the study to continue.'))
+            object_id=identity, message='Edit this simulation device object; return to the study to continue.'))
 
     def _view_changed(self):
         self.canvas.mode = self.view_choice.currentData()
@@ -248,9 +248,9 @@ class IllustrativeBands(QWidget):
 
 class TransportResearchWorkspace(StructuredStudyWorkspace):
     """Presentation over the existing authoritative typed transport request."""
-    def __init__(self, store, capability, parent=None):
+    def __init__(self, store, capability, parent=None, *, document_id=None):
         self.input_forms = {}
-        super().__init__(store, capability, parent)
+        super().__init__(store, capability, parent, document_id=document_id)
         self._setup_native_forms()
         self.device_note = label('')
         _, domain = self.add_section('Device & assignments', 'device_context')
@@ -315,13 +315,14 @@ class TransportResearchWorkspace(StructuredStudyWorkspace):
         self._refresh_forms()
 
     def refresh_context(self, *args):
+        if not self._is_active_document():return
         if not hasattr(self, 'contact_picker'):
             return
         device = getattr(self.store, 'device', None) or {}
         layers = [row for row in device.get('layers', []) if row.get('enabled', True)]
         contacts = [row for row in device.get('contacts', []) if row.get('enabled', True)]
         self.device_panel.refresh(device)
-        self.device_note.setText(str(len(layers))+' enabled layers · '+str(len(contacts))+' enabled contacts · shared device')
+        self.device_note.setText(str(len(layers))+' enabled layers · '+str(len(contacts))+' enabled contacts · simulation device')
         self.contact_picker.blockSignals(True)
         self.contact_picker.clear()
         self.contact_picker.addItem('Choose a contact…', '')
@@ -381,9 +382,9 @@ class TransportResearchWorkspace(StructuredStudyWorkspace):
 
 class HighFieldOpticsWorkspace(TransportResearchWorkspace):
     """Explicit material and carrier-state forms for local FK sensitivity."""
-    def __init__(self, store, capability, parent=None):
+    def __init__(self, store, capability, parent=None, *, document_id=None):
         self.input_forms = {}
-        StructuredStudyWorkspace.__init__(self, store, capability, parent)
+        StructuredStudyWorkspace.__init__(self, store, capability, parent, document_id=document_id)
         from qt_high_field_results import HighFieldResultsPanel
         old_results = self.results
         result_index = self.tabs.indexOf(old_results)

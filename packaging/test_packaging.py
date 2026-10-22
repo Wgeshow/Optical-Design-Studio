@@ -9,20 +9,45 @@ import unittest
 import stage_release as stage
 
 ROOT = Path(__file__).resolve().parent
-SOURCE = ROOT.parent/'s4_ui_redesign'
+SOURCE = ROOT.parent/'src'
 
 
 class PackagingInputsTests(unittest.TestCase):
+    def test_solver_license_gate_rejects_missing_and_changed_public_notices(self):
+        from package_experimental_candidate import verify_dependency_licenses
+        with tempfile.TemporaryDirectory(prefix='license-gate-',dir=ROOT) as directory:
+            application=Path(directory)
+            pairs=[]
+            for name in ('LICENSE','NOTICE'):
+                pairs.append((Path('_internal/devsim-2.11.0.dist-info/licenses')/name,
+                              Path('THIRD_PARTY_LICENSES/DEVSIM-2.11.0')/name))
+            for index in range(12):
+                relative=Path(f'component-{index}.dist-info/licenses/LICENSE')
+                pairs.append((Path('_internal/gpu_solver_runtime')/relative,
+                              Path('THIRD_PARTY_LICENSES/GPU')/relative))
+            for origin,published in pairs:
+                for relative in (origin,published):
+                    target=application/relative;target.parent.mkdir(parents=True,exist_ok=True)
+                    target.write_text(str(origin),encoding='utf-8')
+            self.assertEqual(len(verify_dependency_licenses(application)),14)
+            missing=application/pairs[0][1]
+            original=missing.read_bytes();missing.unlink()
+            with self.assertRaisesRegex(ValueError,'Missing or mismatched'):
+                verify_dependency_licenses(application)
+            missing.write_bytes(original+b' changed')
+            with self.assertRaisesRegex(ValueError,'Missing or mismatched'):
+                verify_dependency_licenses(application)
+
     def test_native_dependency_pins_and_unchanged_solver(self):
         report = stage.validate_dependencies(SOURCE)
         self.assertEqual(report['pyqtgraph'], '0.14.0')
         self.assertEqual(report['colorama'], '0.4.6')
-        old = ROOT.parent/'release-1.2.9'/'source'/'pcs_s4_runtime'/'S4.cp312-win_amd64.pyd'
-        selected=stage.selected_s4_runtime(SOURCE)/old.name
-        expected='feebcca5078672a6382bf0bd5c94f0014635f9c2c88e6427de77f599d37ffea1'
-        self.assertEqual(stage.digest(old),expected)
+        selected=stage.selected_s4_runtime(SOURCE)/'S4.cp312-win_amd64.pyd'
+        # Exact native module shipped with alpha.1; this release changes no S4 binary.
+        expected='1387aa415cf73525420bcdfac5e86de3c0923b26565d62209b3ed1975df3333c'
         self.assertEqual(stage.digest(selected),expected)
-        self.assertEqual(report['pinned_native_inputs'][old.name]['sha256'],expected)
+        self.assertEqual(report['pinned_native_inputs'][selected.name]['sha256'],expected)
+
 
     def test_public_help_copy_preserves_every_csv_and_has_exact_checksums(self):
         original = stage.inventory(SOURCE/'help_assets')

@@ -266,8 +266,8 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
     region_keys = ('id', 'material', 'x_range_um', 'y_range_um', 'donors_cm3', 'acceptors_cm3', 'generation_cm3_s')
     defect_keys = ('id', 'location_um', 'density_cm2', 'sigma_e_cm2', 'sigma_h_cm2', 'energy_eV', 'transition')
 
-    def __init__(self, store, parent=None):
-        super().__init__(store, parent)
+    def __init__(self, store, parent=None, *, document_id=None):
+        super().__init__(store, parent, document_id=document_id)
         self.heading.setText('Semiconductor transport · Sesame')
         self.description.setText('An editable 1D or 2D rectilinear semiconductor domain with two end contacts. '
             'Boltzmann carriers and fixed temperature; no 3D contacts, tunnelling or self-heating.')
@@ -442,6 +442,7 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
         self.study_layout = box
         from qt_research_runtime import ResearchRuntimeCheck
         self.runtime_check = ResearchRuntimeCheck(lambda: dict(engine='sesame_transport',runtime=self.runtime_settings()), self)
+        self.runtime_check.runtimeReady.connect(self._apply_automatic_runtime)
         self.study_layout.insertWidget(3,self.runtime_check)
         body = QWidget(); box = QVBoxLayout(body); form = native_form()
         form.addRow('Run on', self.runtime_mode); form.addRow('Python executable', self.executable)
@@ -474,6 +475,14 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
     def _restyle_inspectors(self, *args):
         """A QObject-bound receiver disconnects when this page is deleted."""
         restyle_inspectors(self)
+
+    def _apply_automatic_runtime(self, runtime):
+        for key, value in runtime.items():
+            control = self.fields.get('runtime.'+key)
+            if isinstance(control, QComboBox): control.setCurrentIndex(max(0, control.findData(value)))
+            elif isinstance(control, QLineEdit): control.setText('; '.join(value) if isinstance(value, list) else str(value))
+        self.remember_runtime()
+        self.runtime_check.check()
 
     def remember_runtime(self):
         from qt_research_runtime import remember_runtime
@@ -573,6 +582,9 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
             self.domain_splitter.setSizes([max(280,self.width()-370),320])
 
     def _dimension_changed(self, *args):
+        active=getattr(self.store,'active_study','sesame_transport')
+        target='sesame_transport.2d' if self.dimension.currentData()==2 else 'sesame_transport'
+        if self.switch_study_variant(target,self.dimension,2 if active.endswith('.2d') else 1):return
         two = self.dimension.currentData() == 2
         self.y_nodes.setEnabled(two)
         self.periodic.setEnabled(two)
@@ -691,6 +703,8 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
         return super().open_diagnostic(target)
 
     def load_settings(self, cfg):
+        if 'dimension' in getattr(self,'_document_fields',{}) and cfg.get('dimension',1)!=self._document_fields['dimension']:
+            raise ValueError('These settings belong to the other transport dimension. Choose that simulation before importing them.')
         from sesame_transport import prepare
         prepare({}, cfg)
         self._loading = True

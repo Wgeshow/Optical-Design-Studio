@@ -128,7 +128,7 @@ def download(item, target, cancel=None, progress=None):
 
 def run_owned(distro, arguments, cancel=None, progress=None, timeout=1800):
     """Run fixed application commands as root, with precise Linux group cancellation."""
-    argv = ['wsl.exe','--distribution',distro,'--user','root','--exec',
+    argv = [meep_runtime.wsl_executable(),'--distribution',distro,'--user','root','--exec',
             '/usr/bin/setsid','--wait','/bin/sh','-c',
             'printf "ODS_SETUP_PID=%s\\n" "$$"; exec "$@"','ods-setup',*arguments]
     process = subprocess.Popen(argv,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
@@ -146,7 +146,7 @@ def run_owned(distro, arguments, cancel=None, progress=None, timeout=1800):
             cancelling = cancel is not None and cancel.is_set()
             if timed_out or (cancelling and (pid is not None or time.monotonic()-started>3)):
                 if pid:
-                    subprocess.run(['wsl.exe','--distribution',distro,'--user','root','--exec',
+                    subprocess.run([meep_runtime.wsl_executable(),'--distribution',distro,'--user','root','--exec',
                         '/bin/kill','-KILL','--','-'+str(pid)],capture_output=True,timeout=10,
                         **meep_runtime.process_options())
                 process.kill()
@@ -166,6 +166,8 @@ def run_owned(distro, arguments, cancel=None, progress=None, timeout=1800):
                     pid = int(value)
             else:
                 tail = (tail+[line.rstrip()])[-20:]
+                if progress:
+                    progress(line.rstrip())
         code = process.wait(timeout=10)
         _cancelled(cancel)
         if code:

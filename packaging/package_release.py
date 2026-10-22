@@ -14,8 +14,8 @@ BUILD = Path(__file__).resolve().parent
 ROOT = BUILD.parent
 SRC = BUILD/'source'
 APP = BUILD/'dist'/'Optical Design Studio'
-OUT = ROOT/'GitHub-Release-1.4.0-alpha.1'
-VERSION = '1.4.0-alpha.1'
+OUT = ROOT/'GitHub-Release-1.4.0-alpha.2'
+VERSION = '1.4.0-alpha.2'
 REQUIRED_FROZEN_MODULES = ('field_volume', 'qt_field_volume', 'qt_native_field_volume',
     'qt_native_figure', 'qt_native_plot', 'qt_structure_3d', 'qt_lattice_diagram',
     'qt_windows_glass', 'qt_help', 'qt_materials', 'qt_core', 'data_library',
@@ -27,7 +27,7 @@ REQUIRED_FROZEN_MODULES = ('field_volume', 'qt_field_volume', 'qt_native_field_v
     'qt_electrical_results','electrical_material_library','electrical_terminal_studies','electrical_thermal','research_simulation','photonic_bands',
     'research_catalog','research_diagnostics','thermal_study','benchmark_registry','research_physics_runtime','research_physics_worker',
     'sesame_transport','input_diagnostics','qt_input_diagnostics','qt_photonic_bands','qt_photonic_band_results','qt_photonic_crystal_3d','qt_photonic_runtime','qt_research_studies','qt_research_results','qt_thermal_setup',
-    'qt_study_flow','qt_simulation_flow','qt_legacy_study_workbench','qt_study_fields','qt_study_library', 'qt_simulation_picker','qt_transport_research_setup','qt_high_field_results','qt_pcsel_research_setup','qt_research_runtime',
+    'qt_study_flow','qt_simulation_flow','qt_legacy_study_workbench','qt_study_fields','qt_study_library', 'qt_simulation_picker','qt_transport_research_setup','qt_high_field_results','qt_pcsel_research_setup','qt_research_runtime','solver_environment','desktop_environment_probe','qt_solver_environment','simulation_documents','qt_study_transfer',
     'qt_research_common','qt_sesame_setup','pcsel_research','pcsel_aperture','pcsel_optional','pcsel_physics_worker',
     'advanced_transport','advanced_transport_graph','electrical_temperature','nonlocal_tunnelling','high_field_optics','bandgap_narrowing',
     'pcsel_transport_study','pcsel_conformal_mesh','pcsel_conformal_solver','pcsel_transport_worker','pcsel_unitcell_transport',
@@ -298,7 +298,8 @@ def main():
         ('OpticalDesignStudio.spec', 'desktop_entry.py', 'backend_entry.py', 'version_info.txt',
          'stage_release.py', 'build_release.py', 'test_release_source.py', 'verify_release.py',
          'package_release.py', 'test_release_package_gates.py', 'test_packaging.py', 'test_native_setup_packaging.py',
-         'verify_release_source_smoke.py', 'audit_source_recipe.py', 'audit_release_archives.py', 'seed_library.zip',
+         'verify_release_source_smoke.py', 'audit_source_recipe.py', 'audit_release_archives.py',
+         'package_experimental_candidate.py', 'test_thermal_packaging.py', 'seed_library.zip',
          'stage-manifest.json', 'source-stage-manifest.json',
          'START_HERE.md', 'RELEASE_NOTES.md', 'THIRD_PARTY_NOTICES.md', 'SOURCE_README.md', 'BUILDING.md')]
     source_entries += [(BUILD/name, name) for name in ('START_HERE.md', 'RELEASE_NOTES.md', 'THIRD_PARTY_NOTICES.md')]

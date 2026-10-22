@@ -50,7 +50,7 @@ def validate_runtime(value=None):
 
 def run_worker(prepared, directory, emit=lambda event: None, cancelled=lambda: False, *, worker_name='research_physics_worker.py'):
     """Run the fixed application worker; never evaluate user-supplied code."""
-    from meep_runtime import ManagedProcess, linux_path
+    from meep_runtime import ManagedProcess, linux_path, wsl_executable
     if worker_name not in {'research_physics_worker.py', 'pcsel_physics_worker.py', 'pcsel_transport_worker.py'}:
         raise ValueError('Unknown fixed application physics worker')
     if cancelled():
@@ -91,7 +91,7 @@ def run_worker(prepared, directory, emit=lambda event: None, cancelled=lambda: F
         if runtime['mode'] == 'wsl':
             if runtime['library_paths']:
                 command=['env','LD_LIBRARY_PATH='+':'.join(runtime['library_paths'])]+command
-            command = ['wsl.exe', '--distribution', runtime['distro'], '--exec']+command
+            command = [wsl_executable(), '--distribution', runtime['distro'], '--exec']+command
             class Cancellation:
                 def is_set(self):
                     return bool(cancelled())

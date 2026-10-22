@@ -152,7 +152,7 @@ class _FieldRow(QWidget):
         self.grid.setColumnStretch(1,1)
 
     def _text_changed(self, *_):
-        if self.workspace.refreshing:
+        if self.workspace.refreshing or not self.workspace._is_active_document():
             return
         raw = self.editor.toPlainText() if isinstance(self.editor, QPlainTextEdit) else self.editor.text()
         self.workspace.drafts[self.key] = raw
@@ -162,9 +162,15 @@ class _FieldRow(QWidget):
                 self.commit()
 
     def _choice_changed(self, *_):
-        if self.workspace.refreshing:
+        if self.workspace.refreshing or not self.workspace._is_active_document():
             return
         value = self.editor.currentData() if isinstance(self.editor, QComboBox) else self.editor.isChecked()
+        store=self.workspace.store
+        if self.key=='ui.electrical.study' and getattr(store,'study_navigation_enabled',False) and store.active_study.startswith('electrical'):
+            target={'bias':'electrical','iv':'electrical.iv','cv':'electrical.cv'}.get(value)
+            if target and target!=store.active_study:
+                store.study_requested.emit(target)
+                return
         try:
             self.workspace.state.set(self.key, value)
             self.error.hide()
@@ -174,6 +180,7 @@ class _FieldRow(QWidget):
             self.workspace.draft_errors[self.key] = str(exc)
 
     def commit(self):
+        if not self.workspace._is_active_document():return False
         if not isinstance(self.editor, (QLineEdit, QPlainTextEdit)):
             return True
         if self.key not in self.workspace.drafts:
@@ -244,6 +251,16 @@ class _FieldRow(QWidget):
         else:
             self.editor.setText(self.workspace.display_value(self.key,value))
         del blocker
+        context = self.workspace._simulation_context or ''
+        identity_field = (self.key == 'ui.optical.engine' and bool(context) or
+            self.key == 'ui.electrical.study' and context.startswith('electrical'))
+        if identity_field and not hasattr(self, 'identity_value'):
+            self.identity_value = _label('', 'setupReadout')
+            self.value_widget.layout().addWidget(self.identity_value, 1)
+        self.editor.setVisible(not identity_field)
+        if hasattr(self, 'identity_value'):
+            self.identity_value.setText(self.editor.currentText() if isinstance(self.editor,QComboBox) else _text(value))
+            self.identity_value.setVisible(identity_field)
         message = self.workspace.draft_errors.get(self.key, '')
         self.error.setText(message)
         self.error.setVisible(bool(message))
@@ -272,7 +289,7 @@ class _PlanTable(QTableWidget):
         self.refresh()
 
     def _select(self, row, *_):
-        if self._updating or row < 0 or row >= len(self._rows):
+        if self._updating or not self.workspace._is_active_document() or row < 0 or row >= len(self._rows):
             return
         value = self._rows[row]
         if isinstance(value, dict):
@@ -285,7 +302,7 @@ class _PlanTable(QTableWidget):
             self.workspace.select_object(ident)
 
     def _edit(self, row, column):
-        if self._updating or row < 0 or row >= len(self._rows):
+        if self._updating or not self.workspace._is_active_document() or row < 0 or row >= len(self._rows):
             return
         key = self.key
         if key == 'search.electrical.biases_V' and not self.field.get('editable', True):
@@ -336,6 +353,7 @@ class _PlanTable(QTableWidget):
             item.setToolTip(str(exc))
 
     def _choice(self, ident, attribute, value):
+        if self._updating or not self.workspace._is_active_document():return
         try:
             if self.key == 'device.layers':
                 self.workspace.state.update_layer(ident, {attribute:value})
@@ -617,8 +635,10 @@ class SimulationSetupWorkspace(QWidget):
     statusChanged = pyqtSignal(str)
     diagnosticRequested = pyqtSignal(dict)
 
-    def __init__(self, store=None, parent=None, *, mode='optical', state=None, workflow=None):
+    def __init__(self, store=None, parent=None, *, mode='optical', state=None, workflow=None, document_id=None):
         super().__init__(parent)
+        self._bound_study_id = document_id
+        self._simulation_context = document_id
         self.state = state or SimulationSetupState(store,self)
         self.store = self.state.store
         self.plan = load_plan()
@@ -639,7 +659,7 @@ class SimulationSetupWorkspace(QWidget):
         self.layout_ = QVBoxLayout(self)
         self.layout_.setContentsMargins(8,0,8,8)
         self.layout_.setSpacing(8)
-        mode_bar = QFrame()
+        mode_bar = self.mode_bar = QFrame()
         mode_bar.setObjectName('setupModeBar')
         row = QHBoxLayout(mode_bar)
         row.setContentsMargins(4,4,4,4)
@@ -654,7 +674,7 @@ class SimulationSetupWorkspace(QWidget):
         row.addStretch()
         self.more_studies_button = _button('More studies…', lambda:self.routeRequested.emit('research.overview'))
         row.addWidget(self.more_studies_button)
-        mode_note=_label('Shared device · independent setups','setupModeNote')
+        mode_note=_label('Independent device · this simulation','setupModeNote')
         mode_note.setWordWrap(False)
         row.addWidget(mode_note)
         self.layout_.addWidget(mode_bar)
@@ -722,7 +742,35 @@ class SimulationSetupWorkspace(QWidget):
         self.refresh()
         from qt_simulation_flow import SimulationSetupFlow
         self.setup_flow = SimulationSetupFlow(self)
+        self.set_simulation_context(document_id)
         self.refresh()
+
+    def _is_active_document(self):
+        return not self._bound_study_id or self.store.active_study == self._bound_study_id
+
+    def set_simulation_context(self, identifier):
+        """Show one study's identity; switching simulations belongs to the host."""
+        self._simulation_context = identifier
+        self.mode_bar.setVisible(not bool(identifier))
+        self._update_context_title()
+        self.refresh()
+
+    def _update_context_title(self):
+        identity = self._simulation_context
+        if not identity:return
+        from qt_simulation_picker import SIMULATIONS
+        title = next((row[1] for row in SIMULATIONS if row[0] == identity), identity)
+        section = getattr(self, 'current_section', self._mode+'.overview')
+        nested = section.split('.')[0] if self._mode == 'coupled' and not section.startswith('coupled.') else ''
+        self.title.setText(title + (' · '+nested.title()+' setup' if nested else ''))
+        self.nav_title.setText({'electrical.iv':'I–V SETUP','electrical.cv':'C–V SETUP',
+            'electrical':'DC SETUP'}.get(identity,self._mode.upper()+' SETUP'))
+
+    def _mode_allowed(self, mode):
+        if not self._simulation_context:return True
+        expected = ('electrical' if self._simulation_context.startswith('electrical') else
+                    'coupled' if self._simulation_context == 'coupled' else 'optical')
+        return mode == expected
 
     @property
     def current_mode(self):
@@ -869,7 +917,7 @@ class SimulationSetupWorkspace(QWidget):
         preview = QVBoxLayout(frame)
         preview.setContentsMargins(12,12,12,12)
         preview.setSpacing(8)
-        preview.addWidget(_label('Shared device','setupCardTitle'))
+        preview.addWidget(_label('This simulation’s device','setupCardTitle'))
         self.shared_preview = DeviceCanvas('3d')
         self.shared_preview.compact_preview=True
         self.shared_preview.depth_display_mode='film'
@@ -895,7 +943,7 @@ class SimulationSetupWorkspace(QWidget):
             minis.addWidget(container,1)
         preview.addLayout(minis)
         preview.addWidget(_label('Cyan: optical cell · dashed: PC area · solid: finite device','setupPreviewLegend'))
-        preview.addWidget(_button('Edit shared structure',lambda:self.routeRequested.emit('global.structure')))
+        preview.addWidget(_button('Edit simulation structure',lambda:self.routeRequested.emit('global.structure')))
         layout.addWidget(frame)
         summary = QFrame()
         summary.setObjectName('setupCard')
@@ -953,12 +1001,14 @@ class SimulationSetupWorkspace(QWidget):
             self.setup_flow.apply_style()
 
     def _choose_mode(self, mode):
+        if not self._mode_allowed(mode):return
         self.set_mode(mode)
         self.selectWorkflow.emit(mode)
 
     def set_mode(self, mode):
         if mode not in self._modes:
             raise ValueError('Choose Optical, Electrical or Coupled.')
+        if not self._mode_allowed(mode):return
         self._mode = self.workflow = mode
         self.nav_title.setText(mode.upper()+' SETUP')
         for key, button in self.mode_buttons.items():
@@ -992,6 +1042,9 @@ class SimulationSetupWorkspace(QWidget):
             return
         source_mode = section.split('.')[0]
         embedded = self._mode=='coupled' and source_mode in ('optical','electrical')
+        if not embedded and not self._mode_allowed(source_mode):
+            self.set_status('Use Choose simulation to open a different simulation workspace.')
+            return False
         if source_mode!=self._mode and not embedded:
             self.set_mode(source_mode)
         self.current_section = section
@@ -1015,6 +1068,7 @@ class SimulationSetupWorkspace(QWidget):
             self.nested_tabs.hide()
         tab=self.section_meta[section]
         self.title.setText(('Coupled · ' if embedded else '')+source_mode.title()+' simulation setup')
+        self._update_context_title()
         self.purpose.setText(tab['title']+'  ·  '+tab.get('purpose',''))
         self.stack.setCurrentWidget(self.pages[section])
         if hasattr(self,'setup_flow'):
@@ -1046,7 +1100,7 @@ class SimulationSetupWorkspace(QWidget):
             self.setup_flow.select_object(ident)
 
     def refresh(self,*_):
-        if self.refreshing:
+        if self.refreshing or not self._is_active_document():
             return
         self.refreshing=True
         try:
@@ -1118,6 +1172,7 @@ class SimulationSetupWorkspace(QWidget):
         self.statusChanged.emit(text)
 
     def commit_drafts(self):
+        if not self._is_active_document():return
         committed=set()
         for field in self.fields:
             if field.key in self.drafts and field.key not in committed:
@@ -1127,13 +1182,30 @@ class SimulationSetupWorkspace(QWidget):
                 committed.add(field.key)
 
     def _reset_project_drafts(self,reason):
-        if reason!='project':return
+        if not self._is_active_document():return
+        if reason not in ('project','study'):return
         self.drafts.clear();self.draft_errors.clear();self.table_drafts.clear();self.table_errors.clear()
+        saved=self.store.search_state.get('research_workspaces',{}).get('setup_pending',{}).get(self._mode,{})
+        self.drafts.update(saved.get('drafts',{}));self.draft_errors.update(saved.get('errors',{}))
+        self.table_drafts.update({tuple(row[0]):row[1] for row in saved.get('tables',[])})
+        self.table_errors.update({tuple(row[0]):row[1] for row in saved.get('table_errors',[])})
         self._issue_return=None
         self.diagnostics.set_diagnostics([])
         self.refresh()
 
+    def flush_draft(self):
+        """Persist unfinished controls, including invalid text, per document."""
+        if not self._is_active_document():return
+        import copy
+        namespace=copy.deepcopy(self.store.search_state.get('research_workspaces',{}))
+        namespace.setdefault('schema_version',1)
+        namespace.setdefault('setup_pending',{})[self._mode]=dict(drafts=copy.deepcopy(self.drafts),
+            errors=copy.deepcopy(self.draft_errors),tables=[[list(key),value] for key,value in self.table_drafts.items()],
+            table_errors=[[list(key),value] for key,value in self.table_errors.items()])
+        self.store.save_search('research_workspaces',namespace)
+
     def validate_current(self):
+        if not self._is_active_document():return False
         self.commit_drafts()
         schedule_issues=[]
         if self._mode in ('electrical','coupled'):
@@ -1251,13 +1323,15 @@ class SimulationSetupWorkspace(QWidget):
         return self.state.job_options(self._mode)
 
     def perform_action(self,action):
+        if not self._is_active_document():return
         target=action.get('target','')
         ident=action.get('id','')
         try:
-            if target in self.pages or '/' in target and target.split('/')[0] in self.pages:
-                # Coupled's explicit standalone action switches mode deliberately.
-                if ident=='coupled.output-standalone':
-                    self.set_mode('optical')
+            if ident=='coupled.output-standalone':
+                # The host opens the independent optical document. Moving inputs
+                # remains the explicit Transfer inputs action in that workspace.
+                self.routeRequested.emit('optical.outputs')
+            elif target in self.pages or '/' in target and target.split('/')[0] in self.pages:
                 self.select_section(target)
             elif target.startswith(('global.','structure.','materials.','results.')) or target.startswith('settings.') and target not in ('settings.optical_unit_cell','settings.theta_deg'):
                 self.routeRequested.emit(target)
@@ -1413,7 +1487,7 @@ class SimulationSetupWorkspace(QWidget):
             dialog=QDialog(self)
             dialog.setWindowTitle('Remove '+rows[index]['name'])
             layout=QVBoxLayout(dialog)
-            layout.addWidget(_label('Remove this object from the shared device? Its ID will no longer resolve in saved setup references.'))
+            layout.addWidget(_label('Remove this object from the current simulation device? Its ID will no longer resolve in saved setup references.'))
             buttons=QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
             buttons.button(QDialogButtonBox.StandardButton.Ok).setText('Remove')
             buttons.accepted.connect(dialog.accept)
@@ -1472,7 +1546,7 @@ class SimulationSetupWorkspace(QWidget):
                 view.yaw=-.6
                 view.elevation=.23
             view.update()
-        self.set_status('Linked views fitted to the shared device.')
+        self.set_status('Linked views fitted to the current simulation device.')
 
     def _runtime_check(self):
         engine='electrical' if self._mode=='electrical' else self.state.get('ui.optical.engine','s4')
@@ -1765,7 +1839,7 @@ class SimulationSetupWorkspace(QWidget):
         form.addRow('Preset name',name)
         form.addRow('Setup scope',scope)
         layout.addLayout(form)
-        layout.addWidget(_label('Stores solver settings and stable device references. Coupled includes both shared solver setups and transfer controls. Device geometry stays in the project.'))
+        layout.addWidget(_label('Stores this simulation’s solver settings and device references. Coupled includes its electrical and optical setups and transfer controls.'))
         status=_label('','setupError')
         layout.addWidget(status)
         buttons=QDialogButtonBox(QDialogButtonBox.StandardButton.Save|QDialogButtonBox.StandardButton.Cancel)
@@ -1805,7 +1879,7 @@ class SimulationSetupWorkspace(QWidget):
             dialog.setWindowTitle('Review setup preset')
             dialog.resize(700,550)
             layout=QVBoxLayout(dialog)
-            layout.addWidget(_label('Review the setup changes before applying. Shared device geometry will be retained.'))
+            layout.addWidget(_label('Review the setup changes before applying. Simulation device geometry will be retained.'))
             review=QTableWidget()
             review.setColumnCount(3)
             review.setHorizontalHeaderLabels(['Setting','Current','Preset'])

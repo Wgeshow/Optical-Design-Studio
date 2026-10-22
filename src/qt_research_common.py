@@ -59,9 +59,10 @@ class ResearchWorkspaceBase(QWidget):
     workspace_id = 'research_studies'
     state_key = 'studies'
 
-    def __init__(self, store, parent=None):
+    def __init__(self, store, parent=None, *, document_id=None):
         super().__init__(parent)
         self.store = store
+        self._bound_study_id=document_id
         self._loading = True
         self._revision = 0
         self._owns_run = False
@@ -142,7 +143,7 @@ class ResearchWorkspaceBase(QWidget):
         return edit
 
     def _edited(self, *args):
-        if self._loading:
+        if self._loading or not self._is_active_document():
             return
         self._revision += 1
         self._save_timer.start()
@@ -174,6 +175,7 @@ class ResearchWorkspaceBase(QWidget):
     def save_draft(self):
         if self._loading:
             return
+        if not self._is_active_document():return
         state = self.draft()
         if state == self._last_state:
             return
@@ -199,24 +201,81 @@ class ResearchWorkspaceBase(QWidget):
         self._save_timer.stop()
         self.save_draft()
 
+    def _is_active_document(self):
+        active=getattr(self.store,'active_study',None)
+        if self._bound_study_id:return active==self._bound_study_id
+        if not getattr(self.store,'study_navigation_enabled',False):return True
+        if self.state_key=='bands':return active.startswith('photonic_bands')
+        if self.state_key=='sesame':return active.startswith('sesame_transport')
+        engine=getattr(self,'engine',self.state_key)
+        return active.startswith('pcsel.') if engine=='pcsel' else active==engine
+
+    def bind_study_document(self, identifier):
+        """Keep this editor, its diagnostics and results attached to one study."""
+        self._bound_study_id=identifier
+        self._document_fields={}
+        if identifier.startswith('pcsel.'):
+            self._document_fields['model']=identifier.split('.',1)[1]
+        elif identifier.startswith('sesame_transport'):
+            self._document_fields['dimension']=2 if identifier.endswith('.2d') else 1
+        elif identifier.startswith('photonic_bands'):
+            self._document_fields.update(dimension=3 if identifier=='photonic_bands' else 2,
+                solver='legume' if identifier.endswith('.legume') else 'mpb')
+        for key,value in self._document_fields.items():
+            self._default_draft.setdefault('fields',{})[key]=value
+            control=self.fields.get(key)
+            if control is None:continue
+            parent=control.parentWidget()
+            if parent is not None:
+                for form in parent.findChildren(QFormLayout):
+                    if form.indexOf(control)>=0:form.setRowVisible(control,False)
+            control.hide()
+        self._store_changed('study')
+
+    def _restored_document(self,state):
+        # Partial/older drafts must not retain values from a previous setup.
+        result=deepcopy(self._default_draft)
+        result.update(deepcopy(state or {}))
+        for key in ('fields','structured'):
+            result[key]=dict(deepcopy(self._default_draft.get(key,{})),**deepcopy((state or {}).get(key,{})))
+        result['fields'].update(getattr(self,'_document_fields',{}))
+        return result
+
+    def switch_study_variant(self,target,control,previous):
+        """Switch before a dimension/model control transforms the old document."""
+        if (self._loading or not self._is_active_document() or
+                not getattr(self.store,'study_navigation_enabled',False) or
+                self.store._switching_study or target==self.store.active_study):return False
+        blocked=control.blockSignals(True)
+        control.setCurrentIndex(control.findData(previous))
+        control.blockSignals(blocked)
+        self.flush_draft()
+        self.store.study_requested.emit(target)
+        return True
+
     def refresh(self):
+        if not self._is_active_document():return
         state = self.store.search_state.get('research_workspaces', {}).get(self.state_key)
         if state is not None and state != self._last_state:
             self._loading = True
             try:
-                self.restore_draft(deepcopy(state))
+                self.restore_draft(self._restored_document(state))
                 self._last_state = deepcopy(state)
             finally:
                 self._loading = False
         self._busy_changed(self.store.busy)
 
     def _store_changed(self, reason=''):
+        if not self._is_active_document():
+            self._save_timer.stop()
+            return
         # A different project's empty namespace must not inherit the previous draft.
-        if reason in ('project', 'load', 'reset', 'all'):
+        if reason in ('project', 'study', 'load', 'reset', 'all'):
+            self._save_timer.stop()
             state = self.store.search_state.get('research_workspaces', {}).get(self.state_key)
             self._loading = True
             try:
-                self.restore_draft(deepcopy(state if state is not None else self._default_draft))
+                self.restore_draft(self._restored_document(state))
                 self._last_state = deepcopy(state)
             finally:
                 self._loading = False
@@ -253,6 +312,7 @@ class ResearchWorkspaceBase(QWidget):
             units=getattr(exc, 'units', ''), revision=str(self._revision))
 
     def validate_inputs(self):
+        if not self._is_active_document():return False
         # A keyboard/global action need not move focus out of a cell delegate.
         self.flush_draft()
         try:
@@ -284,7 +344,7 @@ class ResearchWorkspaceBase(QWidget):
         return True
 
     def run(self):
-        if self.store.busy or not self.validate_inputs():
+        if not self._is_active_document() or self.store.busy or not self.validate_inputs():
             return
         try:
             self._owns_run = True

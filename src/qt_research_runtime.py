@@ -6,6 +6,7 @@ scientific validation result, and remembering a path does not verify it.
 from __future__ import annotations
 
 import json
+from meep_runtime import wsl_executable
 import os
 import sys
 
@@ -114,13 +115,14 @@ def probe_command(request):
     if runtime['mode'] == 'wsl':
         if runtime['library_paths']:
             command = ['env', 'LD_LIBRARY_PATH='+':'.join(runtime['library_paths'])]+command
-        command = ['wsl.exe', '--distribution', runtime['distro'], '--exec']+command
+        command = [wsl_executable(), '--distribution', runtime['distro'], '--exec']+command
     return command, runtime, label, marker
 
 
 class ResearchRuntimeCheck(QWidget):
     """Check without blocking editing. Call invalidate when runtime/model changes."""
     readinessChanged = pyqtSignal(bool)
+    runtimeReady = pyqtSignal(object)
 
     def __init__(self, get_settings, parent=None):
         super().__init__(parent)
@@ -156,6 +158,11 @@ class ResearchRuntimeCheck(QWidget):
         self.details.hide()
         self.details_button.toggled.connect(self.details.setVisible)
         layout.addWidget(self.details)
+        from qt_solver_environment import SolverEnvironmentSetup
+        self.setup = SolverEnvironmentSetup(self._setup_request, self)
+        self.setup.runtimeReady.connect(self.runtimeReady)
+        layout.addWidget(self.setup)
+        self._refresh_setup_visibility()
         self.process = QProcess(self)
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self.process.readyReadStandardOutput.connect(self._read)
@@ -166,6 +173,17 @@ class ResearchRuntimeCheck(QWidget):
         self.timer.setInterval(15000)
         self.timer.timeout.connect(self._timeout)
 
+    def _setup_request(self):
+        _, _, key, _, runtime = _request(self.get_settings())
+        return key, runtime
+
+    def _refresh_setup_visibility(self):
+        try:
+            key, _ = self._setup_request()
+            self.setup.setVisible(bool(key))
+        except (TypeError, ValueError, KeyError):
+            pass
+
     def _set_ready(self, value):
         if self.ready != value:
             self.ready = value
@@ -173,6 +191,8 @@ class ResearchRuntimeCheck(QWidget):
 
     def invalidate(self, *args):
         self._revision += 1
+        self.setup.invalidate()
+        self._refresh_setup_visibility()
         self._set_ready(False)
         if self._running:
             self._finish('Solver setup changed. Check the updated installation.')
@@ -181,6 +201,7 @@ class ResearchRuntimeCheck(QWidget):
             self.status.setText('Solver not checked for these settings.')
 
     def cancel(self):
+        self.setup.cancel()
         if self._running:
             self._revision += 1
             self._set_ready(False)

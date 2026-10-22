@@ -2,9 +2,9 @@
 
 For the Windows portable release, extract the complete ZIP and run **Optical Design Studio.exe**. For source, use `launch_qt_gui.cmd` on Windows or `bash launch_qt_gui.sh` after Linux setup. The ready-to-run portable release targets Windows x64; source runs need their documented native runtime and dependencies.
 
-At startup, **Choose a simulation** opens the setup you select. Search by name or filter by family: Optical, Photonic crystals, Electrical & heat, PCSEL, or Paper library. Selecting a simulation opens its editor; it does not start a calculation. **Menu → Choose simulation** reopens the chooser. **Remember my choice** can reopen the selected simulation on the next normal launch.
+At startup, **Choose a simulation** opens the setup you select. Search by name or filter by family: Optical, Photonic crystals, Electrical & heat, PCSEL, or Paper library. Selecting a simulation opens its editor; it does not start a calculation. The persistent **Choose simulation** button reopens the chooser. **Remember my choice** can reopen the selected simulation on the next normal launch.
 
-The chooser has 27 direct entries, including separate DC, I–V, C–V, 1D/2D semiconductor, 3D/2D MPB and 2D Legume setups and each PCSEL model. Icons identify the model families. Choosing a model preserves authored structures and unfinished input; **Check inputs** explains any incompatibility with the selected solver. A legacy electrical model must be changed explicitly before an editable-device I–V or C–V run.
+The chooser has 28 simulation/tool entries and a Paper comparisons library, including separate DC, I–V, C–V, 1D/2D semiconductor, 3D/2D MPB and 2D Legume setups and each PCSEL model. Icons identify the model families. Each selected type has its own device and parameters. Its name remains visible above the editor, and **Simulation**, **Results**, **Check inputs** and **Run** follow that selection. Returning from Settings restores the selected simulation. To reuse a structure, choose **Transfer inputs**, select a source, and review the compatible inputs before copying them into the active simulation. Switching types alone does not copy inputs. A legacy electrical model must be changed explicitly before an editable-device I–V or C–V run.
 
 Simulation setup uses a structure/object list, a large native preview and an editable parameter inspector. The step buttons group the work; section selectors and **More** retain access to every original and advanced control. On a compact window, the **Settings**, **Device/Structure**, and **Objects** views give each area usable space. Optical table tools open the original optical structure editor; finite-device tools open the shared device editor. Geometry and material editing remain separate from preview display settings.
 
@@ -40,7 +40,7 @@ Open **Results** for bands and sampled gaps. A gap on a finite path does not est
 
 ## Choose a research simulation or paper setup
 
-The startup chooser and **More studies → All studies** expose the same simulation choices. The original optical spectrum, time-domain optics, refractive-index sweep, fields/phase, electrical and coupled-device workflows remain available alongside Photonic Bands and the research models.
+Use **Choose simulation** to change simulation types. Each research setup keeps its own editor, diagnostics and results, including separate PCSEL models and 1D/2D semiconductor transport. The original optical spectrum, time-domain optics, refractive-index sweep, fields/phase, electrical and coupled-device workflows remain available alongside Photonic Bands and the research models.
 
 | Setup | How to use it |
 | --- | --- |
@@ -56,7 +56,7 @@ The three step buttons choose a stage. The **Section** selector chooses a page w
 
 ### PCSEL optical and aperture setup
 
-Each PCSEL optical model can be selected directly at startup. In its editor, **What would you like to calculate?** changes the model while preserving the current draft:
+Each PCSEL optical model can be selected directly at startup or through **Choose simulation**. Its editor contains only that model's workflow. Switching to another PCSEL model preserves the current draft; **Transfer inputs** explicitly copies compatible structure inputs when needed:
 
 | Model | Inputs and interpretation |
 | --- | --- |

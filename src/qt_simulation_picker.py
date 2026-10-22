@@ -10,6 +10,8 @@ SIMULATIONS = (
     ('fdtd', 'Time-domain optics', 'Optical', 'Sources, boundaries and time-domain fields · MEEP'),
     ('tools.index_shift', 'Refractive-index sweep', 'Optical', 'Optical response across editable index changes'),
     ('tools.fields', 'Optical fields & phase', 'Optical', 'Electric and magnetic fields and spectral phase'),
+    ('tools.sweep', 'Simulation parameter sweep', 'Optical', 'Every selected parameter combination, raw spectra and Q / R / T / A analysis'),
+    ('tools.ai', 'AI optical search', 'Optical', 'Independent editable optical design and model-assisted search'),
     ('photonic_bands', '3D Photonic Bands', 'Photonic crystals', 'Fully 3D editable periodic crystals · MPB'),
     ('photonic_bands.2d', '2D Photonic Bands', 'Photonic crystals', 'Editable two-dimensional periodic crystals · MPB'),
     ('photonic_bands.legume', '2D bands · Legume', 'Photonic crystals', 'Plane-wave bands for an infinite cross-section'),
@@ -66,7 +68,9 @@ class SimulationPicker(QWidget):
         self.buttons = {}
         self.cards = {}
         for target, title, family, description in SIMULATIONS:
-            card = QFrame()
+            # Filtering sets visibility before the first grid insertion. Own
+            # cards immediately so Qt cannot briefly show each as a window.
+            card = QFrame(body)
             card.setObjectName('simulationCard')
             card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
             content = QVBoxLayout(card)
@@ -85,7 +89,7 @@ class SimulationPicker(QWidget):
             content.addStretch()
             self.cards[target] = card
             self.buttons[target] = action
-        self.empty = QLabel('No matching simulations. Try another name or family.')
+        self.empty = QLabel('No matching simulations. Try another name or family.', body)
         self.empty.setWordWrap(True)
         self.scroll.setWidget(body)
         root.addWidget(self.scroll, 1)

@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from meep_runtime import wsl_executable
 from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
@@ -47,7 +48,7 @@ class ResearchRuntimeTests(unittest.TestCase):
         runtime = dict(mode='wsl', distro='Physics Test', executable='/opt/my env/python',
             module_paths=["/opt/a 'quoted' folder;$(cmd)"], library_paths=['/opt/native libs'])
         command, validated, label, marker = probe_command(dict(engine='pcsel', settings=dict(model='gme', runtime=runtime)))
-        self.assertEqual(command[:6], ['wsl.exe', '--distribution', 'Physics Test', '--exec', 'env', 'LD_LIBRARY_PATH=/opt/native libs'])
+        self.assertEqual(command[:6], [wsl_executable(), '--distribution', 'Physics Test', '--exec', 'env', 'LD_LIBRARY_PATH=/opt/native libs'])
         self.assertEqual(command[6:8], ['/opt/my env/python', '-c'])
         self.assertNotIn(runtime['module_paths'][0], command[-2])
         self.assertEqual(json.loads(command[-1]), validated)

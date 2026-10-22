@@ -17,7 +17,7 @@ import uuid
 import zipfile
 
 ROOT=Path(__file__).resolve().parent
-VERSION='1.4.0-alpha.1'
+VERSION='1.4.0-alpha.2'
 GUI_MODULES=('installer_smoke','qt_app','qt_device_builder','qt_lattice_diagram','qt_materials',
     'qt_help','qt_native_figure','qt_native_plot','qt_native_field_volume','qt_field_volume','qt_windows_glass',
     'scan_storage','field_sampling', 'field_reconstruction', 'field_storage', 'direct_npz','simulation_fields','contour_sweep',
@@ -31,7 +31,7 @@ NATIVE_SETUP_MODULES=('qt_simulation_setup','simulation_setup_state','qt_device_
     'electrical_material_library','electrical_terminal_studies','electrical_thermal','research_simulation','photonic_bands','device_model',
     'research_catalog','research_diagnostics','thermal_study','benchmark_registry','research_physics_runtime','research_physics_worker',
     'sesame_transport','input_diagnostics','qt_input_diagnostics','qt_photonic_bands','qt_photonic_band_results','qt_photonic_crystal_3d','qt_photonic_runtime','qt_research_studies','qt_research_results','qt_thermal_setup',
-    'qt_study_flow','qt_simulation_flow','qt_legacy_study_workbench','qt_study_fields','qt_study_library', 'qt_simulation_picker','qt_transport_research_setup','qt_high_field_results','qt_pcsel_research_setup','qt_research_runtime',
+    'qt_study_flow','qt_simulation_flow','qt_legacy_study_workbench','qt_study_fields','qt_study_library', 'qt_simulation_picker','qt_transport_research_setup','qt_high_field_results','qt_pcsel_research_setup','qt_research_runtime','solver_environment','desktop_environment_probe','qt_solver_environment','simulation_documents','qt_study_transfer',
     'qt_research_common','qt_sesame_setup','pcsel_research','pcsel_aperture','pcsel_optional','pcsel_physics_worker',
     'advanced_transport','advanced_transport_graph','electrical_temperature','nonlocal_tunnelling','high_field_optics','bandgap_narrowing',
     'pcsel_transport_study','pcsel_conformal_mesh','pcsel_conformal_solver','pcsel_transport_worker','pcsel_unitcell_transport',
@@ -150,6 +150,7 @@ def main():
     parser.add_argument('application',type=Path)
     parser.add_argument('--output',type=Path,default=ROOT/'verification')
     parser.add_argument('--timeout',type=int,default=600)
+    parser.add_argument('--critical',action='store_true',help='Bounded release checks; native Windows startup remains mandatory.')
     args=parser.parse_args()
     application=args.application.resolve(strict=True);output=args.output.resolve()
     output.mkdir(parents=True,exist_ok=True)
@@ -165,6 +166,7 @@ def main():
         S4_LIBRARY_ROOT=str(session/'User Data'),S4_SELF_TEST_GPU='0',
         S4_SELF_TEST_MIN_SAVED_ENTRIES=str(manifest.get('build_input',{}).get('seed_runs',0)),
         S4_SELF_TEST_EXPECT_EMPTY_LIBRARY='1' if manifest.get('delivery_profile')=='public' else '0')
+    env['ODS_RELEASE_CRITICAL_SMOKE']='1' if args.critical else '0'
     report_path=output/'report.json'
     with (output/'stdout.log').open('w',encoding='utf-8') as stdout,(output/'stderr.log').open('w',encoding='utf-8') as stderr:
         process=subprocess.Popen([str(application),'--self-test',str(report_path)],cwd=session,env=env,
@@ -181,32 +183,45 @@ def main():
     assert report['version']==VERSION and report['frozen']
     assert Path(report['executable']).resolve()==application
     assert Path(report['library_root']).resolve()==Path(env['S4_LIBRARY_ROOT'])
-    assert report['checks']['desktop_pages_and_themes']['detail']['themes']==['dark','light','glass_dark','glass_light']
+    assert report.get('validation_profile')==('critical_release' if args.critical else 'full_installer')
+    assert report['checks']['desktop_pages_and_themes']['detail']['themes']==(['light'] if args.critical else ['dark','light','glass_dark','glass_light'])
     models=report['checks']['simulation_launcher_and_model_screens']['detail']
-    assert models.get('choices_checked')==27 and len(models.get('choices',[]))==27,models
+    assert models.get('choices_checked')==29 and len(models.get('choices',[]))==29,models
     assert all(row.get('passed') is True for row in models['choices']),models
-    assert all(models.get(key) is True for key in ('editable_models_verified','correct_model_routes_verified','physical_geometry_preserved')),models
+    assert all(models.get(key) is True for key in ('editable_models_verified','correct_model_routes_verified',
+        'independent_documents_verified','portable_drafts_verified','selective_transfer_verified','no_unintended_windows')),models
+    assert models.get('unique_setup_pages')==28,models
+    windows=report['checks']['no_transient_panel_windows']['detail']
+    assert windows.get('unintended_count')==0 and windows.get('observed_before_main_construction') is True,windows
     assert models.get('automatic_jobs_started')==0,models
-    controls=report['checks']['native_reference_controls_and_graphs']['detail']
-    assert controls['physical_model_unchanged'] and controls['shared_settings_preview']
-    assert controls['native_2d_canvases'] and controls['native_3d_canvases'] and not controls['live_matplotlib_qt_widgets']
-    fields=report['checks']['native_electric_field_maps_and_features']['detail']
-    assert fields['selected_csv_verified']
-    assert fields['selected_snapshot']==Path(fields['directory']).resolve().relative_to(
-        (Path(env['S4_LIBRARY_ROOT'])/'runs').resolve()).as_posix()
-    assert fields['live_renderer']=='NativeVolumeCanvas' and fields['native_2d_field_maps']
-    assert fields['native_orbit_and_zoom'] and fields['actual_phase_vectors_verified']
-    assert fields['saved_xyz_and_complex_fields_preserved'] and not fields['live_publication_artists_created']
+    grid=report['checks']['exact_parameter_grid']['detail']
+    assert grid.get('designs')==4 and grid.get('spectral_rows')==24,grid
+    assert all(grid.get(key) is True for key in ('unselected_inputs_unchanged','exact_requested_wavelengths',
+        'archive_raw_bytes_verified','post_analysis_immutable')),grid
+    environment=report['checks']['automatic_environment_resources']['detail']
+    assert environment.get('setup_modules_imported') is True and environment.get('downloads_started') is False,environment
+    assert environment.get('providers')==['gmsh','legume','meep','mpb','sesame'],environment
     assert len(report['checks']['native_cpu_spectrum']['detail']['rows'])==3
-    speed=report['checks']['simulation_speed_and_scan_storage']['detail']
-    assert all(speed.get(name) is True for name in (
-        'spectrum_rta_only','separate_field_job','validated_fourier_sampling',
-        'exact_disk_backed_spectrum','compact_scan_roundtrip','contour_label_parity')),speed
-    assert speed.get('field_sample_count')==3,speed
-    maximize=report['checks']['maximize_restore_painting']['detail']
-    assert maximize.get('maximized_transparency_policy_verified') is True,maximize
-    assert maximize.get('restored_glass_policy') is True,maximize
-    assert maximize.get('looks')==['glass_dark','glass_light'],maximize
+    if not args.critical:
+        controls=report['checks']['native_reference_controls_and_graphs']['detail']
+        assert controls['physical_model_unchanged'] and controls['shared_settings_preview']
+        assert controls['native_2d_canvases'] and controls['native_3d_canvases'] and not controls['live_matplotlib_qt_widgets']
+        fields=report['checks']['native_electric_field_maps_and_features']['detail']
+        assert fields['selected_csv_verified']
+        assert fields['selected_snapshot']==Path(fields['directory']).resolve().relative_to(
+            (Path(env['S4_LIBRARY_ROOT'])/'runs').resolve()).as_posix()
+        assert fields['live_renderer']=='NativeVolumeCanvas' and fields['native_2d_field_maps']
+        assert fields['native_orbit_and_zoom'] and fields['actual_phase_vectors_verified']
+        assert fields['saved_xyz_and_complex_fields_preserved'] and not fields['live_publication_artists_created']
+        speed=report['checks']['simulation_speed_and_scan_storage']['detail']
+        assert all(speed.get(name) is True for name in (
+            'spectrum_rta_only','separate_field_job','validated_fourier_sampling',
+            'exact_disk_backed_spectrum','compact_scan_roundtrip','contour_label_parity')),speed
+        assert speed.get('field_sample_count')==3,speed
+        maximize=report['checks']['maximize_restore_painting']['detail']
+        assert maximize.get('maximized_transparency_policy_verified') is True,maximize
+        assert maximize.get('restored_glass_policy') is True,maximize
+        assert maximize.get('looks')==['glass_dark','glass_light'],maximize
     errors=(output/'stderr.log').read_text(encoding='utf-8',errors='replace')
     assert not any(marker in errors for marker in ('Traceback (most recent call last)','Exception ignored','ModuleNotFoundError:','ImportError:')),errors[-5000:]
     # The offscreen path does not call qt_app.main or restore native geometry.
@@ -238,7 +253,8 @@ def main():
         payload_audit=str(output/'payload-audit.json'),checks=list(report['checks']),
         source_tree_sha256=payload['source_tree_sha256'],
         readable_source_files_verified=payload['readable_source_files_verified'],
-        payload_files_verified=payload['payload_files_verified'],native_fields_verified=True,
+        payload_files_verified=payload['payload_files_verified'],native_fields_verified=not args.critical,
+        validation_profile=report['validation_profile'],omitted_checks=report.get('omitted_checks',[]),
         native_startup_verified=True,native_startup_report=str(native_report_path),
         native_startup_report_sha256=sha256(native_report_path),
         native_startup_executable_sha256=sha256(application),

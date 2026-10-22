@@ -1,108 +1,84 @@
-# Optical Design Studio 1.4.0-alpha.1 — Highly Experimental
+# Optical Design Studio 1.4.0-alpha.2 — Highly Experimental
 
-**Shipment validation — deliberately partial:** 237 source tests, 20 packaging gates, all 27 compiled startup/model screens, 12 compiled model jobs, and 2 edited band-structure jobs passed. At the explicit request to package and ship, the remaining compiled self-tests and real Windows native startup suite were stopped before completion. This Highly Experimental release does not claim those unfinished checks passed. The finite PCSEL paper case executed but remains unconverged.
+**Highly Experimental prerelease · Windows x64 · October 2026**
 
-**Highly Experimental prerelease · Windows · October 15, 2026**
+This update fixes exhaustive parameter sweeps, separates every simulation into its own editable workspace, and adds automatic solver-environment setup. It follows **1.4.0-alpha.1** and retains its optical, electrical, photonic-crystal, thermal and PCSEL capabilities.
 
-This release brings editable photonic-crystal, semiconductor, thermal and PCSEL studies into Optical Design Studio, alongside a substantial redesign of the existing simulation setup screens. It adds a searchable launcher with **27 destinations**, an integrated library of **24 reference cases**, and clearer routes from a missing input to the exact field that needs attention.
+## Changes since alpha.1
 
-**These additions are experimental research tools.** Implemented controls, a completed calculation and agreement with a particular reference are separate claims. Model assumptions, numerical convergence and the suitability of material parameters still need to be assessed for each device. The 27 destinations include existing tools with redesigned workflows, related modes sharing a solver, and the paper library; they are not 27 new physics engines.
+### Exact parameter sweeps and saved-data analysis
 
-## All simulation destinations
+- **Simulation Sweep** now runs the Cartesian product of the parameter values you select, using exactly the requested optical samples. It does not add hidden wavelength samples, refine the grid, optimize toward a target, or discard designs because they have weak peaks.
+- Every selected combination receives a recorded outcome. Completed spectra, parameters and saved artifacts remain available; stopping a run preserves available partial samples and identifies unfinished or unstarted designs. Unavailable values remain explicit blanks instead of invented zeros. Failed or incomplete designs are excluded from applicable analysis without deleting their raw data.
+- After running, search the saved data for **Q-factor estimates** or designs with **high/low reflection, transmission or absorption**. Changing these filters does not rerun the solver or rewrite the recorded spectra. Q is a sampled, baseline-relative linewidth estimate, not a fitted eigenmode Q or proof of convergence.
+- The sweep has its own setup and saved results. **AI Search** remains a separate selectable tool. Applying a saved design updates the active simulation without restoring an older copy of other simulations.
 
-| Family | Available destinations |
+### Independent simulation workspaces
+
+- The chooser now contains **29 destinations: 28 simulation/tool workspaces and Paper comparisons**. Simulation Sweep and AI Search are directly selectable alongside the existing study types. These are destinations, not 28 separate physics engines.
+- Each type retains its own structure, materials, parameters and unfinished inputs. DC, I–V and C–V, all three band variants, the two Sesame dimensions, and the individual PCSEL models have separate editors. Their diagnostics and results no longer appear as another study's state.
+- Dedicated pages show the selected simulation's controls and identity. Unrelated family/model switches are removed from those pages; **Choose simulation** opens another workspace. The coupled workspace still exposes its own optical and electrical setup sections.
+- **Transfer inputs** explicitly copies compatible structure/material inputs into the destination. It retains destination solver, sampling and operating settings and leaves the source independent. Unsupported crystal/finite-device conversions are not guessed.
+- Saving and reopening retains the document collection, including inactive material-table assets. Existing single-study projects remain readable. Loading a recent setup, an electrical preset or an applied search design no longer overwrites newer edits in unrelated studies.
+
+### Automatic environment setup
+
+- Optional-solver panels provide **Find installed solver**, **Set up automatically**, progress/error logs and cancellation. Supported paths cover Legume, Sesame, Gmsh and the MPB/Meep Linux or WSL runtimes.
+- Setup uses separate managed environments, checks the required solver API and selects a verified runtime for the study. Solver-specific runtime choices are remembered independently. Opening an editor does not download dependencies.
+- Windows source launch/install scripts can prepare a compatible Python desktop environment and check full application construction, native S4 and semiconductor dependencies. Missing PyYAML and native-library discovery issues found during fresh setup were corrected.
+- Windows support still requires a functioning WSL installation for MPB/Meep; enabling Windows components can require administrator permission and a restart. Download access is needed for automatic installation.
+
+## Fixed bugs
+
+- Late edits and selection callbacks from hidden electrical tables could change the active study's doping, enabled objects or selection. Hidden editor/save callbacks are now checked against their owning document.
+- FDTD project restoration could leave the displayed resolution and submitted job stale. Unrun controls now restore with the correct study; AI/index/sweep settings and empty bounds also restore independently.
+- Partial research drafts could retain values from the previously displayed setup. Missing fields now restore defaults; incompatible model/dimension imports cannot change a dedicated workspace's type.
+- Worker progress signals conflicted with a Qt event handler, producing “signal is not callable” errors during cleanup. The signals are now separate from Qt's event method.
+- Grid cancellation could be reported as failure or lose final artifacts while saving. Cancellation now retains partial data, and finalization protects checkpoint/archive saving. Unavailable spectrum cells no longer crash analysis or checkpoint recovery.
+- Opening the simulation chooser briefly created many extra top-level windows. Cards and the empty-search label now have parents before becoming visible. The targeted audit changed from **174 unexpected window-show events to zero** across six chooser constructions.
+- Cached electrical results could appear under another study; Results-to-Simulation navigation could lose the local setup view. Dedicated result ownership and return navigation now preserve the correct context.
+- PCSEL revisits could reset the local section while the header still indicated Results. First-visit titles, paper-library context and setup/result navigation now stay synchronized.
+- Choose simulation and Transfer inputs were hidden in some wide layouts; compact grid controls overlapped. Both actions remain accessible, and the compact sweep form scrolls without the observed overlaps.
+- Coupled's standalone-optical action could remain in Coupled mode. **Open standalone optical simulation** now opens the independent optical workspace; copying inputs remains an explicit transfer.
+- Study-bank metadata could falsely mark an unchanged paper reference as edited. Physical-input comparison excludes this persistence metadata.
+
+- The portable build keeps the reviewed NumPy runtime ahead of optional GPU vendor packages, avoiding an unintended core-library version override.
+
+## Available features
+
+| Family | Selectable studies and tools |
 | --- | --- |
-| Optical — 5 | **Optical spectrum** (S4); **Time-domain optics** (MEEP); **Refractive-index sweep**; **Optical fields & phase**; **High-field optical response** |
-| Photonic crystals — 3 | **3D Photonic Bands** (MPB); **2D Photonic Bands** (MPB); **2D bands · Legume** |
-| Electrical & heat — 8 | **Electrical device · DC**; **Current–voltage sweep**; **Capacitance–voltage sweep**; **Coupled electrical & optical**; **1D Semiconductor transport**; **2D Semiconductor transport**; **Temperature & heat flow**; **Finite-contact transport** |
-| PCSEL and laser — 10 | **PCSEL vertical modes**; **PCSEL coupled-wave modes**; **PCSEL finite-area modes**; **PCSEL far-field beam**; **PCSEL aperture response**; **PCSEL guided-mode expansion**; **PCSEL RCWA resonances**; **PCSEL periodic transport**; **PCSEL representative cell**; **Laser rate equations** |
-| Reference library — 1 | **Paper comparisons**, with 24 cases that can be run as references or opened as editable setups |
+| Optical and search — 7 | S4 optical spectrum; Meep time-domain optics; refractive-index sweep; optical fields and phase; high-field optical response; Simulation Sweep; AI Search |
+| Photonic crystals — 3 | 3D MPB bands; 2D MPB bands; 2D Legume bands |
+| Electrical and heat — 8 | DC device; I–V; C–V; coupled electrical/optical; 1D and 2D Sesame transport; prescribed temperature/heat flow; finite-contact transport |
+| PCSEL and laser — 10 | Vertical modes; coupled-wave modes; finite-area modes; far-field beam; aperture response; guided-mode expansion; RCWA resonances; periodic transport; representative-cell transport; laser rate equations |
+| Paper library — 1 | 24 versioned reference cases with source/provenance, editable copies and comparison artifacts |
 
-Selecting a destination opens its setup; it does not launch a calculation. Existing optical tools, workspace routes and saved-project workflows remain available.
+Editable geometry/material controls, supported structure previews, the 3D crystal editor, clickable missing-input navigation, saved spectra/fields/modes and model-specific result exports remain available. Each solver retains its documented geometry, boundary-condition and physical-model limits.
 
-## Editable setup and a cleaner interface
+## Verification and unresolved scientific limits
 
-- A searchable, family-filtered launcher with native icons provides direct access to DC, IV, CV, 1D/2D transport and the individual optical/PCSEL models.
-- Guided setup stages, structure previews and selected-object inspectors replace dense forms on the redesigned screens. Desktop layouts give the scene room; compact layouts stack or switch panels while retaining access to advanced settings.
-- Geometry, materials and model parameters remain editable within each solver's supported domain. Independent periodic-crystal, Sesame and conformal PCSEL documents do not silently replace the shared finite device. Studies that use the shared device retain its material, contact and mesh assignments.
-- Photonic Bands has a dedicated 3D unit-cell editor with orbit, pan, zoom, object picking, skew lattice cells and repeated neighbors. Existing 2D documents remain supported. PCSEL setups expose editable layer stacks and patterned objects, rather than fixed study presets.
-- Clickable missing-input messages open the appropriate workspace, object and field, including individual coordinate components. The workflow supports returning to the issue list while preserving unfinished edits.
-- Draft persistence retains stable object IDs, inactive settings and unfinished numeric text. Editing a reference uses the ordinary setup controls; reference provenance stays separate from the edited physical inputs.
-- Results expose the saved artifacts appropriate to the model: spectra, band curves, current–voltage data, carrier and temperature fields, mode/beam maps, convergence records and reference comparisons. Array viewers support physical axes where supplied and retain explicit index-based access otherwise.
-- Runtime configuration and explicit installation checks help identify missing external solvers. A successful installation check does not imply that a device calculation or its convergence has been verified.
+The source audit exercised **all 29 chooser destinations**, recorded actual numerical execution for **28 study/tool scenarios**, and ran **all 24 bundled paper cases**. The native S4 sweep check retained all four requested designs and 2,804 samples, exercised saved-data filters, and separately verified cancellation with partial data. A focused grid suite passed **58 tests**. Separate UI acceptance observed 28 distinct setup widgets, checked desktop/compact layouts, explicit transfers and results return paths, and found no remaining issues within that scope.
 
-## Newly integrated models and study controls
+These are scoped execution/UI checks, not proof that every editable device is correct. The UI checks used real Qt widgets and mouse events with offscreen rendering; they do not substitute for native displayed-Windows testing or checks on the final packaged build. Fresh desktop, Legume, Sesame, Gmsh and Meep environments were exercised. MPB was discovered and verified, but a fresh standalone MPB installation was not exercised. This machine required local Python/WSL executable recovery during validation; that recovery is not a general Windows repair feature.
 
-### Periodic photonic bands
+**No bundled paper case is marked as an accepted, converged reproduction by this audit.** All 24 produced comparison artifacts; four finite-PCSEL cases explicitly remain **unconverged**. Several other studies have no directly matched experimental reference, and passing a worker or a UI test does not establish scientific agreement.
 
-MPB calculations support editable 2D and fully 3D periodic crystals; Legume supplies a separate 2D plane-wave route. Controls include real-space lattice vectors, supported geometric objects, dielectric constants, an optional physical reference scale, reciprocal-space paths, explicit points and reciprocal-cell grids. Resolution/basis convergence runs and linked geometry/material parameter sweeps use the same job and saved-result workflow.
+- Fan's small-hole/narrow-resonance spectrum discrepancies remain unresolved. For the r/a = 0.20 S4 case, transmission RMSE was approximately **0.0702**, with maximum residual **0.6166**. Limited higher-basis probes did not remove the largest discrepancy; neither convergence nor a digitization-only explanation has been established.
+- The Winn spectrum RMSE was approximately **0.227 dB**, not a power-fraction error. Other optical cases also failed their recorded tolerance checks; some scalar/transport cases have no established acceptance tolerance.
+- An additional full-3D Meep/Fan comparison executed and saved 351 samples, but did not meet its device field-decay target and failed the passive-power range check. It is an unconverged result, not an accepted reproduction.
+- Passive PCSEL modes, periodic-cell transport and averaged electrical-to-optical coupling do not establish full finite-device active-laser thresholds, output power or ring-contact behavior. Prescribed heating is not a validated coupled steady-state electrothermal solution.
 
-The ordinary 2D MPB/Legume band models describe an infinite cross-section. Finite-thickness slab calculations are a separate PCSEL guided-mode-expansion route. Supported band materials use positive, real, nondispersive scalar permittivity. Sampled bands or a successful refinement run do not establish a complete Brillouin-zone gap or universal convergence. Legume rejects overlapping objects, including overlapping periodic images; MPB retains its own object-precedence behavior.
+Use the release's final build-validation record and checksums for the packaged application's verification scope. Source audit results must not be substituted for unperformed package checks. This release remains **Highly Experimental** and separate from the stable update channel.
 
-### Semiconductor transport and heat
+## Verification of this packaged alpha.2 build
 
-Sesame provides independent editable 1D/2D drift-diffusion domains with mesh nodes, material regions, doping, generation, end contacts, voltage schedules and point/line defects. Saved outputs include current–voltage data, bands, potentials and carrier distributions. This route uses nondegenerate carriers, two contacts at the x ends and constant temperature; it is not a 3D or self-heating model.
+Fresh checks against the final release snapshot passed:
 
-Standalone heat flow uses the current finite device with explicit thermal conductivities, prescribed total power per layer and fixed-temperature, convection or insulated faces. It solves steady heat flow with constant isotropic properties. Current-derived heating and temperature feedback belong to the optional advanced-transport path, not this standalone prescribed-heat study. Reaching a temperature guard is not evidence of thermal runaway.
+- **35 targeted source tests** and **34 packaging gate tests**, with no failures or skips.
+- **8 focused checks in the compiled application**, including all **29 chooser destinations**, **28 distinct setup pages**, independent draft roundtrips and project reloads, explicit compatible transfers, and no unexpected panel windows during the observed chooser flows.
+- A native S4 sweep retained exactly **4 requested designs and 24 spectrum rows**; saved-data analysis left the raw archive unchanged. A separate three-sample native CPU spectrum also passed.
+- **7 real Windows startup/display checks**, covering initial maximized painting, restore/maximize, system commands and caption actions. These are separate from the offscreen UI checks.
+- Both executables contain **106 required modules** and the reviewed **NumPy 1.26.4**. The native binary and all **73 corresponding S4 source hashes** match their manifest.
 
-Finite-contact transport adds explicit contact/interface resistivities and optional recombination, electrochemical heating, temperature feedback, straight-column nonlocal tunnelling, bandgap-sensitivity and high-field optical calculations. These are experimental constitutive models requiring explicit parameters and source notes. They do not constitute a calibrated quantum, multiband, thermionic-barrier or carrier-energy solver. Optional mechanisms remain opt-in.
-
-The standalone high-field optical route exposes a two-band Airy/Franz–Keldysh sensitivity calculation, including absorption and refractive-index changes. Its finite-energy Kramers–Kronig integration needs convergence checks; indirect transitions, excitons and calibrated many-body susceptibility are outside its scope.
-
-### PCSEL and laser studies
-
-Editable PCSEL studies now cover vertical waveguide modes, four-basic-wave coupled-wave calculations, rectangular finite-area modes, saved-mode beam calculations, a reduced aperture response, Legume slab GME and S4 RCWA resonance calculations. Model-specific controls include layer/shape geometry, numerical accuracy, mode selection, excitation and supported parameter sweeps. Existing lumped laser rate-equation tools are also reachable from the launcher.
-
-These models have different meanings. Coupled-wave theory is an approximation, not a full-vector Maxwell solution. Finite-area modes require basis and spatial convergence. The beam model uses a paraxial Fraunhofer treatment; passive modes alone do not predict output watts, and absolute power requires explicit calibration. **PCSEL aperture response is a source-bound carrier, thermal and rate model**, not a new full-aperture 3D drift-diffusion solve.
-
-Periodic PCSEL transport adds an independent editable conformal cell using Gmsh tetrahedral meshing and a finite-element transport worker. It assumes full-face ideal-ohmic end terminals and periodic lateral boundaries, and needs mesh/bias convergence. The separate representative-cell route uses the current rasterized finite device with insulating side faces; it must not be interpreted as periodic wraparound or a boundary-fitted mesh. Neither route automatically supplies calibrated gain or a full laser prediction.
-
-## Paper comparisons that run inside the program
-
-The library contains **24 reference cases, not 24 unique publications**: eight optical-spectrum cases, six dielectric-capacitance cases, two photonic-band cases, two Sesame transport cases and six PCSEL cases.
-
-Each case retains its source and limitations. Users can run a reference through the program or duplicate it into an editable setup. Comparison artifacts retain observed/reference values, residuals and available error metrics, together with whether the physical input was edited. Provenance distinguishes author data, digitized figures and recovered study inputs. Inferred materials, contacts or other assumptions remain part of the case limitations.
-
-The library's presence is not a claim that every case reproduces its publication. Partial results, validity limits, unmatched references and unconverged calculations must remain distinguishable from successful execution and accepted reproduction.
-
-## Notable fixes
-
-- Preserved unfinished edits during missing-input navigation, including shared-device object inspectors, without implicitly applying or discarding them.
-- Flushed active editors before validation, saving and running; preserved inactive and invalid draft fields through model changes and project round trips.
-- Corrected cross-workspace diagnostic routing and exact PCSEL coordinate/aperture-component focus, including stable-ID selection after objects are reordered.
-- Added the normal project-replacement confirmation and active-job guard when restoring saved inputs through Results rerun/refine; reference-copy workflows also respect project replacement handling.
-- Made generic PCSEL and conformal imports open the usable Build device editor, while preserving deliberately saved advanced-section selections. Removed routes to emptied legacy setup tabs.
-- Corrected thermal-only validation so heat-flow models do not require electrical contacts.
-- Corrected Photonic Bands template identity after importing, restoring or editing a crystal; retained physical-scale precision and clarified 2D polarization, reciprocal sampling and lattice-resolution labels.
-- Kept geometry previews available while unrelated solver/runtime inputs are unfinished, with explicit last-valid-scene behavior during invalid geometry edits.
-- Fixed compact-layout clipping, collapsed labels and overlapping 3D controls, and corrected theme callbacks that could reference deleted Qt widgets.
-- Improved saved-array axis selection and unstructured-field handling; unevaluated high-field cells are masked rather than displayed as physical zeros.
-
-## Additional changes since the stable 1.3.2 release
-
-- Device Studio adds editable finite geometry, patterned areas and arrays, local doping, contact footprints, mesh controls, electrical materials with source notes, and linked optical/electrical setup. Original Optical Studio remains available. Finite electrical geometry and the periodic optical cell have explicit, different scopes.
-- Optical execution supports native S4 structural/mirror-symmetry paths and an optional CUDA eigenfree scattering backend, with saved solver selection and runtime checks. Acceleration depends on geometry, sampling and hardware; this release does not promise a universal speedup. GPU operation requires a compatible NVIDIA driver.
-- Spectrum-only and separately requested electric-field jobs are distinct. Saved-spectrum extrema can select an exact field wavelength; changed physical inputs invalidate that selection. Complex electric/magnetic arrays, saved 3D field views and CSV exports remain available.
-- Field-array reconstruction and binary storage reduce repeated per-sample work. Exact-cutoff handling and explicit unavailable-point records avoid substituting shifted wavelengths or invented finite values. A spectrum with unavailable samples displays gaps and warnings; an entirely unavailable spectrum still fails.
-- Phase output preserves the requested reference convention and reports unavailable values explicitly. Native window startup/maximize/restore, glass rendering and deferred layout/plot refresh fixes are retained in this build.
-
-## Dependencies and practical limits
-
-Solver availability depends on the selected route and the packaged/native checks listed below. MPB and MEEP require their supported external environments. Legume and Sesame need compatible Python environments and dependencies; conformal transport additionally needs Gmsh. Advanced semiconductor routes require their configured semiconductor runtime. S4-based spectrum and RCWA calculations use the application's S4 runtime.
-
-Local/WSL executable selections and explicit package/library paths are saved where supported. Merely opening an editor does not install a solver. A configured runtime from one computer may need adjustment on another. No feature in this release implies GPU acceleration, a universally converged mesh, or validated material coefficients.
-
-## Release evidence and downloads
-
-The release packages include **BUILD_VERIFICATION.json**, a public payload manifest, corresponding application/native source and dependency licenses. The release assets **VALIDATION.json** and **SHA256SUMS.txt** record archive identities and integrity. Final release-page verification results refer to this version's exact compiled candidate; earlier local measurements are not substituted for its release checks.
-
-The validation scope includes source regressions, packaging gates, compiled UI/model-route checks, real Windows startup checks and selected actual solver jobs. It does not establish convergence for every editable device or successful reproduction of all 24 reference cases. In particular, a finite-area PCSEL job may execute and still report **unconverged**. Treat that result as unconverged.
-
-- **OpticalDesignStudio-Portable-1.4.0-alpha.1-Windows-x64.zip** — unsigned Windows application and bundled runtime.
-- **OpticalDesignStudio-Source-1.4.0-alpha.1.zip** — matching readable application/native source, build recipe and licenses.
-- **FEATURE-OVERVIEW.html** — a standalone offline overview with 60 actual source-application screenshots, 28 screens and all 27 selectable destinations. Screenshots show editors, not calculated simulation results. Fit-screen and actual-size controls prevent wide browsers from enlarging screenshots beyond their original pixels.
-- **RELEASE_NOTES.md**, **VALIDATION.json** and **SHA256SUMS.txt** — feature/fix list and release evidence.
-
-Extract the portable ZIP into a new writable folder and keep both executables and `_internal` together. Preserve existing projects and User Data. User libraries, sessions and machine-specific solver selections are not included in the public package; configure optional solvers on the destination machine. Read **START_HERE.md** for installation and **SOURCE_README.md** in the source package for rebuilding.
-
-This is a **Highly Experimental prerelease**, not the stable update channel. Download it explicitly from the prerelease page; the stable release remains available. Use device-specific convergence checks before relying on numerical predictions.
+This is the **critical release** verification profile, not the complete installer/scientific acceptance matrix. The extended theme/field/phase, CAD/COMSOL export, machine-learning, AI-search and performance checks were not all repeated in this package. The full paper-physics suite and fresh optional-solver downloads were not repeated in the compiled application. See **VALIDATION.json** for the exact scope, source fingerprint and artifact hashes. The scientific limitations above still apply.

@@ -26,7 +26,7 @@ def main():
         'source-stage-manifest.json', 'START_HERE.md', 'RELEASE_NOTES.md',
         'THIRD_PARTY_NOTICES.md', 'SOURCE_README.md', 'BUILDING.md',
         'test_packaging.py', 'verify_release_source_smoke.py', 'audit_source_recipe.py', 'audit_release_archives.py',
-        'test_native_setup_packaging.py',
+        'test_native_setup_packaging.py', 'package_experimental_candidate.py', 'test_thermal_packaging.py',
     }
     assert required <= packaged, sorted(required-packaged)
     assert all((BUILD/name).is_file() for name in packaged)
@@ -52,16 +52,16 @@ def main():
     readme = (BUILD/'SOURCE_README.md').read_text(encoding='utf-8')
     assert "assert (env_bin/'sqlite3.dll').is_file()" in spec
     assert "names = ['sqlite3.dll'" in spec
-    assert 'matching SQLite runtime' in readme and '**Library/bin**' in readme
+    assert 'compatible SQLite' in readme and '**Library/bin**' in readme and '**ODS_OFFICIAL_RUNTIME**' in readme
     report = {
-        'passed': True, 'version': '1.4.0-alpha.1', 'packaging_files': sorted(packaged),
+        'passed': True, 'version': '1.4.0-alpha.2', 'packaging_files': sorted(packaged),
         'source_tree_sha256': json.loads((BUILD/'stage-manifest.json').read_text())['source_tree_sha256'],
         'local_python_imports': local_imports,
         'corresponding_native_source_fallback': 'native/S4-source',
         'dependency_notices_fallback': 'THIRD_PARTY_LICENSES',
         'source_readme_at_root_and_packaging': True,
         'matching_sqlite_build_runtime_required_and_documented': True,
-        'external_build_inputs_documented': ['ODS_NATIVE_INPUTS', 'ODS_RELEASE_DEPENDENCIES', 'ODS_S4_RUNTIME'],
+        'external_build_inputs_documented': ['ODS_NATIVE_INPUTS', 'ODS_RELEASE_DEPENDENCIES', 'ODS_S4_RUNTIME', 'ODS_OFFICIAL_RUNTIME', 'ODS_CAD_RUNTIME', 'ODS_DEVSIM_DEPENDENCIES', 'ODS_EIGENFREE_GPU_PACKAGES', 'ODS_EIGENFREE_CUDA'],
         'helper_sha256': {name: hashlib.sha256((BUILD/name).read_bytes()).hexdigest()
                           for name in sorted(packaged) if name.endswith('.py')},
         'packaged_file_sha256': {name: hashlib.sha256((BUILD/name).read_bytes()).hexdigest()

@@ -68,13 +68,15 @@ class DesktopApplicationTests(unittest.TestCase):
         self.assertEqual(page.background.text(),'1e-')
 
     def test_new_workspaces_dispatch_through_fixed_actions_and_remain_independent(self):
-        for route,page in ((10,self.window.photonic_bands_page),(11,self.window.research_studies_page)):
-            self.window._navigate_route(route)
+        for target in ('photonic_bands','thermal'):
+            self.window._open_simulation_choice(target)
+            page=self.window.photonic_bands_page if target=='photonic_bands' else self.window.research_studies_page
             with patch.object(page,'run') as run:
                 self.window.run_button.click()
                 run.assert_called_once_with()
         self.window._navigate_route(10)
-        self.assertEqual(self.window.optical_workflow.tabText(self.window.optical_workflow.currentIndex()),'Photonic Bands')
+        self.assertEqual(self.window.optical_workflow.tabText(self.window.optical_workflow.currentIndex()),'Simulation')
+        self.assertIn('Photonic',self.window.active_simulation_label.text())
         self.window._route_setup_action('research.overview')
         self.assertEqual(self.window.stack.currentIndex(),11)
         self.assertEqual(self.window.research_studies_page.stack.currentIndex(),0)
@@ -332,7 +334,8 @@ class DesktopApplicationTests(unittest.TestCase):
         self.assertNotIn('PCSEL',self.window.pages)
 
         self.assertEqual(self.window.stack.count(),12)
-        self.assertIs(self.window.stack.widget(10),self.window.photonic_bands_page)
+        self.assertIs(self.window.stack.widget(10),self.window.photonic_bands_stack)
+        self.assertIs(self.window.photonic_bands_stack.currentWidget(),self.window.photonic_bands_page)
         self.assertIs(self.window.stack.widget(11),self.window.research_studies_page)
 
         self.assertFalse(any('Laser' in label or 'PCSEL' in label for label,_,_ in self.window._tool_pages))
@@ -350,15 +353,15 @@ class DesktopApplicationTests(unittest.TestCase):
 
         self.window._navigate_route(0)
         self.assertEqual([self.window.optical_workflow.tabText(i) for i in range(self.window.optical_workflow.count())],
-            ['Structure','Materials','Simulation','Results','Settings','Help','Photonic Bands'])
+            ['Structure','Materials','Simulation','Results','Settings','Help'])
         for engine in (0,5,6):
             self.window._navigate_route(2,engine)
             self.assertEqual([self.window.optical_workflow.tabText(i) for i in range(self.window.optical_workflow.count())],
-                ['Structure','Materials','Simulation','Results','Settings','Help','Photonic Bands'])
-            self.assertEqual(self.window.optical_routes,[0,1,2,9,6,7,10])
+                ['Structure','Materials','Simulation','Results','Settings','Help'])
+            self.assertEqual(self.window.optical_routes,[0,1,2,9,6,7])
         self.window._navigate_route(9)
         self.assertIs(self.window.stack.currentWidget(),self.window.results_page)
-        self.assertEqual(self.window.optical_routes,[0,1,2,9,6,7,10])
+        self.assertEqual(self.window.optical_routes,[0,1,2,9,6,7])
 
         for width in (640,1460):
 

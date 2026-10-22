@@ -73,8 +73,9 @@ class BoundsEditorTests(unittest.TestCase):
         for low, high, step in [(float('nan'), .2, .01), (.2, .1, .01), (.1, .2, 0)]:
             with self.assertRaises(ValueError):
                 self.add([], 'radius', '1', low=low, high=high, step=step)
-        with self.assertRaisesRegex(ValueError, 'below 0.6'):
-            self.add([], 'r_over_a', '1', high=.6)
+        # The bounds editor describes a sweep; fabrication acceptance belongs
+        # only to the ML/Hybrid optimizers, not the exact grid.
+        self.assertEqual(self.add([], 'r_over_a', '1', high=.6).iloc[0]['Max'], .6)
         bounds = self.add([], 'center_x', '2', low=-.2, high=.2)
         self.assertEqual(bounds.iloc[0]['Min'], -.2)
 

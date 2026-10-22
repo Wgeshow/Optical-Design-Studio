@@ -45,10 +45,11 @@ def build_peak_search_ui(materials, layers, patterns, files, settings, perf_inpu
                 uploads = library.files_for(project)
             model = prepare(project['materials'], project['layers'], project['patterns'], uploads, project['settings'])
             stop = float(project['settings']['wl_stop_nm'])
-            if model['mode'] == 'Wavelength sweep' and model['points'][-1][1] < stop:
+            search_options = dict(zip(ALL_KEYS, values[count:]))
+            if search_options.get('search_mode') != 'Exhaustive grid' and model['mode'] == 'Wavelength sweep' and model['points'][-1][1] < stop:
                 model['points'].append([len(model['points']), stop, model['points'][0][2]])
             bounds_records = records(bounds_df, BOUND_COLS)
-            cfg = parse_search(model, bounds_records, dict(zip(ALL_KEYS, values[count:])))
+            cfg = parse_search(model, bounds_records, search_options)
             if cfg.get('search_mode', 'Exhaustive grid') != 'Exhaustive grid':
                 validate_ml(cfg, model)
                 if resume_file:
@@ -71,6 +72,12 @@ def build_peak_search_ui(materials, layers, patterns, files, settings, perf_inpu
                     directory = Path(event['directory'])
                     summary = event['summary']
                     df = pd.read_csv(directory/'design_results.csv')
+                    if summary.get('search_mode') == 'Exhaustive grid':
+                        text = (f"**{summary['status'].title()}.** {summary['evaluated']} of {summary['grid_designs']} designs completed; "
+                                f"{summary['spectral_points']:,} samples saved. All raw R/T/A samples and design statuses are retained. "
+                                f"{summary['reason']}\n\n{summary['scope']}")
+                        yield None, df.head(5000), pd.DataFrame(), pd.DataFrame(), [event['archive'], str(directory/'all_spectra.csv'), str(directory/'design_results.csv')], text, dict(directory=str(directory), project=project)
+                        continue
                     ties = pd.read_csv(directory/'matching_best.csv')
                     feasible = pd.read_csv(directory/'above_target_by_Q.csv')
                     spectrum = pd.read_csv(directory/'best_spectrum.csv')
@@ -154,14 +161,14 @@ def build_peak_search_ui(materials, layers, patterns, files, settings, perf_inpu
     with gr.Tab('Explore designs'):
         gr.Markdown('### Compare designs across your wavelength range\nFind peaks of the selected response, compare all matching designs, and rank qualifying peaks by Q. This search uses the wavelength range and solver settings chosen in **Simulation**.')
         with gr.Row():
-            search_mode = gr.Dropdown(MODES, value='Hybrid verified', label='Search method', allow_custom_value=False,
+            search_mode = gr.Dropdown(MODES, value='Exhaustive grid', label='Search method', allow_custom_value=False,
                                      info='ML learns where to search. Hybrid adds local exploration and verification. Grid evaluates every combination.')
             budget = gr.Number(500, precision=0, minimum=1, maximum=10000, label='Maximum designs to evaluate',info='Includes learning and local exploration; final verification adds reruns.')
-        gr.Markdown('#### 1. Choose what the optimizer can change')
+        gr.Markdown('#### 1. Choose parameters to sweep\nExhaustive grid uses only these combinations and the exact input samples. It keeps every R/T/A value; targets, fabrication constraints and adaptive refinement apply only to ML/Hybrid methods.')
         bounds = build_bounds_editor(materials, layers, patterns, label='Saved design ranges')
         populate = gr.Button('Create ranges from the entire current structure')
         gr.Markdown('Creating ranges from the structure fixes each value initially. Load a range into the editor to choose wider limits. An empty range list analyzes the current design only.')
-        with gr.Accordion('Absorption target and fabrication limits', open=False):
+        with gr.Accordion('Absorption target and fabrication limits (ML / Hybrid)', open=False, visible=False) as constraints_section:
             with gr.Row():
                 response = gr.Dropdown(['Absorption', 'Reflection', 'Transmission'], value='Absorption', label='Response to optimize')
                 target = gr.Number(.99, minimum=0, maximum=.999999999, label='Required response (fraction)',info='0.99 = 99%. Accepted peaks must be strictly above this value.')
@@ -170,15 +177,15 @@ def build_peak_search_ui(materials, layers, patterns, files, settings, perf_inpu
                 bridge = gr.Number(0, minimum=0, label='Minimum gap between circular regions (µm)')
                 separate = gr.Checkbox(True, label='Keep circular holes and pillars separate')
             gr.Markdown('Circle separation includes periodic neighbors and other circles in the same layer. Set suitable size and position ranges for other shapes.')
-        with gr.Accordion('Peak detection and wavelength sampling', open=False):
+        with gr.Accordion('Peak detection and wavelength sampling (ML / Hybrid)', open=False, visible=False) as detection_section:
             with gr.Row():
                 tie = gr.Number(.0001, minimum=0, maximum=1, label='Tolerance for matching the best response (fraction)',info='0.0001 = 0.01 percentage points.')
                 prominence = gr.Number(.00001, minimum=0, maximum=1, label='Minimum peak prominence (fraction)',info='Lower values allow weaker peaks to be found before optimization.')
             with gr.Row():
                 rounds = gr.Number(3, precision=0, minimum=0, maximum=6, label='Rounds of finer sampling around peaks')
-                points = gr.Number(200000, precision=0, minimum=3, maximum=MAX_SWEEP_POINTS, label='Maximum wavelength evaluations for the whole run')
             gr.Markdown('Q is estimated from the resolved spectral linewidth relative to the local baseline. Narrow peaks may need a smaller initial wavelength step in Simulation.')
-        with gr.Accordion('Learning and verification settings', open=False) as ml_section:
+        points = gr.Number(200000, precision=0, minimum=1, maximum=MAX_SWEEP_POINTS, label='Maximum samples for the whole run')
+        with gr.Accordion('Learning and verification settings', open=False, visible=False) as ml_section:
             with gr.Row():
                 initial = gr.Number(24, precision=0, minimum=2, label='Initial designs before guided learning')
                 trials = gr.Number(60, precision=0, minimum=2, label='Total learning trials',info='Includes the initial designs and any resumed trials.')
@@ -196,7 +203,8 @@ def build_peak_search_ui(materials, layers, patterns, files, settings, perf_inpu
                 with gr.Row():
                     a_agreement = gr.Number(.001, minimum=0, maximum=1, label='Allowed response change between resolutions (fraction)')
                     q_agreement = gr.Number(.05, minimum=0, maximum=1, label='Allowed relative Q change between resolutions',info='0.05 = 5%.')
-        search_mode.change(lambda mode: gr.Accordion(visible=mode != 'Exhaustive grid'), search_mode, ml_section, queue=False, api_visibility='private')
+        search_mode.change(lambda mode: [gr.Accordion(visible=mode != 'Exhaustive grid') for _ in range(3)], search_mode,
+                           [ml_section, constraints_section, detection_section], queue=False, api_visibility='private')
         gr.Markdown('#### 2. Run the search')
         with gr.Row():
             start = gr.Button('Start design search', variant='primary')
@@ -205,6 +213,30 @@ def build_peak_search_ui(materials, layers, patterns, files, settings, perf_inpu
         plot = gr.Plot(label='Best response spectrum found')
         gr.Markdown('#### 3. Compare and use a design')
         state = gr.State(None)
+        with gr.Group():
+            gr.Markdown('**Analyze saved grid data** · These filters never start another simulation. Q needs a resolved wavelength linewidth.')
+            with gr.Row():
+                filter_metric = gr.Dropdown(['Response', 'Q factor'], value='Response', label='Find')
+                filter_response = gr.Dropdown(['Reflection', 'Transmission', 'Absorption'], value='Reflection', label='Response')
+                filter_direction = gr.Dropdown(['High', 'Low'], value='High', label='Order')
+            filter_limit = gr.Number(value=None, minimum=0, label='Optional threshold (fraction for R/T/A; dimensionless for Q)')
+            filter_run = gr.Button('Find in saved data')
+            filter_results = gr.Dataframe(label='Filtered saved data', interactive=False)
+            filter_download = gr.File(label='Complete filtered data CSV')
+            def filter_saved(saved_state, metric, response, direction, threshold):
+                from peak_optimizer import analyze_grid_results, write_csv
+                if not saved_state:
+                    raise gr.Error('Run a grid sweep first.')
+                directory = Path(saved_state['directory'])
+                summary = json.loads((directory/'search_summary.json').read_text(encoding='utf-8'))
+                if summary.get('search_mode') != 'Exhaustive grid':
+                    raise gr.Error('This analysis applies to exhaustive grid results.')
+                matches = analyze_grid_results(directory, response, direction, threshold, metric)
+                path = directory/'filtered_results.csv'
+                write_csv(path, matches)
+                return pd.DataFrame(matches).head(5000), str(path)
+            filter_run.click(filter_saved, [state, filter_metric, filter_response, filter_direction, filter_limit],
+                             [filter_results, filter_download], api_visibility='private')
         with gr.Row():
             selected_design = gr.Dropdown([], value=None, label='Design to use in Structure',allow_custom_value=False,scale=3)
             apply = gr.Button('Use selected design',variant='primary',scale=1)

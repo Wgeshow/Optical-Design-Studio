@@ -25,7 +25,7 @@ from qt_surfaces import WorkspacePanel
 
 
 class MeepWorker(QThread):
-    event = pyqtSignal(dict)
+    progress_event = pyqtSignal(dict)
     completed = pyqtSignal(dict)
     failed = pyqtSignal(str)
 
@@ -73,7 +73,7 @@ class MeepWorker(QThread):
                         if message['kind'] in ('complete', 'error', 'cancelled'):
                             terminal = message
                         else:
-                            self.event.emit(dict(message, run_kind='fdtd', directory=str(self.directory)))
+                            self.progress_event.emit(dict(message, run_kind='fdtd', directory=str(self.directory)))
                 code = self.process.wait(timeout=10)
             if self._cancelled.is_set():
                 terminal = dict(kind='cancelled')
@@ -144,41 +144,35 @@ class _ManagedRuntimeTask(QThread):
 
     def run(self):
         import meep_managed
-        from update_client import UpdateCancelled, _cancelled
+        import solver_environment
+        from update_client import UpdateCancelled
         try:
-            status = meep_managed.prerequisites(self.cancelled)
-            if status['ready'] and meep_managed.receipt():
-                ready = meep_managed.verify_installed(cancel=self.cancelled)
-                if ready['available']:
-                    self.completed.emit(dict(ready, managed=True, ready=True, needs_setup=False))
+            configured = meep_runtime.load_config()
+            candidate = dict(mode=configured['mode'], distro=configured['distro'],
+                executable=configured['python'], timeout_s=86400.)
+            if self.install:
+                runtime = solver_environment.setup('meep', candidate, cancel=self.cancelled, progress=self.line.emit)
+            else:
+                runtime = solver_environment.discover('meep', candidate, cancel=self.cancelled, progress=self.line.emit)
+                if not runtime:
+                    status = meep_managed.prerequisites(self.cancelled)
+                    self.completed.emit(dict(status, available=False, message=
+                        'Click Install FDTD engine to create a separate Meep environment from the official Ubuntu and conda-forge providers.'
+                        if status['ready'] else status['message']))
                     return
-            client = meep_managed.ManagedMeepClient()
-            self.line.emit('Checking the official GitHub release for compatible FDTD setup files…')
-            release = client.check_pack(self.cancelled)
-            if release is None:
-                self.completed.emit(dict(status, available=False, message=
-                    'No managed FDTD package is published for this application version yet. Nothing was downloaded or installed. '
-                    + (status['message'] if not status['ready'] else 'Expert setup can use an existing Meep installation.')))
-                return
-            if not self.install or not status['ready']:
-                self.completed.emit(dict(status, available=False, release=release, message=
-                    ('FDTD setup available. Install downloads Linux and Meep dependencies from their official providers; an internet connection and additional disk space are required.'
-                     if status['ready'] else status['message'])))
-                return
-            self.line.emit('Downloading verified FDTD setup files from the official GitHub release…')
-            with tempfile.TemporaryDirectory(prefix='ods-meep-download-') as tmp:
-                package = client.download(release, tmp,
-                    lambda done, total: self.progress.emit(int(100*done/total)), self.cancelled)
-                self.line.emit('Verifying FDTD setup files…')
-                rootfs, manifest = meep_managed.unpack_pack(package, release, Path(tmp)/'verified', self.cancelled)
-                _cancelled(self.cancelled)
-                result = meep_managed.import_pack(rootfs, manifest, release, cancel=self.cancelled, progress=self.line.emit)
-            self.completed.emit(dict(result, managed=True, ready=True, needs_setup=False))
-        except UpdateCancelled:
-            self.completed.emit(dict(available=False, message='FDTD setup cancelled. Any completed dedicated runtime import is preserved; click Check availability to verify it later.'))
+            config = dict(mode=runtime['mode'], distro=runtime.get('distro', 'Ubuntu'),
+                python=runtime['executable'], conda=configured.get('conda', '/opt/ods-solvers/bin/micromamba'))
+            if runtime.get('distro') == solver_environment.DISTRO:
+                config['managed'] = True
+                config['conda'] = '/opt/ods-solvers/bin/micromamba'
+            result = meep_runtime.probe(config)
+            if result['available']:
+                meep_runtime.save_config(config)
+            self.completed.emit(dict(result, managed=bool(config.get('managed')), ready=result['available'], needs_setup=False))
+        except (UpdateCancelled, InterruptedError):
+            self.completed.emit(dict(available=False, message='FDTD setup cancelled. Existing runtimes were preserved; click Install FDTD engine to retry.'))
         except Exception as exc:
             self.completed.emit(dict(available=False, message=str(exc)))
-
 
 class MeepRuntimeSettings(QWidget):
     runtime_changed = pyqtSignal(dict)
@@ -192,7 +186,7 @@ class MeepRuntimeSettings(QWidget):
         self._reserved = False
         self._external_busy = False
         layout = QVBoxLayout(self)
-        intro = QLabel('Install MEEP in its own Linux environment. Setup files come from the Optical Design Studio GitHub release; Linux and Meep dependencies download directly from their official providers. Downloads start only when you click Install FDTD engine. Existing Linux distributions are left unchanged.')
+        intro = QLabel('Install Meep in a separate environment automatically. Ubuntu and pinned conda-forge dependencies download from their official providers after you click Install FDTD engine. An existing working installation can also be discovered and reused.')
         intro.setWordWrap(True)
         layout.addWidget(intro)
         managed_row = QHBoxLayout()
@@ -298,7 +292,7 @@ class MeepRuntimeSettings(QWidget):
             self._task.completed.connect(self._done)
             self._task.finished.connect(self._cleanup)
             self._set_busy(True)
-            self.status.setText('Checking Windows support and the official FDTD package…')
+            self.status.setText('Checking Windows support and installed Meep environments…')
             self._task.start()
         except Exception as exc:
             self._release()
@@ -389,7 +383,7 @@ class FDTDPage(QWidget):
         title.setObjectName('pageTitle')
         layout.addWidget(title)
         title.hide()
-        note = QLabel('Broadband pulse simulation of the shared structure, with an incident-reference run for reflection and transmission. Lateral boundaries are periodic; incidence is normal.')
+        note = QLabel('Broadband pulse simulation of the simulation structure, with an incident-reference run for reflection and transmission. Lateral boundaries are periodic; incidence is normal.')
         note.setWordWrap(True)
         layout.addWidget(note)
         note.hide()
@@ -528,6 +522,10 @@ class FDTDPage(QWidget):
         store.run_failed.connect(self._failed)
         self._busy(store.busy)
         self._restore()
+        if hasattr(store,'changed'):store.changed.connect(self._project_changed)
+        for control in self.controls.values():
+            signal=control.currentIndexChanged if isinstance(control,QComboBox) else control.toggled if isinstance(control,QCheckBox) else control.valueChanged
+            signal.connect(self._save_options)
         from qt_legacy_study_workbench import StudyWorkbench
         # Retain the existing controls and result widgets; only their placement changes.
         action_layout.removeWidget(area)
@@ -538,13 +536,14 @@ class FDTDPage(QWidget):
         self.workbench = StudyWorkbench(store, 'Time-domain optics',
             ['Domain', 'Pulse & sampling', 'Calculate'], action_panel, output,
             edit_geometry=lambda: self.routeRequested.emit('structure.original'),
-            preview_note='Shared optical unit cell. Lateral boundaries are periodic; PML and padding apply along the propagation direction. Normal incidence.')
+            preview_note='This simulation’s optical unit cell. Lateral boundaries are periodic; PML and padding apply along the propagation direction. Normal incidence.')
         self.workbench.add_parameter_tab(recent, 'Saved runs')
         self.workbench.set_step_targets(self.input_groups)
         layout.insertWidget(0, self.workbench, 1)
         splitter.hide()
 
     def _restore(self):
+        self._restoring=True
         options = self.store.search_state.get('fdtd', {})
         for key, control in self.controls.items():
             value = options.get(key, DEFAULTS[key])
@@ -554,6 +553,17 @@ class FDTDPage(QWidget):
                 control.setChecked(bool(value))
             else:
                 control.setValue(float(value) if not isinstance(value, int) else value)
+        self._restoring=False
+
+    def _project_changed(self,reason):
+        if reason in ('project','study'):self._restore()
+
+    def _save_options(self,*_):
+        if self._restoring:return
+        if not hasattr(self.store,'save_search'):return
+        if getattr(self.store,'study_navigation_enabled',False) and self.store.active_study!='fdtd':return
+        try:self.store.save_search('fdtd',self.options())
+        except ValueError:pass
 
     def options(self):
         return validate_options({key: control.currentData() if isinstance(control, QComboBox)
@@ -632,7 +642,7 @@ class FDTDPage(QWidget):
         try:
             project,search=self.store.library.project_for(item.data(Qt.ItemDataRole.UserRole),0)
             if search:project['search']=search
-            self.store.load_project(project);self._restore()
+            self.store.replace_active_study(project);self._restore()
             self.status.setText('Setup loaded')
         except Exception as exc:self.status.setText('Could not load setup: '+str(exc))
 

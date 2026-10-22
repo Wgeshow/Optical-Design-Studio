@@ -375,7 +375,7 @@ class DeviceCanvas(QWidget):
 
     def set_render_quality(self, quality='studio', *, shadows=None,
                            reflections=None, ambient_occlusion=None):
-        """Change live presentation without touching the shared device model."""
+        """Change live presentation without touching the current simulation device model."""
         if quality not in ('studio', 'flat'):
             raise ValueError('Preview quality must be studio or flat')
         self.render_quality = quality
@@ -1568,7 +1568,7 @@ class CustomDevicePage(QWidget):
                 optical_export = self.export_menu.addMenu('Periodic optical model')
                 for action in legacy_menu.actions():
                     optical_export.addAction(action)
-        self.advanced_return=_button('← Shared device canvas',lambda:self.tabs.setCurrentIndex(0))
+        self.advanced_return=_button('← Simulation device canvas',lambda:self.tabs.setCurrentIndex(0))
         self.advanced_return.hide();self.layout_.insertWidget(0,self.advanced_return)
         self.tabs.currentChanged.connect(lambda index:self.advanced_return.setVisible(index>0))
         for canvas in (self.top_view, self.section_view, self.view_3d):
@@ -2581,7 +2581,7 @@ class CustomDevicePage(QWidget):
             try:
                 self.store.undo()
                 self.refresh()
-                self.status.setText('Shared device / optical structure edit undone.')
+                self.status.setText('Simulation device / optical structure edit undone.')
             except Exception as exc:
                 self.status.setText(str(exc))
             return

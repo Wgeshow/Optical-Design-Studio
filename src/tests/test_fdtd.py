@@ -2,9 +2,11 @@
 import copy
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
+from meep_runtime import wsl_executable
 from unittest.mock import patch
 from types import SimpleNamespace
 
@@ -100,10 +102,32 @@ class TranslationTests(unittest.TestCase):
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_explicit_wsl_recovery_launcher_is_absolute_and_shared(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as folder:
+            launcher = Path(folder)/'recovered wsl.exe'
+            launcher.touch()
+            with patch.dict(os.environ, ODS_WSL_EXECUTABLE=str(launcher)):
+                config = dict(mode='wsl', distro='Ubuntu', python='/env/bin/python', conda='/bin/conda')
+                self.assertEqual(meep_runtime.command(config, ['--version'])[0], str(launcher.resolve()))
+            with patch.dict(os.environ, ODS_WSL_EXECUTABLE='relative.exe'):
+                with self.assertRaisesRegex(ValueError, 'absolute WSL'):
+                    meep_runtime.wsl_executable()
+
+    def test_path_wsl_resolution_is_absolute_for_windows_process_creation(self):
+        with patch.dict(os.environ, ODS_WSL_EXECUTABLE=''), \
+             patch.object(meep_runtime.shutil, 'which', return_value=str(Path.cwd()/'wsl.exe')):
+            self.assertEqual(meep_runtime.wsl_executable(), str((Path.cwd()/'wsl.exe').resolve()))
+
+    def test_linux_path_reports_readable_wsl_stdout_failure(self):
+        failed = SimpleNamespace(returncode=1, stdout='M\0i\0s\0s\0i\0n\0g\0', stderr='')
+        with patch.object(meep_runtime.subprocess, 'run', return_value=failed):
+            with self.assertRaisesRegex(RuntimeError, 'directory: Missing'):
+                meep_runtime.linux_path(Path.cwd(), dict(mode='wsl', distro='Ubuntu'))
+
     def test_wsl_command_preserves_paths_without_shell(self):
         config = dict(mode='wsl', distro='Ubuntu', python='/home/alice/my env/bin/python', conda='/home/alice/miniforge3/bin/conda')
         self.assertEqual(meep_runtime.command(config, ['--job', '/mnt/c/A B/job.json']),
-            ['wsl.exe', '--distribution', 'Ubuntu', '--exec', config['python'], '--job', '/mnt/c/A B/job.json'])
+            [wsl_executable(), '--distribution', 'Ubuntu', '--exec', config['python'], '--job', '/mnt/c/A B/job.json'])
 
     def test_install_only_managed_environment(self):
         config = dict(mode='wsl', distro='Ubuntu', python='/home/alice/miniforge3/envs/ods-meep/bin/python', conda='/home/alice/miniforge3/bin/conda')

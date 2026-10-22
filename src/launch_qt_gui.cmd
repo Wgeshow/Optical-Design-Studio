@@ -1,11 +1,13 @@
 @echo off
 setlocal
-if not defined S4_PYTHON set "S4_PYTHON=%USERPROFILE%\anaconda3\envs\s4_updated\python.exe"
-if not exist "%S4_PYTHON%" set "S4_PYTHON=python"
-"%S4_PYTHON%" "%~dp0qt_app.py" %*
+if defined S4_PYTHON (
+  "%S4_PYTHON%" "%~dp0qt_app.py" %*
+) else (
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0setup_windows.ps1" -Launch %*
+)
 if errorlevel 1 (
   echo.
-  echo Run install_desktop_dependencies.cmd in the S4 Python 3.12 environment.
-  echo See DESKTOP_GUIDE.md for setup and troubleshooting.
+  echo Automatic setup or application startup did not complete. Review the message above and retry.
+  echo A custom S4_PYTHON override must include the complete desktop and native dependencies.
   pause
 )

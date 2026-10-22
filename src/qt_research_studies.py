@@ -326,11 +326,11 @@ class PcselSweepEditor(QWidget):
 
 class StructuredStudyWorkspace(ResearchWorkspaceBase):
     """Schema-driven typed controls for newly registered editable research models."""
-    def __init__(self, store, capability, parent=None):
+    def __init__(self, store, capability, parent=None, *, document_id=None):
         self.engine, self.study = capability['engine'], capability['study']
         self.workspace_id = 'advanced_transport' if self.engine == 'advanced_transport' else 'research_studies'
         self.state_key = 'model_'+self.engine+'_'+self.study
-        super().__init__(store, parent)
+        super().__init__(store, parent, document_id=document_id)
         self.heading.setText(capability['label'])
         self.description.setText(' '.join(capability.get('limitations', [])))
         self.structured = {}
@@ -397,7 +397,7 @@ class StructuredStudyWorkspace(ResearchWorkspaceBase):
         from advanced_transport import input_template
         editor = self.structured[key]
         if not self.store.project().get('device'):
-            self.status.setText('Create the shared finite device first so fields use its actual material and contact IDs.'); return
+            self.status.setText('Create this simulation’s finite device first so fields use its actual material and contact IDs.'); return
         try:
             current = editor.value()
             template = input_template(key, self.store.project())
@@ -463,7 +463,7 @@ class StructuredStudyWorkspace(ResearchWorkspaceBase):
         device = getattr(self.store, 'device', None) or {}
         layout.addWidget(label('This model uses the current finite device and its mesh. '
             'Material/contact identifiers below are stable assignments from that device; editing this list does not change the geometry.'))
-        layout.addWidget(button('Edit shared device and contacts', lambda: self.diagnosticRequested.emit(dict(
+        layout.addWidget(button('Edit this simulation’s device and contacts', lambda: self.diagnosticRequested.emit(dict(
             workspace='structure', section='device', field='device', message='Edit the device used for this transport study.'))))
         descriptions = ['Contacts: '+', '.join(row.get('name', row['id'])+' ['+row['id']+']' for row in device.get('contacts', []) if row.get('enabled', True))]
         descriptions.append('Materials: '+', '.join(row.get('name', row['id'])+' ['+row['id']+']' for row in getattr(self.store, 'electrical_materials', [])))
@@ -574,6 +574,9 @@ class StructuredStudyWorkspace(ResearchWorkspaceBase):
         return dict(engine=self.engine, study=self.study, settings=settings)
 
     def load_settings(self, settings):
+        for key,value in getattr(self,'_document_fields',{}).items():
+            if key in settings and settings[key]!=value:
+                raise ValueError('These settings belong to a different simulation type. Choose that simulation before importing them.')
         self._loading = True
         try:
             self.restore_draft(self._default_draft)
@@ -643,17 +646,20 @@ class ResearchStudiesWorkspace(QWidget):
         super().__init__(parent)
         self.store = store
         self._pages = {}
+        self._document_pages = {}
         self._capabilities = {}
         self._reference_running = False
         self._embedded = False
         layout = QVBoxLayout(self)
-        row = QHBoxLayout()
+        self.navigation_row=QWidget()
+        row = QHBoxLayout(self.navigation_row)
+        row.setContentsMargins(0,0,0,0)
         row.addWidget(button('All studies', lambda: self.select_section('Overview')))
         self.selector = QComboBox()
         self.selector.setAccessibleName('Additional simulation study')
         row.addWidget(self.selector, 1)
         row.addWidget(button('Paper library', self.show_paper_library))
-        layout.addLayout(row)
+        layout.addWidget(self.navigation_row)
         self.stack = QStackedWidget()
         layout.addWidget(self.stack, 1)
         self.overview_text = label('')
@@ -697,40 +703,57 @@ class ResearchStudiesWorkspace(QWidget):
 
     def _selected(self, *args):
         engine = self.selector.currentData()
+        if engine and engine!='reference_result' and getattr(self.store,'study_navigation_enabled',False) and not self.store._switching_study:
+            current=self.store.active_study
+            target='pcsel.vertical' if engine=='pcsel' else engine
+            family=current.split('.')[0]
+            if family!=engine:
+                self.store.study_requested.emit(target)
+                return
         namespace = deepcopy(self.store.search_state.get('research_workspaces', {}))
         namespace.setdefault('schema_version', 1)
         namespace.setdefault('studies', {})['selected_engine'] = engine or ''
         self.store.save_search('research_workspaces', namespace)
         if not engine:
-            self.stack.setCurrentIndex(0); self.selectionChanged.emit(); return
-        if engine not in self._pages:
+            self.stack.setCurrentIndex(0); self.navigation_row.show(); self.selectionChanged.emit(); return
+        self._show_engine(engine)
+
+    def _show_engine(self,engine):
+        active=getattr(self.store,'active_study','')
+        bound=active if active.split('.')[0]==engine else None
+        key=bound or engine
+        page=self._document_pages.get(key)
+        if engine=='reference_result':page=self._pages.get(engine)
+        if page is None:
             if engine == 'thermal':
                 from qt_thermal_setup import ThermalSetupWorkspace
-                page = ThermalSetupWorkspace(self.store, self)
+                page = ThermalSetupWorkspace(self.store, self, document_id=bound)
             elif engine == 'sesame_transport':
                 from qt_sesame_setup import SesameSetupWorkspace
-                page = SesameSetupWorkspace(self.store, self)
+                page = SesameSetupWorkspace(self.store, self, document_id=bound)
             elif engine == 'lumped_laser':
                 from qt_pcsel import PCSELPage
                 page = PCSELPage(self.store)
             elif engine in ('pcsel', 'pcsel_transport'):
                 from qt_pcsel_research_setup import PcselResearchWorkspace
-                page = PcselResearchWorkspace(self.store, self._capabilities[engine], self)
+                page = PcselResearchWorkspace(self.store, self._capabilities[engine], self, document_id=bound)
             elif engine in ('advanced_transport', 'pcsel_unitcell_transport', 'high_field_optics'):
                 from qt_transport_research_setup import TransportResearchWorkspace, HighFieldOpticsWorkspace
                 cls = HighFieldOpticsWorkspace if engine == 'high_field_optics' else TransportResearchWorkspace
-                page = cls(self.store, self._capabilities[engine], self)
+                page = cls(self.store, self._capabilities[engine], self, document_id=bound)
             else:
-                page = StructuredStudyWorkspace(self.store, self._capabilities[engine], self)
+                page = StructuredStudyWorkspace(self.store, self._capabilities[engine], self, document_id=bound)
             if hasattr(page, 'diagnosticRequested'):
                 page.diagnosticRequested.connect(self.diagnosticRequested)
             if hasattr(page, 'set_embedded'):
                 page.set_embedded(self._embedded)
-            self._pages[engine] = page
+            if bound and hasattr(page,'bind_study_document'):page.bind_study_document(bound)
+            self._document_pages[key] = page
             self.stack.addWidget(page)
-        self.stack.setCurrentWidget(self._pages[engine])
-        if hasattr(self._pages[engine], 'refresh'):
-            self._pages[engine].refresh()
+        self._pages[engine]=page
+        self.stack.setCurrentWidget(page)
+        if hasattr(page, 'refresh'):page.refresh()
+        self.navigation_row.setVisible(not self._embedded or engine=='reference_result')
         self.adapt_layout()
         self.selectionChanged.emit()
 
@@ -768,25 +791,28 @@ class ResearchStudiesWorkspace(QWidget):
 
     def refresh(self):
         selected = self.store.search_state.get('research_workspaces', {}).get('studies', {}).get('selected_engine', '')
-        if selected != self.selector.currentData():
-            index = self.selector.findData(selected)
-            self.selector.setCurrentIndex(max(0, index))
-        for page in self._pages.values():
-            if hasattr(page, 'refresh'):
-                page.refresh()
+        if getattr(self.store,'study_navigation_enabled',False):
+            engine=self.store.active_study.split('.')[0]
+            if engine not in self._capabilities and engine!='lumped_laser':selected=''
+            elif selected and selected!=engine:selected=engine
+        self.selector.blockSignals(True)
+        self.selector.setCurrentIndex(max(0,self.selector.findData(selected)))
+        self.selector.blockSignals(False)
+        if selected:self._show_engine(selected)
+        else:self.stack.setCurrentIndex(0);self.navigation_row.show()
 
     def _store_changed(self, reason=''):
-        if reason in ('project', 'load', 'reset', 'all'):
+        if reason in ('project', 'study', 'load', 'reset', 'all'):
             self.refresh()
 
     def flush_draft(self):
-        for page in self._pages.values():
-            if hasattr(page, 'flush_draft'):
-                page.flush_draft()
+        page=self.stack.currentWidget()
+        if hasattr(page, 'flush_draft'):page.flush_draft()
 
     def set_embedded(self, embedded=True):
         self._embedded = bool(embedded)
-        for page in self._pages.values():
+        self.navigation_row.setVisible(not self._embedded or self.stack.currentIndex()==0)
+        for page in self._document_pages.values():
             if hasattr(page, 'set_embedded'):
                 page.set_embedded(self._embedded)
 
@@ -835,6 +861,10 @@ class ResearchStudiesWorkspace(QWidget):
             case = editable_copy(identity)
             if case['kind'] == 'research_simulation':
                 engine = case['options']['engine']
+                if engine!='photonic_bands' and getattr(self.store,'study_navigation_enabled',False):
+                    settings=case['options']['settings']
+                    target='pcsel.'+settings.get('model','vertical') if engine=='pcsel' else 'sesame_transport.2d' if engine=='sesame_transport' and settings.get('dimension',1)==2 else engine
+                    self.simulationRequested.emit(target)
                 if engine == 'photonic_bands':
                     self.independentBenchmarkRequested.emit(identity, False)
                 elif self.select_engine(engine):

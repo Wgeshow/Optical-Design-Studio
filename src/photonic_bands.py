@@ -497,7 +497,7 @@ def parse_frequencies(lines, prepared):
 
 def execute(prepared, directory, emit=lambda event: None, cancelled=lambda: False):
     """Run MPB in a separate cancellable process and save portable band data."""
-    from meep_runtime import ManagedProcess, linux_path
+    from meep_runtime import ManagedProcess, linux_path, wsl_executable
     if cancelled():
         raise InterruptedError('Band structure cancelled')
     directory = Path(directory).resolve()
@@ -521,7 +521,7 @@ def execute(prepared, directory, emit=lambda event: None, cancelled=lambda: Fals
     source = control_file(prepared, runtime_directory+'/mpb-')
     path.write_text(source, encoding='utf-8')
     (directory/'band_inputs.json').write_text(json.dumps(prepared, indent=2, allow_nan=False), encoding='utf-8')
-    command = (['wsl.exe', '--distribution', runtime['distro'], '--exec'] if runtime['mode'] == 'wsl' else [])
+    command = ([wsl_executable(), '--distribution', runtime['distro'], '--exec'] if runtime['mode'] == 'wsl' else [])
     command += ['env', 'OMP_NUM_THREADS=1', 'OPENBLAS_NUM_THREADS=1', runtime['executable'], runtime_directory+'/bands.ctl']
     emit(dict(phase='photonic_bands', progress=0., message='Running editable '+str(prepared['dimension'])+'D MPB band structure'))
     class Cancellation:

@@ -101,8 +101,8 @@ class ThermalSetupWorkspace(ResearchWorkspaceBase):
     workspace_id = 'thermal'
     state_key = 'thermal'
 
-    def __init__(self, store, parent=None):
-        super().__init__(store, parent)
+    def __init__(self, store, parent=None, *, document_id=None):
+        super().__init__(store, parent, document_id=document_id)
         self._layer_ids, self._material_ids = [], []
         self.heading.setText('Steady heat flow')
         self.description.setText('Prescribed layer power on the current editable device and mesh. '

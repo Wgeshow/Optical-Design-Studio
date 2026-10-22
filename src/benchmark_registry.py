@@ -56,7 +56,7 @@ def load_benchmark(identifier):
 
 def input_fingerprint(project, kind, options):
     project = copy.deepcopy(project)
-    for key in ('benchmark_request', 'desktop_search', 'appearance', 'performance', 'literature_validation'):
+    for key in ('benchmark_request', 'desktop_search', 'appearance', 'performance', 'literature_validation', 'simulation_documents'):
         project.pop(key, None)
     options = copy.deepcopy(options)
     if kind == 'research_simulation':

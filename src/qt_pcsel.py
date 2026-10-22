@@ -146,6 +146,44 @@ class PCSELPage(QWidget):
         self.report.setPlainText('No laser simulation has been run. Results and provenance will appear here.')
         self.retheme()
         self._install_clean_workbench(root, optical, electrical, modulation, thermal, device)
+        self._draft_loading=False
+        self._draft_controls={name:value for name,value in vars(self).items()
+            if isinstance(value,(QDoubleSpinBox,QSpinBox,QComboBox)) and name not in ('result_selector','parameter_selector')}
+        self._default_draft=self.draft()
+        self._restore_project_draft()
+        store.changed.connect(self._project_draft_changed)
+        self.device_store.changed.connect(self.flush_draft)
+        for control in self._draft_controls.values():
+            (control.currentIndexChanged if isinstance(control,QComboBox) else control.valueChanged).connect(self.flush_draft)
+
+    def draft(self):
+        return dict(device=self.device_store._project_payload(),controls={name:
+            control.currentText() if isinstance(control,QComboBox) else control.value()
+            for name,control in self._draft_controls.items()})
+
+    def flush_draft(self,*_):
+        if self._draft_loading:return
+        if getattr(self.store,'study_navigation_enabled',False) and self.store.active_study!='lumped_laser':return
+        from copy import deepcopy
+        namespace=deepcopy(self.store.search_state.get('research_workspaces',{}))
+        namespace.setdefault('schema_version',1)
+        namespace['lumped_laser']=self.draft()
+        self.store.save_search('research_workspaces',namespace)
+
+    def _restore_project_draft(self):
+        from copy import deepcopy
+        value=deepcopy(self.store.search_state.get('research_workspaces',{}).get('lumped_laser',self._default_draft))
+        self._draft_loading=True
+        try:
+            self.device_store.load_project(value['device'],autosave=False)
+            for name,value in value.get('controls',{}).items():
+                control=self._draft_controls.get(name)
+                if isinstance(control,QComboBox):control.setCurrentText(str(value))
+                elif control is not None:control.setValue(value)
+        finally:self._draft_loading=False
+
+    def _project_draft_changed(self,reason):
+        if reason in ('project','study'):self._restore_project_draft()
 
     def _install_clean_workbench(self, root, optical, electrical, modulation, thermal, device):
         from qt_legacy_study_workbench import StudyWorkbench
@@ -231,11 +269,6 @@ class PCSELPage(QWidget):
         from data_library import read_json
         result=ProjectStore(parent_store.library if parent_store else None,restore=False)
         result.session_path=result.library.data/'laser_device_session.json'
-        if result.session_path.exists():
-            try:
-                result.load_project(read_json(result.session_path),autosave=False)
-                return result
-            except (ValueError,OSError,KeyError):pass
         result.materials=pd.DataFrame([
             ['Air','constant_nk',1.,0.,'','nm'],['InP','constant_nk',3.17,0.,'','nm'],
             ['InGaAsP','constant_nk',3.45,0.,'','nm']],columns=MAT_COLS)

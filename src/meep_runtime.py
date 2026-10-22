@@ -15,6 +15,22 @@ import time
 PROBE = "import meep as mp; import numpy; print('ODS_MEEP_VERSION='+str(mp.__version__)); assert hasattr(mp, 'Simulation')"
 
 
+def wsl_executable():
+    """Resolve once per command so Windows cannot prefer System32 over PATH.
+
+    ODS_WSL_EXECUTABLE is an explicit local recovery/administrator setting.
+    It never downloads a launcher or changes the Windows WSL installation.
+    """
+    configured = os.environ.get('ODS_WSL_EXECUTABLE', '').strip()
+    if configured:
+        path = Path(configured)
+        if not path.is_absolute() or not path.is_file() or path.suffix.lower() != '.exe':
+            raise ValueError('ODS_WSL_EXECUTABLE must name an existing absolute WSL .exe path.')
+        return str(path.resolve())
+    found = shutil.which('wsl.exe')
+    return str(Path(found).resolve()) if found else 'wsl.exe'
+
+
 def configuration_path():
     base = Path(os.environ.get('LOCALAPPDATA') or Path.home()/'.config')
     return base/'Optical Design Studio'/'meep-runtime.json'
@@ -57,7 +73,7 @@ def save_config(config):
 
 def command(config, arguments, executable=None):
     config = validate_config(config)
-    base = ['wsl.exe', '--distribution', config['distro'], '--exec'] if config['mode']=='wsl' else []
+    base = [wsl_executable(), '--distribution', config['distro'], '--exec'] if config['mode']=='wsl' else []
     return base+[executable or config['python']]+list(arguments)
 
 
@@ -88,11 +104,12 @@ def linux_path(path, config):
         if len(windows.drive)!=2 or windows.drive[1]!=':' or not windows.drive[0].isalpha():
             raise RuntimeError('The managed FDTD engine needs the project library on a local Windows drive.')
         return '/mnt/'+windows.drive[0].lower()+'/'+ '/'.join(windows.parts[1:])
-    result = subprocess.run(['wsl.exe', '--distribution', config['distro'], '--exec',
+    result = subprocess.run([wsl_executable(), '--distribution', config['distro'], '--exec',
         'wslpath', '-a', '-u', path], capture_output=True, timeout=15,
         encoding='utf-8', errors='replace', **process_options())
     if result.returncode or not result.stdout.strip().startswith('/'):
-        raise RuntimeError('WSL could not access the saved job directory: '+result.stderr.strip())
+        detail = (result.stderr or result.stdout or 'The WSL launcher did not return a Linux path.').replace('\0', '').strip()
+        raise RuntimeError('WSL could not access the saved job directory: '+detail)
     return result.stdout.strip()
 
 
@@ -153,7 +170,7 @@ class ManagedProcess:
             return
         try:
             if self.config['mode']=='wsl' and self.linux_pid:
-                subprocess.run(['wsl.exe', '--distribution', self.config['distro'], '--exec',
+                subprocess.run([wsl_executable(), '--distribution', self.config['distro'], '--exec',
                     'kill', '-KILL' if force else '-TERM', '--', '-'+str(self.linux_pid)],
                     timeout=5, capture_output=True, **process_options())
             elif self.config['mode']=='local':

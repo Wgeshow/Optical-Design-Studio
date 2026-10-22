@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from backend import execute
 from model import DEFAULT_PERFORMANCE, sweep, MAX_SWEEP_POINTS
-from peak_optimizer import parse_search, execute_search
+from peak_optimizer import parse_search, execute_search, analyze_grid_results
 from test_backend import sample
 from spectral_phase import write_phase_csv
 
@@ -24,9 +24,9 @@ class SpectralFeatures(unittest.TestCase):
             return [[i,w,t,r,1-r,0.] for (i,w,t),r in zip(model['points'], [.1,.8,.1])], {}
         with tempfile.TemporaryDirectory() as d:
             result=execute_search(base, DEFAULT_PERFORMANCE, cfg, d, executor, lambda e:None, lambda:False)
-            self.assertEqual(result['summary']['response'],'Reflection')
-            self.assertAlmostEqual(result['summary']['best_absorption'],.8)
-            rows=list(csv.DictReader((Path(d)/'best_spectrum.csv').read_text().splitlines()))
+            self.assertEqual(result['summary']['search_mode'],'Exhaustive grid')
+            self.assertAlmostEqual(analyze_grid_results(d, 'Reflection')[0]['response_value'],.8)
+            rows=list(csv.DictReader((Path(d)/'design_1_spectrum.csv').read_text().splitlines()))
             self.assertEqual(float(rows[1]['A']),0.)
             self.assertEqual(float(rows[1]['R']),.8)
 

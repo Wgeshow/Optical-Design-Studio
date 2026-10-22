@@ -2,6 +2,7 @@
 import os
 import sys
 import unittest
+from meep_runtime import wsl_executable
 from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
@@ -16,7 +17,7 @@ APP = QApplication.instance() or QApplication([])
 class RuntimeCheckTests(unittest.TestCase):
     def test_wsl_command_keeps_paths_as_arguments(self):
         command, _ = probe_command(dict(solver='mpb', runtime=dict(mode='wsl', distro='Ubuntu Test', executable='/opt/my solver/mpb')))
-        self.assertEqual(command, ['wsl.exe', '--distribution', 'Ubuntu Test', '--exec', '/opt/my solver/mpb', '--version'])
+        self.assertEqual(command, [wsl_executable(), '--distribution', 'Ubuntu Test', '--exec', '/opt/my solver/mpb', '--version'])
         with self.assertRaises(ValueError):
             probe_command(dict(solver='mpb', runtime=dict(mode='wsl', executable='mpb\nother')))
 

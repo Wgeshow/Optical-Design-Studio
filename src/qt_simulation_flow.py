@@ -70,7 +70,7 @@ class SimulationSetupFlow:
         nav.insertWidget(2, self.object_heading)
         self.object_tree = QTreeWidget(); self.object_tree.setObjectName('setupObjectTree')
         self.object_tree.setHeaderHidden(True); self.object_tree.setMinimumWidth(0)
-        self.object_tree.setAccessibleName('Shared device objects')
+        self.object_tree.setAccessibleName('This simulation’s device objects')
         self.object_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.object_tree.currentItemChanged.connect(self._object_selected)
         nav.insertWidget(3, self.object_tree, 1)
@@ -84,7 +84,7 @@ class SimulationSetupFlow:
         self.scene = QFrame(); self.scene.setObjectName('setupScene')
         scene = QVBoxLayout(self.scene); scene.setContentsMargins(12, 10, 12, 10); scene.setSpacing(8)
         tools = QHBoxLayout()
-        caption = QLabel('Shared device'); caption.setObjectName('setupCardTitle'); tools.addWidget(caption, 1)
+        caption = QLabel('This simulation’s device'); caption.setObjectName('setupCardTitle'); tools.addWidget(caption, 1)
         self.view_choice = QComboBox(); self.view_choice.setAccessibleName('Device preview view')
         self.view_choice.addItems(['3D view', 'Top · XY', 'Section · XZ'])
         self.view_choice.setMinimumWidth(118); self.view_choice.setMaximumWidth(160)
@@ -230,7 +230,7 @@ class SimulationSetupFlow:
         ident = getattr(self.page, 'selected_object', '')
         if ident:
             self.page.diagnosticRequested.emit(dict(workspace='structure', section='structure', object_id=ident,
-                field='', message='Edit the selected shared device object.'))
+                field='', message='Edit the selected simulation device object.'))
         else:
             self.page.routeRequested.emit('global.structure')
 

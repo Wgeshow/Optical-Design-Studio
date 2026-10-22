@@ -9,12 +9,14 @@ inputs = Path(os.environ.get('ODS_NATIVE_INPUTS', root.parent/'local-windows-rev
 source = root/'source'
 dependency_source = Path(os.environ.get('ODS_RELEASE_DEPENDENCIES', root.parent/'s4_ui_redesign'))
 dependency_paths = [dependency_source/name for name in ('plot_dependencies', 'ml_dependencies', 'geometry_dependencies')]
-dependency_paths.insert(0,Path(os.environ['ODS_DEVSIM_DEPENDENCIES']))
-if os.environ.get('ODS_EIGENFREE_GPU_PACKAGES'):
-    dependency_paths.insert(0,Path(os.environ['ODS_EIGENFREE_GPU_PACKAGES']))
+for key in ('ODS_DEVSIM_DEPENDENCIES',):
+    if os.environ.get(key):dependency_paths.insert(0,Path(os.environ[key]))
 for path in reversed([source, *dependency_paths]):
     sys.path.insert(0, str(path))
-env_bin = Path(os.environ['ODS_OFFICIAL_RUNTIME'])
+env_bin = Path(os.environ.get('ODS_OFFICIAL_RUNTIME', Path(sys.prefix)/'Library'/'bin'))
+cad_runtime = Path(os.environ.get('ODS_CAD_RUNTIME', env_bin/'cad_runtime' if os.environ.get('ODS_OFFICIAL_RUNTIME') else dependency_source/'cad_runtime'))
+vtk_marker = cad_runtime/'vtk.libs'/'vtk-runtime-directory.txt'
+if not vtk_marker.is_file():vtk_marker = inputs.parent/'assets'/'vtk-runtime-directory.txt'
 
 data = [(str(root/'seed_library.zip'), '.'), (str(source/'S4_Studio.ico'), '.'),
         (str(source/'meep_runner.py'), '.'),
@@ -24,7 +26,7 @@ data = [(str(root/'seed_library.zip'), '.'), (str(source/'S4_Studio.ico'), '.'),
         (str(source/'simulation_setup_plan.json'), '.'),
         (str(source/'pcs_s4_runtime'/'s4_runtime.py'), 'pcs_s4_runtime'),
         (str(source/'pcs_s4_runtime'/'s4_parallel.py'), 'pcs_s4_runtime'),
-        (str(Path(os.environ['ODS_OFFICIAL_RUNTIME'])/'cad_runtime'/'vtk.libs'/'vtk-runtime-directory.txt'), 'cad_runtime/vtk.libs')]
+        (str(vtk_marker), 'cad_runtime/vtk.libs')]
 # Qt Help resolves assets relative to its frozen module; retain the complete
 # approved Silicon tutorial (41 saved wavelength field CSVs), not a seed library.
 for path in (source/'help_assets').rglob('*'):
@@ -41,7 +43,6 @@ for path in (source/'benchmark_data').rglob('*'):
 
 # Preserve the existing isolated CAD runtime: its NumPy/SciPy must never replace
 # the solver environment. IVtk loads vtk.libs dynamically, so retain its DLLs.
-cad_runtime = Path(os.environ['ODS_OFFICIAL_RUNTIME'])/'cad_runtime'
 for path in cad_runtime.rglob('*'):
     if not path.is_file() or '__pycache__' in path.parts or path.suffix == '.pyc':
         continue
@@ -87,7 +88,7 @@ hidden += ['electrical_sweep', 'electrical_thermal', 'electrical_transport', 'el
 hidden += ['research_simulation', 'photonic_bands', 'research_catalog', 'research_diagnostics',
            'thermal_study', 'benchmark_registry', 'research_physics_runtime', 'research_physics_worker','sesame_transport',
            'input_diagnostics','qt_input_diagnostics','qt_photonic_bands','qt_photonic_band_results','qt_photonic_crystal_3d','qt_photonic_runtime','qt_research_studies','qt_research_results','qt_thermal_setup',
-           'qt_study_flow','qt_simulation_flow','qt_legacy_study_workbench','qt_study_fields','qt_study_library', 'qt_simulation_picker','qt_transport_research_setup','qt_high_field_results','qt_pcsel_research_setup','qt_research_runtime']
+           'qt_study_flow','qt_simulation_flow','qt_legacy_study_workbench','qt_study_fields','qt_study_library', 'qt_simulation_picker','qt_transport_research_setup','qt_high_field_results','qt_pcsel_research_setup','qt_research_runtime','solver_environment','desktop_environment_probe','qt_solver_environment','simulation_documents','qt_study_transfer']
 hidden += ['qt_research_common','qt_sesame_setup','pcsel_research','pcsel_aperture','pcsel_optional','pcsel_physics_worker',
            'advanced_transport','advanced_transport_graph','electrical_temperature','nonlocal_tunnelling','high_field_optics','bandgap_narrowing',
            'pcsel_transport_study','pcsel_conformal_mesh','pcsel_conformal_solver','pcsel_transport_worker','pcsel_unitcell_transport']

@@ -45,6 +45,13 @@ class NativeSetupDispatchTests(unittest.TestCase):
         self.state.set('search.electrical.biases_V',[0.,-.1,-.2])
         for key,value in (('bias_start_V',-.2),('bias_stop_V',0.),('bias_step_V',.1)):
             self.state.set('ui.electrical.'+key,value)
+        # This dispatch fixture intentionally supplies the same physical case
+        # to three independent documents; navigation itself never copies it.
+        configured=self.store.project()
+        seed=configured['simulation_documents']['documents']['optical']
+        for identifier in ('electrical','coupled'):
+            configured['simulation_documents']['documents'][identifier]=copy.deepcopy(seed)
+        self.store.load_project(configured)
         APP.processEvents()
 
     def tearDown(self):
@@ -100,7 +107,7 @@ class NativeSetupDispatchTests(unittest.TestCase):
             self.assertEqual(start.call_count,1)
             self.assertEqual(start.call_args.args[0],'simulation' if mode=='optical' else mode)
 
-    def test_current_manual_biases_and_iv_cv_checkboxes_reach_both_modes(self):
+    def test_current_manual_biases_and_iv_cv_checkboxes_stay_with_electrical_document(self):
         page=self.open_mode('electrical','electrical.study')
         mode=self.editor(page,'ui.electrical.sweep_mode')
         mode.setCurrentIndex(mode.findData('manual'))
@@ -111,16 +118,21 @@ class NativeSetupDispatchTests(unittest.TestCase):
         for key in ('iv_enabled','cv_enabled'):
             widget=self.editor(page,'search.electrical.terminal_studies.'+key)
             if not widget.isChecked():QTest.mouseClick(widget,Qt.MouseButton.LeftButton,pos=QPoint(10,widget.height()//2))
-        for mode,kind in (('electrical','electrical'),('coupled','coupled')):
+        for mode,kind in (('electrical','electrical'),('coupled','coupled'),('electrical','electrical')):
             self.open_mode(mode)
             with patch.object(self.store,'start_run') as start:
                 QTest.mouseClick(self.window.run_button,Qt.MouseButton.LeftButton)
             self.assertEqual(start.call_count,1)
             self.assertEqual(start.call_args.args[0],kind)
             options=start.call_args.args[1]
-            self.assertEqual(options['biases_V'],[0.,-.05,-.15])
-            self.assertTrue(options['terminal_studies']['iv_enabled'])
-            self.assertTrue(options['terminal_studies']['cv_enabled'])
+            if mode=='electrical':
+                self.assertEqual(options['biases_V'],[0.,-.05,-.15])
+                self.assertTrue(options['terminal_studies']['iv_enabled'])
+                self.assertTrue(options['terminal_studies']['cv_enabled'])
+            else:
+                self.assertNotEqual(options['biases_V'],[0.,-.05,-.15])
+                self.assertFalse(options['terminal_studies']['iv_enabled'])
+                self.assertFalse(options['terminal_studies']['cv_enabled'])
 
     def test_current_range_is_submitted_without_apply_range_click(self):
         page=self.open_mode('electrical','electrical.study')
