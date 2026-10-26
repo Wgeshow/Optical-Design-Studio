@@ -3,11 +3,13 @@ from model import MODES
 
 
 def gpu_requested(perf):
-    return perf.get('mode', MODES[0]) != MODES[0]
+    return perf.get('solver_backend') == 'eigenfree-gpu' or perf.get('mode', MODES[0]) != MODES[0]
 
 
 def acceleration_warnings(info, perf):
     if not gpu_requested(perf):
+        return []
+    if info.get('solver_backend') == 'eigenfree-gpu' and info.get('gpu_solved_points',0) > 0:
         return []
     status = ' '.join(str(value) for value in info.get('statuses', {}).values())
     if 'no CUDA support' in status:
@@ -24,6 +26,9 @@ def acceleration_warnings(info, perf):
 
 
 def acceleration_summary(info):
+    if info.get('solver_backend') == 'eigenfree-gpu':
+        return (f"GPU wavelengths solved: {info.get('gpu_solved_points',0):,}; "
+                f"eigendecompositions: {info.get('eigendecompositions',0):,}.")
     return (f"CPU matrix products: {info.get('cpu_gemm_calls', 0):,}; "
             f"GPU matrix products: {info.get('gpu_gemm_calls', 0):,}; "
             f"GPU failures: {info.get('gpu_failures', 0):,}.")
@@ -44,6 +49,8 @@ def gpu_settings_note(mode, threshold, basis):
 def runtime_check_summary(info, selected_perf):
     if not gpu_requested(selected_perf):
         return '**CPU runtime check completed.** Select a GPU compute mode to test the GPU.\n\n'+acceleration_summary(info)
+    if info.get('solver_backend') == 'eigenfree-gpu' and info.get('gpu_solved_points',0) > 0:
+        return '**Eigenfree CUDA execution verified.**\n\n'+acceleration_summary(info)
     if info.get('gpu_gemm_calls', 0) > 0 and not info.get('gpu_failures', 0):
         result = f"**GPU connection verified on CUDA device {selected_perf['gpu_device']}.**"
     else:

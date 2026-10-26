@@ -19,6 +19,42 @@ def rows_for(x, y):
 
 
 class PeakSearchTests(unittest.TestCase):
+    def test_design_bound_safety_cap_boundary(self):
+        self.assertEqual(len(grid_values(0, 9999, 1)), 10_000)
+        with self.assertRaisesRegex(ValueError, 'budget or safety limit'):
+            grid_values(0, 10000, 1)
+
+    def test_bounds_editor_uses_design_bound_safety_cap(self):
+        from bounds_editor import upsert_bound
+        materials = [['Air', 'constant_nk', 1, 0, '', 'nm']]
+        layers = [['Top', 0, 'Air'], ['Device', 1, 'Air'], ['Bottom', 0, 'Air']]
+        patterns = [['circle', 'Device', 'Air', 0, 0, .1, 0, 0]]
+        arguments = (materials, layers, patterns, None)
+        self.assertEqual(len(upsert_bound([], 'center_x', '1', 0, 9999, 1, *arguments)), 1)
+        with self.assertRaisesRegex(ValueError, 'budget or safety limit'):
+            upsert_bound([], 'center_x', '1', 0, 10000, 1, *arguments)
+
+    def test_numeric_domains_reject_large_allocations_before_materializing(self):
+        with self.assertRaisesRegex(ValueError, 'budget or safety limit'):
+            grid_values(0, 1, 1e-12)
+        with self.assertRaisesRegex(ValueError, 'budget or safety limit'):
+            parse_search(sample(), [bound('radius', '1', .01, .2, 1e-12)], {})
+        with self.assertRaisesRegex(ValueError, 'budget or safety limit'):
+            parse_search(sample(), [bound('radius', '1', .01, .2, 1e-12)], dict(search_mode='ML assisted'))
+        # The appended maximum also counts against the allocation budget.
+        with self.assertRaisesRegex(ValueError, 'budget or safety limit'):
+            grid_values(0, 1, .4, max_values=3)
+        self.assertEqual(grid_values(0, 1, .5, max_values=3), [0., .5, 1.])
+
+    def test_exhaustive_product_budget_and_larger_ml_grid(self):
+        bounds = [bound('lattice_x', lo=.7, hi=.8, step=.0001),
+                  bound('lattice_y', lo=.7, hi=.8, step=.0001)]
+        with self.assertRaisesRegex(ValueError, 'budget or safety limit'):
+            parse_search(sample(), bounds, dict(design_budget=2000))
+        cfg = parse_search(sample(), bounds, dict(search_mode='ML assisted'))
+        self.assertEqual(cfg['design_count'], 1001**2)
+        self.assertEqual(cfg['dimensions'][0]['values'][-1], .8)
+
     def test_bounds_endpoints_and_conflicts(self):
         self.assertEqual(grid_values(0, 1, .4), [0., .4, .8, 1.])
         self.assertEqual(grid_values(.2, .2, 0), [.2])

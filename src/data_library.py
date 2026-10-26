@@ -3,6 +3,8 @@ import base64
 import copy
 import hashlib
 import json
+import logging
+import math
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import shutil
@@ -16,14 +18,17 @@ from datetime import datetime, timezone
 from model import MAT_COLS, LAYER_COLS, PAT_COLS, number, numeric_rows
 
 
-def write_json(path, value):
+def write_json(path, value, *, compact=False):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + '.' + uuid.uuid4().hex + '.tmp')
     try:
         with temporary.open('w', encoding='utf-8') as stream:
             from scan_storage import json_default
-            json.dump(value, stream, indent=2, allow_nan=False, default=json_default)
+            if compact:
+                stream.write(json.dumps(value, separators=(',', ':'), allow_nan=False, default=json_default))
+            else:
+                json.dump(value, stream, indent=2, allow_nan=False, default=json_default)
             stream.flush()
             os.fsync(stream.fileno())
         for attempt in range(6):
@@ -57,6 +62,7 @@ class DataLibrary:
         self.presets_dir = self.data / 'presets'
         self.exports = self.data / 'exports'
         self.lock = threading.RLock()
+        self.diagnostics = []
         for path in (self.runs, self.assets, self.presets_dir, self.exports):
             path.mkdir(parents=True, exist_ok=True)
 
@@ -177,12 +183,35 @@ class DataLibrary:
         names = {row['DataFile'] for row in project.get('materials', []) if row.get('Model') == 'table_nk'}
         return [str(self.assets / name) for name in sorted(names)]
 
+    def _diagnostic(self, path, error):
+        """Keep recovery details available without changing the original file."""
+        item = dict(path=str(path), message=str(error))
+        with self.lock:
+            if item not in self.diagnostics:
+                self.diagnostics.append(item)
+                logging.getLogger(__name__).warning('Library metadata needs attention: %s: %s', path, error)
+
+    def _clear_diagnostic(self, path):
+        with self.lock:
+            self.diagnostics[:] = [item for item in self.diagnostics if item['path'] != str(path)]
+
     def presets(self):
         result = {}
         for path in sorted(self.presets_dir.glob('*.json')):
-            record = read_json(path)
-            key = f"{record['label']} [saved {record['created']}; {record['id'][:8]}]"
-            result[key] = record
+            try:
+                record = read_json(path)
+                if (not isinstance(record, dict)
+                        or not all(isinstance(record.get(k), str) for k in ('label', 'created', 'id'))
+                        or not record['id'] or not isinstance(record.get('project'), dict)
+                        or not isinstance(record['project'].get('materials'), list)
+                        or len(record['project']['materials']) != 1
+                        or not isinstance(record['project']['materials'][0], dict)):
+                    raise ValueError('Invalid material preset metadata')
+                key = f"{record['label']} [saved {record['created']}; {record['id'][:8]}]"
+                result[key] = record
+                self._clear_diagnostic(path)
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                self._diagnostic(path, 'Cannot read material preset: ' + str(error))
         return result
 
     def material_metadata(self, row):
@@ -240,9 +269,25 @@ class DataLibrary:
                 id=directory.name, title=directory.name, created=datetime.fromtimestamp(
                     directory.stat().st_mtime, timezone.utc).isoformat(timespec='seconds'),
                 kind='saved data', status='saved', notes='')
+            record = self._run_metadata(record, directory)
             record.update(updates, id=directory.name)
             write_json(path, record)
         return record
+
+    def _run_metadata(self, record, directory):
+        if not isinstance(record, dict):
+            raise ValueError('Saved-run metadata must be a mapping')
+        defaults = dict(id=directory.name, title=directory.name,
+                        created=datetime.fromtimestamp(directory.stat().st_mtime, timezone.utc).isoformat(timespec='seconds'),
+                        kind='saved data', status='saved', notes='')
+        result = dict(record)
+        for key, value in defaults.items():
+            if key not in result:
+                result[key] = value
+            elif not isinstance(result[key], str):
+                raise ValueError('Invalid saved-run metadata field: ' + key)
+        result['id'] = directory.name
+        return result
 
     def entries(self, query=''):
         records = []
@@ -252,7 +297,7 @@ class DataLibrary:
             try:
                 meta = path / 'library_record.json'
                 if meta.exists():
-                    record = read_json(meta)
+                    record = self._run_metadata(read_json(meta), path)
                 else:
                     kind = 'optimization' if (path / 'design_results.csv').exists() else 'simulation'
                     status = 'complete' if (path / 'results.csv').exists() else 'saved'
@@ -270,14 +315,59 @@ class DataLibrary:
                     record = self.record(path, kind=kind, status=status, title=kind.title() + ' ' + path.name[:12])
                 if query.lower() in json.dumps(record, ensure_ascii=False).lower():
                     records.append(record)
-            except (OSError, ValueError, KeyError):
+                self._clear_diagnostic(meta)
+            except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
                 # One damaged legacy directory must not hide the rest of the collection.
+                self._diagnostic(path / 'library_record.json', error)
                 records.append(dict(id=path.name, title=path.name, kind='unreadable metadata',
-                                    status='inspect files', created='', notes=''))
+                                    status='inspect files', created='', notes='Cannot read saved metadata; inspect library_record.json.'))
         return sorted(records, key=lambda item: item['created'], reverse=True)
 
     def from_model(self, model, base=None):
         project = copy.deepcopy(base or {})
+        cell=model.get('optical_unit_cell',{})
+        original_crop=model.get('geometry_source')=='original_tables' and cell.get('enabled')
+        source_indices=None
+        if original_crop:
+            # A selected design is still a full physical document. Cropped
+            # candidate rows must return to their source table coordinates.
+            message=('Cannot apply this cropped Original optical design without an unambiguous full-table mapping. '
+                     'Reopen the original project and run the search again; clipped or missing source rows cannot be recovered safely.')
+            rows=project.get('patterns')
+            source_indices=cell.get('pattern_source_indices')
+            if (not isinstance(rows,list) or cell.get('original_patterns')!=len(rows)
+                    or not isinstance(source_indices,list) or len(source_indices)!=len(model['patterns'])
+                    or any(type(index) is not int or not 1<=index<=len(rows) for index in source_indices)
+                    or len(set(source_indices))!=len(source_indices)
+                    or cell.get('clipped_patterns',0)
+                    or any(row.get('unit_cell_clipped') or row.get('shape') not in ('circle','ellipse','rectangle')
+                           for row in model['patterns'])):
+                raise ValueError(message)
+            selection=cell.get('selection',{})
+            settings=project.get('settings',{})
+            try:
+                full_ax,full_ay=float(settings['ax_um']),float(settings['ay_um'])
+                cx,cy=float(selection['cx_um']),float(selection['cy_um'])
+                width,depth=float(selection['width_um']),float(selection['depth_um'])
+                model_axes=('source_model_ax_um' in cell,'source_model_ay_um' in cell)
+                if any(model_axes) and not all(model_axes):
+                    raise ValueError(message)
+                if all(model_axes):
+                    source_ax,source_ay=float(cell['source_model_ax_um']),float(cell['source_model_ay_um'])
+                else:
+                    # Legacy crops recorded these source dimensions without
+                    # separating the table period from the physical footprint.
+                    source_ax,source_ay=float(cell['source_width_um']),float(cell['source_depth_um'])
+                if (not all(math.isfinite(value) for value in (full_ax,full_ay,cx,cy,width,depth,source_ax,source_ay))
+                        or not math.isclose(full_ax,source_ax,rel_tol=1e-9,abs_tol=1e-12)
+                        or not math.isclose(full_ay,source_ay,rel_tol=1e-9,abs_tol=1e-12)):
+                    raise ValueError(message)
+            except (KeyError,TypeError,ValueError) as exc:
+                raise ValueError(message) from exc
+            if (not math.isclose(model['ax'],width,rel_tol=1e-9,abs_tol=1e-12)
+                    or not math.isclose(model['ay'],depth,rel_tol=1e-9,abs_tol=1e-12)):
+                raise ValueError('This design changes the optical PC pitch. Change and regenerate the finite PC array in Structure first, '
+                                 'then run the search again before applying the design. Its saved evaluation and pitch remain available.')
         materials = []
         for mat in model['materials']:
             name = ''
@@ -287,12 +377,18 @@ class DataLibrary:
             materials.append(dict(zip(MAT_COLS, [mat['name'], mat['model'], mat['a'], mat['b'], name, 'nm'])))
         project['materials'] = materials
         project['layers'] = [dict(zip(LAYER_COLS, [r['name'], r['thickness'], r['material']])) for r in model['layers']]
-        project['patterns'] = [dict(zip(PAT_COLS, [r['shape'], r['layer'], r['material'], r['cx'], r['cy'], r['sx'], r['sy'], r['angle']])) for r in model['patterns']]
+        patterns = [dict(zip(PAT_COLS, [r['shape'], r['layer'], r['material'], r['cx'], r['cy'], r['sx'], r['sy'], r['angle']])) for r in model['patterns']]
+        if original_crop:
+            for index,row in zip(source_indices,patterns):
+                row.update(CenterX_um=row['CenterX_um']+cx,CenterY_um=row['CenterY_um']+cy)
+                project['patterns'][index-1]=row
+        else:
+            project['patterns']=patterns
         settings = project.setdefault('settings', {})
         policies = {mat['name']: mat['interpolation'] for mat in model['materials'] if 'interpolation' in mat}
         if policies:
             settings['material_interpolations'] = dict(settings.get('material_interpolations', {}), **policies)
-        settings.update(ax_um=model['ax'], ay_um=model['ay'], NumG=model['basis'], mode=model['mode'],
+        settings.update(ax_um=full_ax if original_crop else model['ax'], ay_um=full_ay if original_crop else model['ay'], NumG=model['basis'], mode=model['mode'],
                         phi_deg=model['phi'], polarization=model['polarization'])
         points = model.get('points', [])
         if points:
@@ -459,8 +555,7 @@ class DataLibrary:
                 probe.save_preset(row, record['label'], record['notes'],
                                   interpolation=policies.get(row['Name']), source_notes=record.get('source_notes'))
             for path in (stage / 'runs').glob('*/library_record.json'):
-                if not isinstance(read_json(path), dict):
-                    raise ValueError('Invalid saved-run metadata')
+                self._run_metadata(read_json(path), path.parent)
             for path in incoming_assets:
                 self.asset(path.read_bytes())
             imported_presets = 0

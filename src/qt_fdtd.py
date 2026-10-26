@@ -84,11 +84,18 @@ class MeepWorker(QThread):
             self.completed.emit(dict(run_kind='fdtd', status=status, directory=str(self.directory),
                 output=str(self.directory/'results.csv'), info=terminal.get('info', {})))
         except Exception as exc:
+            errors = [str(exc)]
             if managed is not None:
-                managed.terminate(force=True)
+                try:
+                    managed.terminate(force=True)
+                except Exception as cleanup_exc:
+                    errors.append('Could not stop the Meep process: '+str(cleanup_exc))
             if self.directory:
-                self.library.record(self.directory, status='error')
-            self.failed.emit(str(exc))
+                try:
+                    self.library.record(self.directory, status='error')
+                except Exception as record_exc:
+                    errors.append('Could not save the failed run status: '+str(record_exc))
+            self.failed.emit('\n'.join(errors))
 
 
 class _RuntimeTask(QThread):

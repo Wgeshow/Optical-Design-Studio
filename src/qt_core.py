@@ -27,7 +27,7 @@ if getattr(sys, 'frozen', False) and not os.environ.get('S4_LIBRARY_ROOT'):
     initialize_desktop()
 import app as legacy
 from data_library import DataLibrary, read_json, write_json
-from model import MAT_COLS, LAYER_COLS, PAT_COLS, DEFAULT_PERFORMANCE, MODES, prepare, performance, integer
+from model import MAT_COLS, LAYER_COLS, PAT_COLS, DEFAULT_PERFORMANCE, MODES, SOLVER_BACKENDS, prepare, performance, integer
 from structure_builder import validate_structure
 
 
@@ -73,6 +73,9 @@ def desktop_settings(values):
     if 'material_interpolations' in supplied:
         from model import material_interpolations
         result['material_interpolations'] = material_interpolations(supplied['material_interpolations'])
+    if 'optical_unit_cell' in supplied:
+        from optical_unit_cell import validate_unit_cell
+        result['optical_unit_cell'] = validate_unit_cell(supplied['optical_unit_cell'])
     return result
 
 
@@ -114,6 +117,15 @@ def desktop_performance(values):
     supplied = _mapping(values, 'Performance settings')
     result = dict(DEFAULT_PERFORMANCE)
     result.update({key: value for key, value in supplied.items() if key in result})
+    if result['solver_backend'] not in SOLVER_BACKENDS:
+        raise ValueError('Invalid solver backend.')
+    for key in ('mirror_symmetry', 'eigenfree_symmetry'):
+        if not isinstance(result[key], bool):
+            raise ValueError(key.replace('_', ' ') + ' must be true or false.')
+    result['eigenfree_batch_size'] = _desktop_number(result['eigenfree_batch_size'],
+        'GPU wavelengths per batch', integral=True, minimum=1, maximum=256)
+    if result['solver_backend'] == 'eigenfree-gpu':
+        result.update(mode=MODES[2], workers=1)
     if result['mode'] not in MODES:
         raise ValueError('Invalid CPU/GPU mode.')
     if not isinstance(result['require_gpu'], bool):
@@ -175,14 +187,17 @@ def desktop_search(values):
         elif kind == 'index_shift':
             from index_shift import validate_options
             result[kind] = validate_options(controls)
+        elif kind in ('electrical','coupled'):
+            from electrical_optics import validate_options
+            result[kind] = validate_options(controls)
         elif kind == 'simulation':
             from simulation_fields import validate_settings
             controls['electric_fields']=validate_settings(controls.get('electric_fields',{}))
         elif kind == 'fields':
             if 'depth_samples' in controls:
-                controls['depth_samples'] = _desktop_number(controls['depth_samples'], '3D depths per layer', integral=True, minimum=3, maximum=40)
+                controls['depth_samples'] = _desktop_number(controls['depth_samples'], '3D depths per layer', integral=True, minimum=3, maximum=2147483647)
             if 'grid' in controls:
-                controls['grid'] = _desktop_number(controls['grid'], 'Field grid', integral=True, minimum=3, maximum=80)
+                controls['grid'] = _desktop_number(controls['grid'], 'Field grid', integral=True, minimum=3, maximum=2147483647)
             if 'wavelength_nm' in controls:
                 controls['wavelength_nm'] = _desktop_number(controls['wavelength_nm'], 'Field wavelength', minimum=1e-6)
             if 'layer' in controls and not isinstance(controls['layer'], str):
@@ -194,7 +209,27 @@ def prepare_job(kind, project, options, library):
     """Use the same validated solver/search contracts as the existing application."""
     project=copy.deepcopy(project)
     options=copy.deepcopy(options)
+    geometry_source=options.get('optical_geometry_source','device')
+    if geometry_source not in ('device','original_tables'):
+        raise ValueError('Choose device geometry or original optical tables.')
+    if geometry_source=='original_tables' and kind not in ('simulation','fields','simulation_fields','index_shift','peaks','target','ai_search'):
+        raise ValueError('Original optical tables are available only for optical calculations.')
     cfg=None
+    if kind=='coupled':
+        kind='electrical'
+        options['optical_enabled']=True
+    if kind=='electrical':
+        from electrical_optics import validate_options, prepare_coupling
+        if options.get('model')=='custom_device':
+            options.update(device=project.get('device'),material_library=project.get('electrical_materials'))
+        options=validate_options(options)
+        # A DC run does not require optical materials or a complete spectrum
+        # draft. Optical coupling validates the actual current structure below.
+        if not options.get('optical_enabled', False):
+            if options.get('model')=='custom_device':
+                options=prepare_coupling(None,options)
+            perf=performance(project['performance'],1,os.cpu_count() or 1)
+            return project,dict(model=None,performance=perf,search=dict(options,task='electrical'))
     if kind=='diagnostic':
         selected_perf=dict(project['performance'])
         project.update(materials=legacy.records(legacy.DEFAULT_MATERIALS,MAT_COLS),
@@ -218,9 +253,30 @@ def prepare_job(kind, project, options, library):
     elif kind=='fields':
         wavelength=float(options.get('wavelength_nm',1550))
         project['settings'].update(mode='Wavelength sweep',wl_start_nm=wavelength,wl_stop_nm=wavelength)
-    elif kind not in ('simulation','peaks','index_shift'):
+    elif kind=='simulation_fields':
+        if options.get('single_wavelength',True) and options.get('wavelength_source','manual')=='manual':
+            wavelength=_desktop_number(options.get('wavelength_nm',1550),'Field wavelength',minimum=1e-6)
+            project['settings'].update(mode='Wavelength sweep',wl_start_nm=wavelength,wl_stop_nm=wavelength)
+    elif kind not in ('simulation','peaks','index_shift','electrical'):
         raise ValueError('Unknown calculation: '+kind)
-    model=prepare(project['materials'],project['layers'],project['patterns'],library.files_for(project),project['settings'],compact_points=kind=='simulation')
+    model=prepare(project['materials'],project['layers'],project['patterns'],library.files_for(project),project['settings'],compact_points=kind in ('simulation','simulation_fields'))
+    from device_project_bridge import apply_polygons,validate_optical_assignment
+    if kind in ('simulation','fields','simulation_fields','index_shift','electrical'):
+        if geometry_source!='original_tables':apply_polygons(model,project)
+        else:
+            # Original optics keeps its own optical tables. A filled finite PC
+            # still supplies only one fundamental air-hole period to S4.
+            from optical_unit_cell import apply_original_pc_cell
+            apply_original_pc_cell(model,project)
+        validate_optical_assignment(model)
+    elif geometry_source=='original_tables' and kind in ('peaks','target','ai_search'):
+        from optical_unit_cell import apply_original_pc_cell,remap_cell_search_options
+        if apply_original_pc_cell(model,project):
+            options=remap_cell_search_options(model,options)
+            if kind=='target':
+                bounds=remap_cell_search_options(model,dict(bounds=bounds))['bounds']
+    model['geometry_source']=geometry_source
+    if kind=='simulation':model['allow_unavailable_points']=True
     if kind == 'simulation' and options.get('measure_phase'):
         from spectral_phase import validate_phase_model
         validate_phase_model(model)
@@ -232,6 +288,9 @@ def prepare_job(kind, project, options, library):
     elif kind=='index_shift':
         from index_shift import prepare_sweep
         cfg=prepare_sweep(model,options)
+    elif kind=='electrical':
+        cfg=prepare_coupling(model,options)
+        cfg['task']='electrical'
     elif kind=='peaks':
         from peak_optimizer import parse_search
         from ml_optimizer import validate_ml
@@ -296,17 +355,16 @@ def prepare_job(kind, project, options, library):
                 raise ValueError(f"{material['name']}: optical data must cover {target-window:g}–{target+window:g} nm for AI design; choose a suitable library dataset or narrower window.")
     elif kind=='fields':
         grid=integer(options.get('grid',25),'Map grid',3)
-        if grid>80:
-            raise ValueError('Map grid must be at most 80.')
         depths=integer(options.get('depth_samples',3),'3D depths per layer',3)
-        if depths>40:
-            raise ValueError('3D depths per layer must be at most 40.')
         cfg=dict(task='fields',wavelength_nm=wavelength,layer=str(options.get('layer') or ''),grid=grid,depth_samples=depths,maps=True,project=project)
+    elif kind=='simulation_fields':
+        from spectrum_field_job import prepare_field_job
+        cfg=prepare_field_job(model,options,library)
     perf=performance(project['performance'],len(model['points']),os.cpu_count() or 1)
+    if kind=='electrical' and cfg.get('requires_native'):
+        perf=performance(dict(project['performance'],solver_backend='native'),len(model['points']),os.cpu_count() or 1)
     result=dict(model=model,performance=perf,search=cfg)
-    if kind=='simulation':
-        from simulation_fields import validate_settings
-        result['simulation_fields']=validate_settings(options.get('electric_fields',{}))
+    # The spectrum action never requests fields, including restored old options.
     if kind=='diagnostic':
         result['diagnostic_selected_performance']=selected_perf
     return project,result
@@ -358,8 +416,8 @@ class BackendWorker(QThread):
             write_json(directory/'project.json',project)
             write_json(directory/'desktop_request.json',dict(kind=self.kind,options=self.options))
             write_json(directory/'job.json',spec)
-            self.library.record(directory,kind='simulation' if self.kind in ('simulation','diagnostic','index_shift') else 'optimization',
-                title=dict(ai_search='AI field training and search',simulation='Spectrum',index_shift='Refractive-index sweep',peaks='Peak search',target='Target design',fields='Electric fields',diagnostic='GPU / CPU diagnostic')[self.kind],
+            self.library.record(directory,kind='simulation' if self.kind in ('simulation','diagnostic','index_shift','electrical','coupled') else 'optimization',
+                title=dict(ai_search='AI field training and search',simulation='Spectrum',simulation_fields='Spectrum electric fields',index_shift='Refractive-index sweep',electrical='Electrical simulation',coupled='Coupled electrical and optical simulation',peaks='Peak search',target='Target design',fields='Electric fields',diagnostic='GPU / CPU diagnostic')[self.kind],
                 status='running',materials=', '.join(r['Name'] for r in project['materials']))
             command=backend_command(directory/'job.json')
             options=dict(stdout=subprocess.PIPE,text=True,encoding='utf-8',errors='replace',bufsize=1)
@@ -462,6 +520,7 @@ class TaskWorker(QThread):
 
 class ProjectStore(QObject):
     changed=pyqtSignal(str)
+    search_changed=pyqtSignal()
     library_changed=pyqtSignal()
     busy_changed=pyqtSignal(bool)
     progress=pyqtSignal(dict)
@@ -485,9 +544,16 @@ class ProjectStore(QObject):
         self.search_state={}
         self.imported_search={}
         self.appearance={'layer_colors': {},'material_opacities': {}}
+        from electrical_material_library import builtin_materials
+        from device_model import from_optical_project
+        self.electrical_materials=builtin_materials()
+        self.device=from_optical_project(dict(layers=legacy.records(self.layers,LAYER_COLS),
+            patterns=legacy.records(self.patterns,PAT_COLS),settings=self.settings),self.electrical_materials)
         self._undo=[]
         self._worker=None
         self.busy=False
+        # An interface preference, not a persisted physical project property.
+        self.optical_geometry_source='device'
         self.last_result=None
         self.session_path=self.library.data/'desktop_session.json'
         self.restore_error=''
@@ -501,7 +567,8 @@ class ProjectStore(QObject):
         return dict(format_version=3,materials=legacy.records(self.materials,MAT_COLS),
             layers=legacy.records(self.layers,LAYER_COLS),patterns=legacy.records(self.patterns,PAT_COLS),
             settings=copy.deepcopy(self.settings),performance=copy.deepcopy(self.performance),
-            desktop_search=copy.deepcopy(self.search_state),appearance=copy.deepcopy(self.appearance))
+            desktop_search=copy.deepcopy(self.search_state),appearance=copy.deepcopy(self.appearance),
+            device=copy.deepcopy(self.device),electrical_materials=copy.deepcopy(self.electrical_materials))
 
     def portable_project(self):
         return self.library.snapshot(self.project(),self.files)
@@ -516,14 +583,15 @@ class ProjectStore(QObject):
     def _capture(self):
         return (self.materials,self.layers,self.patterns,copy.deepcopy(self.settings),
                 copy.deepcopy(self.performance),list(self.files),copy.deepcopy(self.search_state),
-                copy.deepcopy(self.imported_search),list(self._undo),copy.deepcopy(self.appearance))
+                copy.deepcopy(self.imported_search),list(self._undo),copy.deepcopy(self.appearance),
+                copy.deepcopy(self.device),copy.deepcopy(self.electrical_materials))
 
     def _finish_change(self,previous,reason=None):
         try:
             self._autosave()
         except Exception:
             (self.materials,self.layers,self.patterns,self.settings,self.performance,self.files,
-             self.search_state,self.imported_search,self._undo,self.appearance)=previous
+             self.search_state,self.imported_search,self._undo,self.appearance,self.device,self.electrical_materials)=previous
             raise
         if reason:
             self.changed.emit(reason)
@@ -537,6 +605,10 @@ class ProjectStore(QObject):
         self.materials=pd.DataFrame(mats,columns=MAT_COLS)
         self.layers=pd.DataFrame(lay,columns=LAYER_COLS)
         self.patterns=pd.DataFrame(pat,columns=PAT_COLS)
+        from device_project_bridge import sync_from_optical
+        if any(float(row['Thickness_um'])>0 for row in lay[1:-1]):
+            self.device=sync_from_optical(self.project(),self.electrical_materials,self.device)
+        else:self.device=None
         # A constant replacement has no wavelength interpolation. Commit that
         # policy change with its material rows so an autosave never contains an
         # invalid combination; table policies survive ordinary geometry edits.
@@ -551,18 +623,70 @@ class ProjectStore(QObject):
         if not self._undo:
             raise ValueError('There is no earlier structure edit to restore.')
         previous=self._capture()
-        self.materials,self.layers,self.patterns,interpolations=self._undo.pop()
+        entry=self._undo.pop()
+        if isinstance(entry,dict):
+            self.materials,self.layers,self.patterns=entry['tables']
+            self.device=entry['device'];self.electrical_materials=entry['electrical_materials']
+            self.settings=entry['settings']
+            self._finish_change(previous,'device')
+            return
+        self.materials,self.layers,self.patterns,interpolations=entry
         self.settings=dict(self.settings)
         if interpolations is None:
             self.settings.pop('material_interpolations',None)
         else:
             self.settings['material_interpolations']=interpolations
+        from device_project_bridge import sync_from_optical
+        self.device=sync_from_optical(self.project(),self.electrical_materials,self.device)
         self._finish_change(previous,'structure')
+
+    def set_device(self,device):
+        from device_model import validate_device
+        from device_project_bridge import optical_structure
+        value=validate_device(device,self.electrical_materials)
+        old_objects={row['id']:row for group in ('layers','shapes') for row in (self.device or {}).get(group,[])}
+        for group in ('layers','shapes'):
+            for row in value[group]:
+                old=old_objects.get(row['id'])
+                if old and old.get('material_id')!=row.get('material_id'):
+                    row.pop('optical_material_name',None)
+        m,l,p,_=optical_structure(value,self.electrical_materials,self.project())
+        m,l,p=validate_structure(m,l,p)
+        previous=self._capture()
+        self._undo.append(dict(device=copy.deepcopy(self.device),electrical_materials=copy.deepcopy(self.electrical_materials),
+            tables=(self.materials.copy(deep=True),self.layers.copy(deep=True),self.patterns.copy(deep=True)),settings=copy.deepcopy(self.settings)))
+        self._undo=self._undo[-30:]
+        self.device=value
+        self.materials=pd.DataFrame(m,columns=MAT_COLS);self.layers=pd.DataFrame(l,columns=LAYER_COLS);self.patterns=pd.DataFrame(p,columns=PAT_COLS)
+        self.settings=dict(self.settings,ax_um=value['width_um'],ay_um=value['depth_um'])
+        self._finish_change(previous,'device')
+
+    def set_electrical_materials(self,materials):
+        from electrical_material_library import validate_materials
+        from device_model import validate_device
+        from device_project_bridge import optical_structure
+        values=validate_materials(materials)
+        if self.device:validate_device(self.device,values)
+        previous=self._capture()
+        self._undo.append(dict(device=copy.deepcopy(self.device),electrical_materials=copy.deepcopy(self.electrical_materials),
+            tables=(self.materials.copy(deep=True),self.layers.copy(deep=True),self.patterns.copy(deep=True)),settings=copy.deepcopy(self.settings)))
+        self._undo=self._undo[-30:]
+        self.electrical_materials=values
+        if self.device:
+            m,l,p,_=optical_structure(self.device,values,self.project())
+            self.materials=pd.DataFrame(m,columns=MAT_COLS);self.layers=pd.DataFrame(l,columns=LAYER_COLS);self.patterns=pd.DataFrame(p,columns=PAT_COLS)
+        self._finish_change(previous,'electrical_materials')
+
+    def sync_from_structure(self):
+        from device_project_bridge import sync_from_optical
+        self.set_device(sync_from_optical(self.project(),self.electrical_materials,self.device))
 
     def update_settings(self,values):
         values=desktop_settings(dict(self.settings,**_mapping(values,'Settings')))
         previous=self._capture()
         self.settings=values
+        if self.device:
+            self.device=dict(self.device,width_um=values['ax_um'],depth_um=values['ay_um'])
         self._finish_change(previous,'settings')
 
     def update_appearance(self, values):
@@ -579,9 +703,18 @@ class ProjectStore(QObject):
 
     def save_search(self,key,options):
         values=desktop_search(dict(self.search_state,**{key:options}))
+        changed=values!=self.search_state
         previous=self._capture()
         self.search_state=values
         self._finish_change(previous)
+        if changed:self.search_changed.emit()
+
+    def load_electrical_preset(self,model='explicit_ito',ito_thickness_nm=40.,ito_density_cm3=8e20):
+        from electrical_preset import device_project
+        project=device_project(model=model,ito_thickness_nm=ito_thickness_nm,
+                               ito_density_cm3=ito_density_cm3)
+        project['performance']=copy.deepcopy(self.performance)
+        self.load_project(project)
 
     def load_project(self,project,autosave=True):
         project=read_json(project) if isinstance(project,(str,Path)) else copy.deepcopy(project)
@@ -596,6 +729,12 @@ class ProjectStore(QObject):
         # Missing optical tables may belong to a draft. Keep their references,
         # but do not misidentify nonexistent paths as supplied upload files.
         files=[path for path in self.library.files_for(project) if Path(path).is_file()]
+        from electrical_material_library import builtin_materials,validate_materials
+        from device_model import validate_device
+        from device_project_bridge import sync_from_optical
+        electrical_materials=validate_materials(project.get('electrical_materials',builtin_materials()))
+        device=validate_device(project['device'],electrical_materials) if project.get('device') else (
+            sync_from_optical(project,electrical_materials) if any(float(row['Thickness_um'])>0 for row in l[1:-1]) else None)
         previous=self._capture()
         self.materials=pd.DataFrame(m,columns=MAT_COLS)
         self.layers=pd.DataFrame(l,columns=LAYER_COLS)
@@ -606,6 +745,8 @@ class ProjectStore(QObject):
         self.search_state=search_state
         self.imported_search=imported_search
         self.appearance=appearance
+        self.electrical_materials=electrical_materials
+        self.device=device
         self._undo.clear()
         if autosave:
             self._finish_change(previous)
@@ -631,13 +772,30 @@ class ProjectStore(QObject):
         self.busy=value
         self.busy_changed.emit(value)
 
-    def start_run(self,kind,options=None):
+    def start_run(self,kind,options=None,*,project_snapshot=None):
         if self.busy:
             raise ValueError('A calculation or library operation is already running.')
         options=copy.deepcopy(options or {})
-        project=self.portable_project()
-        self.save_search(kind,options)
-        project['desktop_search']=copy.deepcopy(self.search_state)
+        if kind in ('simulation','fields','simulation_fields','index_shift','peaks','target','ai_search') and self.optical_geometry_source=='original_tables':
+            options.setdefault('optical_geometry_source','original_tables')
+        if kind=='coupled':options['optical_enabled']=True
+        if kind in ('electrical','coupled') and options.get('model')=='custom_device':
+            options.update(device=copy.deepcopy(self.device),material_library=copy.deepcopy(self.electrical_materials))
+        project=(copy.deepcopy(project_snapshot) if project_snapshot is not None else
+            self.project() if kind=='electrical' and not options.get('optical_enabled',False) else self.portable_project())
+        saved_options=options
+        if kind=='simulation' and self.optical_geometry_source=='original_tables':
+            # Original spectrum Run submits phase only. Recording the job must
+            # keep that editor's independent manual-field sampling draft.
+            saved_options=copy.deepcopy(self.search_state.get(kind,{}))
+            saved_options.update(options)
+        self.save_search(kind,saved_options)
+        if project_snapshot is None:
+            project['desktop_search']=copy.deepcopy(self.search_state)
+        else:
+            # A spectrum→field sequence resolves both stages from the same
+            # immutable structure even if the user edits the visible project.
+            project.setdefault('desktop_search',{})[kind]=copy.deepcopy(options)
         if kind == 'fdtd':
             from qt_fdtd import MeepWorker
             worker=MeepWorker(kind,project,options,self.library,self)

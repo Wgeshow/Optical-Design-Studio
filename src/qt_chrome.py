@@ -1,6 +1,6 @@
 """Theme-aware window chrome, with movement and resizing owned by the OS."""
 import sys
-from PyQt6.QtCore import Qt, QEvent, QPoint, QRect, QRectF, QSize
+from PyQt6.QtCore import Qt, QEvent, QPoint, QRect, QRectF, QSize, QTimer
 from PyQt6.QtGui import QColor, QPainter, QPen, QIcon, QKeySequence, QAction, QActionGroup, QShortcut, QPixmap, QLinearGradient
 from PyQt6.QtWidgets import QWidget, QFrame, QHBoxLayout, QLabel, QToolButton, QMenu
 
@@ -17,6 +17,8 @@ class WindowsCustomFrame:
     def __init__(self, window):
         self.window = window
         self.enabled = False
+        self._transitioning=False
+        self._pending_state=None
         if sys.platform != 'win32':
             return
         from PyQt6.QtWidgets import QApplication
@@ -88,6 +90,25 @@ class WindowsCustomFrame:
             return 9  # HTMAXBUTTON: Windows owns hover and Snap Layout menu.
         return 1  # Interactive Qt controls and startSystemMove handle client.
 
+    def request_state(self,state):
+        """Exit the Win32 callback before changing Qt's layered surface."""
+        if self._transitioning:return
+        if self._pending_state is not None:
+            self._pending_state=state
+            return
+        self._pending_state=state
+        def apply_state():
+            state=self._pending_state
+            self._pending_state=None
+            self._transitioning=True
+            try:
+                if state=='maximized':
+                    if not self.window.isMaximized() or self.window.isMinimized():self.window.showMaximized()
+                elif state=='normal':
+                    if self.window.windowState()!=Qt.WindowState.WindowNoState:self.window.showNormal()
+            finally:self._transitioning=False
+        QTimer.singleShot(0,apply_state)
+
     def event(self, message):
         if not self.enabled:
             return None
@@ -100,16 +121,19 @@ class WindowsCustomFrame:
             # frame and leaves Qt's layered backing store at the old size.
             # Keep shell/system-menu commands on the same path as our button.
             if command == 0xf030:  # SC_MAXIMIZE
-                self.window.showMaximized()
+                if self._transitioning:return None
+                self.request_state('maximized')
                 return True, 0
             if command == 0xf120 and self.window.windowState() & (
                     Qt.WindowState.WindowMaximized | Qt.WindowState.WindowFullScreen | Qt.WindowState.WindowMinimized):
                 # A normal window can be snapped to part of a monitor. Let
                 # Windows restore that geometry instead of overriding Snap.
                 if self.window.isMinimized() and self.window.windowState() & Qt.WindowState.WindowMaximized:
-                    self.window.showMaximized()
+                    if self._transitioning:return None
+                    self.request_state('maximized')
                 else:
-                    self.window.showNormal()
+                    if self._transitioning:return None
+                    self.request_state('normal')
                 return True, 0
         if msg.message == 0x0083:  # WM_NCCALCSIZE
             if msg.wParam and self.user.IsZoomed(msg.hWnd):
@@ -133,7 +157,7 @@ class WindowsCustomFrame:
             # Non-client hits bypass QPushButton mouse events. Consume both
             # halves and toggle once on release, avoiding a second OS toggle.
             if msg.message == 0x00A2:
-                self.window.chrome.toggle_maximize()
+                self.request_state('normal' if self.window.isMaximized() else 'maximized')
             return True, 0
         return None
 
@@ -162,6 +186,14 @@ class CaptionButton(QToolButton):
         colors = COLORS[theme_manager().mode]
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if theme_manager().style == 'glass':
+            # The glyph must remain legible over either a bright or dark
+            # desktop; only its small control plate receives this tint.
+            plate = QColor(colors['field'])
+            plate.setAlpha(230)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(plate)
+            painter.drawRoundedRect(QRectF(self.rect()).adjusted(3, 4, -3, -4), 5, 5)
         hover = self.underMouse() or self.hasFocus()
         if hover:
             highlight=QColor('#c42b35' if self.symbol == 'close' else colors['hover'])
@@ -204,6 +236,15 @@ class ResizeHandle(QWidget):
             cursor = Qt.CursorShape.SizeHorCursor if horizontal else Qt.CursorShape.SizeVerCursor
         self.setCursor(cursor)
 
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if theme_manager().style == 'glass':
+            # Alpha-zero pixels are skipped by native layered-window hit
+            # testing. A 1/255 fill keeps the resize edge interactive.
+            painter = QPainter(self)
+            painter.fillRect(self.rect(), QColor(0, 0, 0, 1))
+            painter.end()
+
     def mousePressEvent(self, event):
         window = self.window()
         if event.button() == Qt.MouseButton.LeftButton and not (window.isMaximized() or window.isFullScreen()):
@@ -221,9 +262,9 @@ class WindowChrome(QFrame):
         self.host = window
         self.native_frame = native_frame
         self.setObjectName('windowChrome')
-        self.setFixedHeight(50)
+        self.setFixedHeight(48)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(24, 0, 0, 0)
+        layout.setContentsMargins(18, 0, 0, 0)
         layout.setSpacing(2)
         self.logo = QLabel()
         ring = QPixmap(26, 26)
@@ -237,18 +278,17 @@ class WindowChrome(QFrame):
         painter.setPen(QPen(gradient, 5))
         painter.drawEllipse(QRectF(4, 4, 18, 18))
         painter.end()
-        icon=window.windowIcon()
-        if icon.isNull():icon=QIcon(str(resource_root()/'S4_Studio.ico'))
-        self.logo.setPixmap(icon.pixmap(QSize(26,26),window.devicePixelRatioF()) if not icon.isNull() else ring)
-        self.logo.setFixedSize(26, 28)
+        from qt_reference_style import optical_logo
+        self.logo.setPixmap(optical_logo(32))
+        self.logo.setFixedSize(32,32)
         self.logo.setAccessibleName('Optical Design Studio logo')
         self.logo.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         layout.addWidget(self.logo)
-        layout.addSpacing(7)
+        layout.addSpacing(12)
         self.title = QLabel(window.windowTitle())
         self.title.setObjectName('windowTitle')
-        self.title.setMaximumWidth(235)
-        self.title.setMinimumWidth(130)
+        self.title.setMaximumWidth(210)
+        self.title.setMinimumWidth(210)
         self.title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         layout.addWidget(self.title)
         layout.addSpacing(19)
@@ -320,6 +360,15 @@ class WindowChrome(QFrame):
         button.clicked.connect(callback)
         return button
 
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if theme_manager().style == 'glass':
+            # Keep empty caption space available for dragging/double-click
+            # without putting a visible background behind individual labels.
+            painter = QPainter(self)
+            painter.fillRect(self.rect(), QColor(0, 0, 0, 1))
+            painter.end()
+
     def menu_button(self, text, menu):
         button = self.action_button(text, lambda: None)
         button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
@@ -339,6 +388,10 @@ class WindowChrome(QFrame):
             button.update()
 
     def toggle_maximize(self):
+        adapter=getattr(self.host,'_windows_frame',None)
+        if adapter is not None and adapter.enabled:
+            adapter.request_state('normal' if self.host.isMaximized() else 'maximized')
+            return
         if self.host.isMaximized():
             self.host.showNormal()
         else:

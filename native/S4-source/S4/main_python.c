@@ -23,6 +23,9 @@
 #ifdef HAVE_S4_ACCEL
 #include "accelerator.h"
 #endif
+#ifdef HAVE_S4_CUDA_EIGEN
+#include "cuda_eigensolver.h"
+#endif
 
 #ifdef HAVE_MPI
 #include <mpi.h>
@@ -1135,7 +1138,7 @@ static PyObject *S4Sim_GetBasisSet(S4Sim *self, PyObject *args){
 	int n, i, ret;
 	PyObject *rv;
 
-	ret = Simulation_InitSolution(self->S);
+	ret = NULL == self->S->solution ? Simulation_InitSolution(self->S) : 0;
 	if(0 != ret){
 		HandleSolutionErrorCode("GetBasisSet", ret);
 		return NULL;
@@ -1382,6 +1385,127 @@ static PyObject *S4Sim_GetFields(S4Sim *self, PyObject *args, PyObject *kwds){
 	);
 }
 
+static PyObject *S4Sim_GetFieldCoefficientsMany(S4Sim *self, PyObject *args){
+	PyObject *input, *seq, *result;
+	Py_ssize_t nz, i, n, length;
+	double *z;
+	int ret;
+	if(!PyArg_ParseTuple(args, "O:GetFieldCoefficientsMany", &input)){ return NULL; }
+	seq = PySequence_Fast(input, "z_values must be an iterable of finite depths");
+	if(NULL == seq){ return NULL; }
+	nz = PySequence_Fast_GET_SIZE(seq);
+	if(nz == 0){ Py_DECREF(seq); return PyBytes_FromStringAndSize(NULL, 0); }
+	ret = NULL == self->S->solution ? Simulation_InitSolution(self->S) : 0;
+	if(ret){ Py_DECREF(seq); HandleSolutionErrorCode("GetFieldCoefficientsMany", ret); return NULL; }
+	n = self->S->n_G;
+	if(n <= 0 || n > PY_SSIZE_T_MAX / (12*sizeof(double)) ||
+		nz > PY_SSIZE_T_MAX / (12*sizeof(double)*n)){
+		Py_DECREF(seq); return PyErr_NoMemory();
+	}
+	length = nz*n*12*sizeof(double);
+	z = (double*)PyMem_Malloc(nz*sizeof(double));
+	if(NULL == z){ Py_DECREF(seq); return PyErr_NoMemory(); }
+	for(i = 0; i < nz; ++i){
+		z[i] = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(seq, i));
+		if(PyErr_Occurred() || !isfinite(z[i])){
+			if(!PyErr_Occurred()){ PyErr_SetString(PyExc_ValueError, "z_values must contain only finite depths"); }
+			PyMem_Free(z); Py_DECREF(seq); return NULL;
+		}
+	}
+	Py_DECREF(seq);
+	result = PyBytes_FromStringAndSize(NULL, length);
+	if(NULL == result){ PyMem_Free(z); return NULL; }
+	// Keep the GIL: the public simulation object is mutable and has no lock.
+	ret = S4_Simulation_GetFieldCoefficientsMany(self->S, (size_t)nz, z,
+		(double*)PyBytes_AS_STRING(result));
+	PyMem_Free(z);
+	if(ret){ Py_DECREF(result); HandleSolutionErrorCode("GetFieldCoefficientsMany", ret); return NULL; }
+	return result;
+}
+
+static PyObject *S4Sim_GetEigenfreeOperators(S4Sim *self, PyObject *args){
+	S4_Simulation *S = self->S;
+	PyObject *layers = NULL, *basis = NULL, *kx = NULL, *ky = NULL;
+	PyObject *incident = NULL, *result = NULL;
+	Py_complex omega;
+	Py_ssize_t n, i;
+	int ret;
+	if(S->exc.type != 0){
+		PyErr_SetString(PyExc_NotImplementedError, "Eigenfree export requires plane-wave excitation");
+		return NULL;
+	}
+	ret = S->solution ? 0 : Simulation_InitSolution(S);
+	if(ret){ HandleSolutionErrorCode("GetEigenfreeOperators", ret); return NULL; }
+	n = S->n_G;
+	if(n < 1 || n > PY_SSIZE_T_MAX/n/(8*sizeof(double))){ return PyErr_NoMemory(); }
+	layers = PyList_New(S->n_layers);
+	basis = PyTuple_New(n); kx = PyTuple_New(n); ky = PyTuple_New(n);
+	incident = PyBytes_FromStringAndSize(NULL, 4*n*sizeof(double));
+	if(!layers || !basis || !kx || !ky || !incident){ goto cleanup; }
+	memset(PyBytes_AS_STRING(incident), 0, 4*n*sizeof(double));
+	if(S->exc.sub.planewave.order < (size_t)n){
+		double *h = (double*)PyBytes_AS_STRING(incident);
+		const size_t order = S->exc.sub.planewave.order;
+		h[2*order] = S->exc.sub.planewave.hx[0];
+		h[2*order+1] = S->exc.sub.planewave.hx[1];
+		h[2*(order+n)] = S->exc.sub.planewave.hy[0];
+		h[2*(order+n)+1] = S->exc.sub.planewave.hy[1];
+	}
+	for(i = 0; i < n; ++i){
+		PyObject *g = Py_BuildValue("(ii)", S->G[2*i], S->G[2*i+1]);
+		PyObject *x = PyFloat_FromDouble(S->kx[i]), *y = PyFloat_FromDouble(S->ky[i]);
+		if(!g || !x || !y){ Py_XDECREF(g); Py_XDECREF(x); Py_XDECREF(y); goto cleanup; }
+		PyTuple_SET_ITEM(basis,i,g); PyTuple_SET_ITEM(kx,i,x); PyTuple_SET_ITEM(ky,i,y);
+	}
+	for(i = 0; i < S->n_layers; ++i){
+		const S4_Layer *layer = &S->layer[i];
+		const S4_Layer *source = layer->copy >= 0 ? &S->layer[layer->copy] : layer;
+		const S4_Material *material = &S->material[source->material];
+		const int uniform = source->pattern.nshapes == 0 && material->type == 0;
+		PyObject *inverse = NULL, *transverse = NULL, *epsilon = NULL, *record = NULL;
+		if((i == 0 || i == S->n_layers-1) && !uniform){
+			PyErr_SetString(PyExc_NotImplementedError, "Eigenfree export requires uniform scalar exterior layers");
+			goto cleanup;
+		}
+		inverse = PyBytes_FromStringAndSize(NULL, 2*n*n*sizeof(double));
+		transverse = PyBytes_FromStringAndSize(NULL, 8*n*n*sizeof(double));
+		if(uniform){ epsilon = PyComplex_FromDoubles(material->eps.s[0], material->eps.s[1]); }
+		else{ epsilon = Py_None; Py_INCREF(epsilon); }
+		if(!inverse || !transverse || !epsilon){
+			Py_XDECREF(inverse); Py_XDECREF(transverse); Py_XDECREF(epsilon); goto cleanup;
+		}
+		ret = S4_Simulation_GetLayerOperators(S, (S4_LayerID)i, (size_t)n,
+			(double*)PyBytes_AS_STRING(inverse), (double*)PyBytes_AS_STRING(transverse));
+		if(ret){
+			Py_DECREF(inverse); Py_DECREF(transverse); Py_DECREF(epsilon);
+			HandleSolutionErrorCode("GetEigenfreeOperators", ret); goto cleanup;
+		}
+		record = Py_BuildValue("{s:s,s:d,s:O,s:O,s:O,s:O}",
+			"name", layer->name ? layer->name : "", "thickness", layer->thickness,
+			"uniform", uniform ? Py_True : Py_False, "epsilon", epsilon,
+			"epsilon_inv", inverse, "epsilon2", transverse);
+		Py_DECREF(inverse); Py_DECREF(transverse); Py_DECREF(epsilon);
+		if(!record){ goto cleanup; }
+		PyList_SET_ITEM(layers,i,record);
+	}
+	omega.real = S->omega[0]; omega.imag = S->omega[1];
+	result = Py_BuildValue("{s:i,s:D,s:O,s:O,s:O,s:((dd)(dd)),s:((dd)(dd)),s:O,s:O,s:O,s:O}",
+		"n", (int)n, "omega", &omega, "kx", kx, "ky", ky, "G", basis,
+		"reciprocal", S->Lk[0], S->Lk[1], S->Lk[2], S->Lk[3],
+		"lattice", S->Lr[0], S->Lr[1], S->Lr[2], S->Lr[3],
+		"excitation_h", incident, "backwards", S->exc.sub.planewave.backwards ? Py_True : Py_False,
+		"layers", layers, "mirror_eligible", S4_Simulation_IsMirrorEligible(S) ? Py_True : Py_False);
+cleanup:
+	Py_XDECREF(layers); Py_XDECREF(basis); Py_XDECREF(kx); Py_XDECREF(ky); Py_XDECREF(incident);
+	return result;
+}
+
+static PyObject *S4Sim_GetEpsilonCacheStats(S4Sim *self, PyObject *args){
+	return Py_BuildValue("{s:n,s:n,s:n}", "hits", (Py_ssize_t)self->S->epsilon_cache_hits,
+		"misses", (Py_ssize_t)self->S->epsilon_cache_misses,
+		"bytes", (Py_ssize_t)self->S->epsilon_cache_bytes);
+}
+
 static PyObject *S4Sim_GetFieldsOnGrid(S4Sim *self, PyObject *args, PyObject *kwds){
 	int i, j, ret;
 	static char *kwlist[] = { "z", "NumSamples", "Format", "BaseFilename", NULL };
@@ -1600,6 +1724,11 @@ static PyObject *S4Sim_SetOptions(S4Sim *self, PyObject *args, PyObject *kwds){
 		&bool_converter, &subpixel_smoothing,
 		&bool_converter, &conserve_memory
 	)){ return NULL; }
+	// Invalidate before any mutation, including paths that reject a later
+	// option after an earlier option has already been applied.
+	S4_Simulation_DestroyLayerModes(self->S, -1);
+	Simulation_DestroySolution(self->S);
+	Simulation_InvalidateFieldCache(self->S);
 	if(verbosity >= 0){
 		if(verbosity > 9){ verbosity = 9; }
 		self->S->options.verbosity = verbosity;
@@ -1824,6 +1953,9 @@ static PyMethodDef S4Sim_methods[] = {
 	{"GetHField"				, (PyCFunction)S4Sim_GetHField, METH_VARARGS, PyDoc_STR("GetHField(x,y,z) -> (Tuple)")},
 	*/
 	{"GetFields"				, (PyCFunction)S4Sim_GetFields, METH_VARARGS, PyDoc_STR("GetFields(x,y,z) -> (Tuple,Tuple)")},
+	{"GetFieldCoefficientsMany", (PyCFunction)S4Sim_GetFieldCoefficientsMany, METH_VARARGS, PyDoc_STR("GetFieldCoefficientsMany(z_values) -> bytes: native complex128 [nz,nG,6] Ex,Ey,Ez,Hx,Hy,Hz in GetFields convention; no in-plane phase")},
+	{"GetEigenfreeOperators", (PyCFunction)S4Sim_GetEigenfreeOperators, METH_NOARGS, PyDoc_STR("Export exact Fourier dielectric operators, wavevectors and incident H without eigendecomposition; matrix bytes are complex128 column-major")},
+	{"GetEpsilonCacheStats", (PyCFunction)S4Sim_GetEpsilonCacheStats, METH_NOARGS, PyDoc_STR("GetEpsilonCacheStats() -> dict with hits, misses, bytes")},
 	{"GetFieldsOnGrid"			, (PyCFunction)S4Sim_GetFieldsOnGrid, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("GetFieldsOnGrid(z,nsamples,format,filename) -> Tuple")},
 	{"GetSMatrixDeterminant"	, (PyCFunction)S4Sim_GetSMatrixDeterminant, METH_NOARGS, PyDoc_STR("GetSMatrixDeterminant() -> Tuple")},
 	/*
@@ -2002,9 +2134,20 @@ static PyObject *S4_SolveInParallel(PyObject *Self, PyObject *args, PyObject *kw
 
 static PyObject *S4_AccelerationInfo(PyObject *self, PyObject *args) {
 #ifdef HAVE_S4_ACCEL
+#ifdef HAVE_S4_CUDA_EIGEN
+	return Py_BuildValue("{s:s,s:K,s:K,s:K,s:s,s:K,s:K,s:K,s:K,s:K,s:K,s:i,s:i}",
+		"status", S4_accel_status(), "cpu_gemm_calls", S4_accel_cpu_calls(),
+		"gpu_gemm_calls", S4_accel_gpu_calls(), "gpu_failures", S4_accel_gpu_failures(),
+		"eigen_status", S4_cuda_eigen_status(), "gpu_eigen_calls", S4_cuda_eigen_calls(),
+		"gpu_eigen_fallbacks", S4_cuda_eigen_fallbacks(), "gpu_eigen_failures", S4_cuda_eigen_failures(),
+		"gpu_eigen_workspace_queries", S4_cuda_eigen_workspace_queries(),
+		"gpu_eigen_device_bytes", S4_cuda_eigen_device_bytes(), "gpu_eigen_host_bytes", S4_cuda_eigen_host_bytes(),
+		"gpu_eigen_last_status", S4_cuda_eigen_last_status(), "gpu_eigen_last_info", S4_cuda_eigen_last_info());
+#else
 	return Py_BuildValue("{s:s,s:K,s:K,s:K}", "status", S4_accel_status(),
 		"cpu_gemm_calls", S4_accel_cpu_calls(), "gpu_gemm_calls", S4_accel_gpu_calls(),
 		"gpu_failures", S4_accel_gpu_failures());
+#endif
 #else
 	return Py_BuildValue("{s:s}", "status", "Reference build (internal matrix routines)");
 #endif

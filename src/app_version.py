@@ -6,8 +6,8 @@ import struct
 
 from desktop_runtime import application_root
 
-APP_VERSION = '1.3.2'
-BUILD_DATE = '2026-10-09'
+APP_VERSION = '1.3.3'
+BUILD_DATE = '2026-10-26'
 
 
 def installation_info():
@@ -34,5 +34,5 @@ def installation_info():
         pass
     date = (f'{updated_at.strftime("%B")} {updated_at.day}, {updated_at.year}'
             if updated_at is not None else 'Not recorded')
-    return dict(version=APP_VERSION, last_updated=date, platform=f'{system} · {bits}-bit',
+    return dict(version=APP_VERSION, last_updated=date, platform=f'{system} Â· {bits}-bit',
                 platform_id=platform_id, build_date=BUILD_DATE)

@@ -12,21 +12,23 @@ Detailed S4 scans stream exact results to indexed storage and keep plotting and 
 
 ## Native Qt desktop
 
+At startup choose **Device Studio** for the editable finite device and Optical / Electrical / Coupled setup, or **Original Optical Studio** for the original optical layer/region tables, periodic S4 scans, Fields and search tools. Both interfaces use the same project, presets and saved library. **Remember my choice** is unchecked by default; checking it reopens that interface on later starts. **Menu → Switch workspace…** changes the interface without discarding applied project/settings or rerunning jobs. See [DEVICE_STUDIO_GUIDE.md](DEVICE_STUDIO_GUIDE.md) for the two workflows and all 20 Device Studio setup tabs.
+
 The application has seven top-level pages:
 
 | Page | Use it for |
 | --- | --- |
-| Structure | Build the applied layer stack, lattice, holes, and material regions. |
-| Materials | Inspect, import, assign, and save optical materials. |
-| Simulation | Run S4 RCWA, MEEP FDTD, or Δn sweeps; open Fields and Saved results in its nested tabs. |
+| Structure | Build an editable finite device with layers, material/void shapes, contacts and doping; preview linked top, cross-section and 3D views. The advanced periodic optical editor retains lattice and repeat tools. |
+| Materials | Inspect, import, assign, and save optical materials; electrical presets and custom material properties are available in the shared device builder. |
+| Simulation | Choose Optical S4/FDTD/Δn, Electrical-only, or Coupled electrical/S4 workflows; inspect saved electrical fields and terminal curves, optical Fields and Saved results. |
 | Simulation Sweep | Explore bounded designs or search a target wavelength. |
 | AI Search | Train models, propose candidates, and verify them with the solver. |
 | Settings | Set appearance, data storage, performance, and add-ons. |
 | Help | Read illustrated guides, load the Silicon example, and inspect actual saved results. |
 
-Every calculation uses the same applied Structure. In Structure, choose a layer by name in the **Layer** dropdown or the stack. Use **Apply layer**, **Apply lattice**, and **Apply pattern** to commit edits; **Advanced editing…** provides layer renaming and the complete region/repeat tools. Run and Stop remain in the bottom bar. Background calculations report progress and support cancellation.
+Device Studio calculations use its applied finite device and selected optical domain; Original Optical Studio calculations use the applied optical layer/region tables. Active PC arrays use one fundamental pitch cell with one air hole for optics in both interfaces; other Original designs retain their original periods. **Structure → Device canvas** combines a device tree, drawing tools, editable object properties, electrical material shortcuts and linked top/XZ/3D previews. Create rectangles, circles, ellipses, polygons and square rings; add contacts and local doping; make pattern arrays or extrude a footprint through selected layers. **Apply selected object** commits inspector edits, **Validate device** checks the actual resolved mesh and exposed contact faces, and device JSON import/export preserves editable geometry. **Advanced periodic optical editor** retains the existing **Apply layer**, **Apply lattice**, **Apply pattern** and advanced region/repeat tools. Shared geometry edits update the optical tables too. Run and Stop remain available; background calculations report progress and support cancellation.
 
-Choose **B Light**, **B Dark**, **Glass Light**, or **Glass Dark** through **Settings → Appearance** or **Menu → Appearance**. Each look has customizable colors and a real preview of the applied structure. Layer colors and material preview opacity are saved with projects and do not change optical constants or solver inputs.
+Choose **B Light**, **B Dark**, **Glass Light**, or **Glass Dark** through **Settings → Appearance** or **Menu → Appearance**. The default B Dark palette uses the approved blue-toned device-builder mockup. Each look has customizable colors and a real preview of the applied structure. Layer colors and material preview opacity are saved with projects and do not change optical constants or solver inputs.
 
 Glass looks use Windows Desktop Acrylic to blur the actual desktop behind the window while controls and scientific data remain sharp. It requires Windows 11 build 22621 or later. Windows transparency, accessibility, power, or remote-session settings can substitute a solid backdrop; unsupported desktops and offscreen captures use a solid fallback. B looks are opaque. Maximized and fullscreen windows use the same theme with an opaque background to keep painting stable; restoring the window enables Acrylic again.
 
@@ -39,6 +41,18 @@ Live 2D scientific plots use native Qt/PyQtGraph items. Geometry and saved 3D fi
 **Simulation Sweep → Explore designs** offers Exhaustive grid, ML assisted, and Hybrid verified searches, with resumable JSON histories and higher-resolution S4 checks. See [ML_SEARCH_GUIDE.md](ML_SEARCH_GUIDE.md) for optional dependencies, budgets, result interpretation, and validation.
 
 ## Run from source
+
+**Simulation → Electrical** runs the finite editable device from Structure without optical work; **Simulation → Coupled** applies its saved carrier/field profiles to voltage-dependent periodic S4 optics. Optical has seven setup sections, Electrical seven, and Coupled six; Coupled's nested Optical and Electrical editors use the same settings as the standalone modes. Run submits the visible voltage range or manual offsets, validates the resolved schedule, and saves immutable inputs with the results. The legacy contacts-only and explicit-ITO study models remain available. The custom solver resolves actual extruded shape/void and doping masks on a layer-aligned finite-volume mesh; narrow features require refinement. It solves carrier-reservoir electrostatics, with optional **Ohmic conductivity I–V estimates** and **electrode displacement-charge C–V derivatives**, rather than a calibrated junction transport model. Forward-biased p/n carrier reservoirs require a continuity model and are blocked explicitly.
+
+GaAs, ITO, AlGaAs and Silicon electrical properties are preloaded, sourced and editable, with Air/void and custom/imported definitions. ITO film values and AlGaAs mobility defaults are labeled assumptions. Electrical properties link to optical materials; missing optical data must be assigned before optical/coupled runs, and static permittivity is never silently used as optical n/k.
+
+**Materials → Electrical** opens the full catalog with evaluated properties, sources, Add/Edit/Duplicate, optical links, and validated import/export. **Settings** contains Appearance, Execution defaults, Storage & exports, Solver runtimes, and Add-ons. Execution edits remain drafts until Apply; Save defaults affects explicit new projects. Setup presets have separate Apply/Cancel behavior and preserve stable device references.
+
+The default dark interface follows the approved navy/blue reference. Linked top, cross-section and 3D views display the actual device. Structure's 3D view menu provides Studio lighting, Soft shadows, Surface reflections and Hole and edge shading; these display options do not change solver inputs. The PC-area optical workflow uses one pitch cell with one air hole, independently of the full finite electrical device. Device Studio derives that cell when unconfigured and validates explicit PC selections; custom non-PC periodic designs retain selected-cell and full-footprint-supercell choices. PC-area fill uses the PC area's dimensions and period, retaining every generated hole in the editable project even when large previews use display sampling.
+
+**Results → Optical E/H** loads field-only jobs and the field stage of spectrum-to-fields runs, with wavelength selection, XY/XZ component maps, 3D playback, and complete CSV/NPZ export. These electromagnetic phasor fields use their saved S4 source normalization; static electrical potential and fields have separate categories. **Results → Specular phase** shows the actual saved reflection/transmission phase and exports the full phase CSV. Spectrum-to-fields jobs retain the original submitted geometry and settings even if the visible project is edited while the spectrum runs.
+
+The **Device results** dashboard displays actual saved potential, |E|, n/p and charge arrays in linked XY/XZ/3D views, with bias selection and a nearest-grid probe. It also shows actual computed/measured I–V/C–V, mesh checks, material sources and saved inputs. NPZ, complete-grid CSV, nonuniform VTK and figure exports are available. Existing optical n/k, R/T/A and sampled resonance-shift tabs remain. See [ELECTRICAL_SIMULATIONS.md](ELECTRICAL_SIMULATIONS.md) for setup, editable geometry, property provenance, outputs, model limits, legacy presets and reference conventions.
 
 Use a 64-bit Python 3.12 environment with an S4 native extension built for the same platform and Python version. Keep **pcs_s4_runtime** beside the application source. The corresponding native source is supplied with the source release. Do not substitute an unrelated S4 package.
 
@@ -58,6 +72,8 @@ python qt_app.py
 ```
 
 **launch_qt_gui.cmd** and **launch_peak_gui.cmd** launch the native desktop on Windows. Set **S4_PYTHON** to the intended interpreter when using a launcher. **install_desktop_dependencies.cmd** installs the pinned GUI dependencies into an existing scientific environment; optional calculation runtimes have their own setup requirements.
+
+From source, `python qt_app.py --workspace ask` opens the chooser; `--workspace device` or `--workspace original` opens that interface directly. Original Optical Studio compiles its applied optical layer/region tables. Active PC arrays use one fundamental pitch cell with one air hole; other designs use the original `ax`/`ay` periods. Canonical contact pads, device polygons and arbitrary Device Studio crop settings are not added automatically. Add optical metal explicitly in the original layer/region tables when using that workflow. Switching workspaces preserves the shared document and library.
 
 On Linux, follow `bash setup_linux.sh` to build the native S4 extension and install the documented dependencies, then use `bash launch_qt_gui.sh`. A Windows native extension cannot run on Linux. Native Linux desktop execution has not been tested on the development Windows host. See [DESKTOP_GUIDE.md](DESKTOP_GUIDE.md) for details.
 
@@ -203,6 +219,12 @@ viewing saved spectra, restoring original or optimized designs, and continuing
 saved ML histories. New runs save completed worker batches as well as final
 results. The **Materials** tab can save user-entered n/k, permittivity or uploaded
 wavelength-dependent tables as reusable, dated material presets.
+
+The shared device builder's **Electrical material library** also creates, duplicates,
+edits, imports and exports electrical definitions with stable IDs, units, source
+records and model notes. These definitions, device contacts/doping and mesh
+settings travel with portable project JSON. **Manage / import…** opens the electrical
+library; **Materials** continues to manage the linked optical reference data.
 
 Use **Simulation → Saved results → Back up, share or import a library →
 Create whole-library backup** with application source included to share

@@ -1,6 +1,12 @@
-# Optical Design Studio 1.3.2 — corresponding source
+# Optical Design Studio 1.3.3 — corresponding source
 
-For normal Windows use, download the separate **OpticalDesignStudio-Portable-1.3.2-Windows-x64.zip**. This source archive is for inspection, development, and rebuilding; it does not replace the complete portable runtime.
+## This release snapshot
+
+This archive is the preserved Absolute Phase Fix source, with only app_version.py changed for version 1.3.3 and build date 2026-10-26. The portable asset uses the .7z extension. VALIDATION.json is authoritative for the checks actually run; historical recipe text below is not a claim that every recipe gate was rerun.
+
+The supplied PyInstaller specification additionally requires ODS_OFFICIAL_RUNTIME (the compatible portable _internal directory), ODS_DEVSIM_DEPENDENCIES, ODS_EIGENFREE_GPU_PACKAGES, and ODS_EIGENFREE_CUDA. ODS_RELEASE_DEPENDENCIES supplies installed dependency trees. The spec itself is the authoritative list of input paths. Native DLLs are taken from ODS_OFFICIAL_RUNTIME, not from an assumed local Conda installation. Supply these inputs explicitly for a fresh build, and verify the frozen result independently. No developer-specific runtime or private library is included in this source archive.
+
+For normal Windows use, download the separate **OpticalDesignStudio-Portable-1.3.3-Windows-x64.zip**. This source archive is for inspection, development, and rebuilding; it does not replace the complete portable runtime.
 
 Application source and requirement files are in **src**. The corresponding S4 native source is in **native/S4-source**. Dependency notices accompany the archive. The public Silicon tutorial under **src/help_assets** contains genuine saved S4 results, explicit constant-index inputs, and file checksums; it is not a private user library.
 
@@ -50,11 +56,11 @@ python .\audit_release_archives.py
 
 Stop if any command fails. Staging creates a fresh **packaging/source** snapshot and records its hashes; it refuses to overwrite an existing snapshot. The original shipped manifests are reference records, and staging replaces the manifest files with the hashes of your new snapshot. The compiler also refuses to overwrite an existing nonempty **packaging/dist**. The tests require the numerical, machine-learning and geometry dependencies from the pinned requirements in the build interpreter; the supplied dependency trees are additionally used by PyInstaller through **ODS_RELEASE_DEPENDENCIES**.
 
-The final command creates locally verified portable and corresponding-source archives in **GitHub-Release-1.3.2** beside **packaging**. It does not upload, publish, sign, or install them. The helpers do not download native S4, MKL, CUDA, CAD or third-party build inputs automatically; prepare those compatible inputs and retain their applicable source and licenses first.
+The final command creates locally verified portable and corresponding-source archives in **GitHub-Release-1.3.3** beside **packaging**. It does not upload, publish, sign, or install them. The helpers do not download native S4, MKL, CUDA, CAD or third-party build inputs automatically; prepare those compatible inputs and retain their applicable source and licenses first.
 
 The staged source tests include the simulation speed and detailed-scan regressions. Both compiled executables must contain **scan_storage**, **field_sampling**, **simulation_fields**, and **contour_sweep**. Independent frozen checks exercise shared spectrum and field solves, validated Fourier sampling, exact SQLite spectrum results, and compact scan serialization before packaging. See **packaging/BUILDING.md** for the local candidate verification sequence.
 
-For 1.3.2, source checks also cover saved startup window state and the full 0–100% glass opacity range. Frozen verification requires an additional **--native-startup-test** through **qt_app.main** and the real Windows Qt platform, with an isolated saved maximized state. It temporarily opens a native window and requires five checks covering initial maximized painting, restore and maximize, and the Windows system restore/maximize commands. Existing offscreen checks remain required independently.
+For 1.3.3, source checks also cover saved startup window state and the full 0–100% glass opacity range. Frozen verification requires an additional **--native-startup-test** through **qt_app.main** and the real Windows Qt platform, with an isolated saved maximized state. It temporarily opens a native window and requires five checks covering initial maximized painting, restore and maximize, and the Windows system restore/maximize commands. Existing offscreen checks remain required independently.
 
 ## Data and licenses
 

@@ -17,12 +17,23 @@ import uuid
 import zipfile
 
 ROOT=Path(__file__).resolve().parent
-VERSION='1.3.2'
+VERSION='1.3.3'
 GUI_MODULES=('installer_smoke','qt_app','qt_device_builder','qt_lattice_diagram','qt_materials',
     'qt_help','qt_native_figure','qt_native_plot','qt_native_field_volume','qt_field_volume','qt_windows_glass',
-    'scan_storage','field_sampling','simulation_fields','contour_sweep')
+    'scan_storage','field_sampling', 'field_reconstruction', 'field_storage', 'direct_npz','simulation_fields','contour_sweep',
+    'eigenfree_scan','s4_eigenfree_gpu','gpu_solver_runtime')
 BACKEND_MODULES=('backend','field_solver','model','field_volume',
-    'scan_storage','field_sampling','simulation_fields','contour_sweep')
+    'scan_storage','field_sampling', 'field_reconstruction', 'field_storage', 'direct_npz','simulation_fields','contour_sweep',
+    'eigenfree_scan','s4_eigenfree_gpu','gpu_solver_runtime')
+NATIVE_SETUP_MODULES=('qt_simulation_setup','simulation_setup_state','qt_device_lighting',
+    'qt_tool_workspace','qt_electrical_material_catalog','qt_results_workspace','qt_optical_results','qt_workspace_start',
+    'qt_electrical','qt_electrical_materials','qt_electrical_results',
+    'electrical_material_library','electrical_terminal_studies','device_model',
+    'device_project_bridge','custom_electrical_solver','custom_device_optics',
+    'electrical_optics','electrical_solver','electrical_preset','contact_optics','optical_unit_cell','pc_array',
+    'fdtd_model','meep_runtime','meep_managed','meep_bootstrap','structure_preview')
+GUI_MODULES+=NATIVE_SETUP_MODULES
+BACKEND_MODULES+=NATIVE_SETUP_MODULES
 NATIVE_STARTUP_CHECKS=('initial_maximized_native_surface','restore_state','remaximize_native_surface',
     'system_restore_state','system_maximize_native_surface')
 
@@ -44,10 +55,15 @@ def validate_native_startup(report, application):
     for name in NATIVE_STARTUP_CHECKS:
         check=report.get('checks',{}).get(name,{})
         assert isinstance(check,dict) and check.get('passed') is True,(name,check)
+        if name in ('initial_maximized_native_surface','remaximize_native_surface','system_maximize_native_surface'):
+            detail=check.get('detail',{})
+            assert isinstance(detail,dict),(name,detail)
+            for field in ('qt_surface_alpha_preserved','transparent_background_verified','visible_controls_verified'):
+                assert detail.get(field) is True,(name,field,detail)
 
 def audit_payload(application,output):
     from PyInstaller.archive.readers import CArchiveReader
-    from stage_release import inventory as source_inventory,tree_digest
+    from stage_release import inventory as source_inventory,tree_digest,REQUIRED_RESOURCES,validate_runtime_resources
     folder=application.parent
     manifest=json.loads((folder/'PAYLOAD-MANIFEST.json').read_text(encoding='utf-8'))
     assert str(manifest.get('version',manifest.get('app_version','')))==VERSION,manifest.keys()
@@ -89,6 +105,10 @@ def audit_payload(application,output):
     assert staged_files==stage['files'],'The staged source changed before verification'
     source_tree_sha256=tree_digest(staged_files)
     assert source_tree_sha256==stage['source_tree_sha256']==manifest['source_tree_sha256']
+    runtime_resources=validate_runtime_resources(folder/'_internal')
+    for name in REQUIRED_RESOURCES:
+        record=staged_files.get(name)
+        assert record and runtime_resources[name]['sha256']==record['sha256'] and runtime_resources[name]['size']==record['size'],('Native setup runtime resource differs from staged source',name)
     readable_files={name:record for name,record in staged_files.items()
         if Path(name).suffix not in ('.pyd','.dll','.exe')}
     for relative,record in readable_files.items():
@@ -173,7 +193,7 @@ def main():
         'exact_disk_backed_spectrum','compact_scan_roundtrip','contour_label_parity')),speed
     assert speed.get('field_sample_count')==3,speed
     maximize=report['checks']['maximize_restore_painting']['detail']
-    assert maximize.get('maximized_opaque_workspace') is True,maximize
+    assert maximize.get('maximized_transparency_policy_verified') is True,maximize
     assert maximize.get('restored_glass_policy') is True,maximize
     assert maximize.get('looks')==['glass_dark','glass_light'],maximize
     errors=(output/'stderr.log').read_text(encoding='utf-8',errors='replace')

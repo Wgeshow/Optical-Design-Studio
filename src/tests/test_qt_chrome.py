@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout
 
 from qt_chrome import WindowChrome
 from qt_common import theme_manager
+from qt_surfaces import WorkspaceBackground
 
 
 class ChromeHost(QMainWindow):
@@ -74,6 +75,43 @@ class WindowChromeTests(unittest.TestCase):
         self.window.show()
         self.window.activateWindow()
         self.settle()
+
+    def test_clear_caption_has_one_alpha_for_native_hits_while_workspace_stays_clear(self):
+        previous_look = self.manager.look
+        previous_opacity = self.manager.glass_opacity
+        window = QMainWindow()
+        window.setObjectName('opticalStudioWindow')
+        window.setWindowTitle('Optical Design Studio')
+        window.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        window.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
+        window.resize(1000, 360)
+        root = WorkspaceBackground(desktop_root=True)
+        layout = QVBoxLayout(root)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        chrome = WindowChrome(window, Mock(), Mock(), Mock())
+        layout.addWidget(chrome)
+        layout.addStretch()
+        window.setCentralWidget(root)
+        window._desktop_glass = SimpleNamespace(active=True, alpha_active=True)
+        try:
+            self.manager.glass_opacity = 0
+            for look in ('glass_dark', 'glass_light'):
+                self.manager.apply_look(look, persist=False)
+                window.show()
+                self.settle()
+                image = root.grab().toImage()
+                self.assertGreaterEqual(image.pixelColor(round(chrome.width()*.65), 25).alpha(),96)
+                self.assertGreaterEqual(image.pixelColor(500, 150).alpha(),96)
+                self.assertLess(image.pixelColor(500, 150).alpha(),255)
+                self.assertEqual(window.windowOpacity(), 1)
+                self.assertTrue(chrome.maximize_button.isVisible())
+        finally:
+            window.hide()
+            window.deleteLater()
+            self.settle()
+            self.manager.glass_opacity = previous_opacity
+            self.manager.apply_look(previous_look, persist=False)
 
     def tearDown(self):
         for menu in (self.chrome.file_menu, self.chrome.view_menu, self.chrome.system_menu):

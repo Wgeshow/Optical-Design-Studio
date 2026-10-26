@@ -30,7 +30,7 @@ def main():
     with (ROOT / 'build.log').open('w', encoding='utf-8') as log:
         result = subprocess.run([
             sys.executable, '-m', 'PyInstaller', '--noconfirm',
-            '--distpath', str(destination), '--workpath', str(ROOT / 'work'),
+            '--distpath', str(destination), '--workpath', str(ROOT / 'work-fresh-20261013-absolute-phase-fix'),
             str(ROOT / 'OpticalDesignStudio.spec')], cwd=ROOT,
             stdout=log, stderr=subprocess.STDOUT)
     report = dict(version=stage['version'], passed=result.returncode == 0,

@@ -10,6 +10,9 @@ import time
 ROOT = Path(__file__).resolve().parent
 SOURCE = ROOT / 'source'
 DEPENDENCIES = Path(os.environ.get('ODS_RELEASE_DEPENDENCIES', ROOT.parent / 's4_ui_redesign'))
+OFFICIAL_RUNTIME = Path(os.environ['ODS_OFFICIAL_RUNTIME'])
+os.environ['S4_DLL_DIRS'] = str(OFFICIAL_RUNTIME)
+sys.path.append(str(OFFICIAL_RUNTIME/'cad_runtime'))
 GROUPS = {
     'scientific-rendering': [
         'tests.test_native_figure', 'tests.test_native_material_saved_plots',
@@ -32,6 +35,9 @@ GROUPS = {
         'tests.test_lattice_diagram',
         'tests.test_windows_desktop_glass', 'tests.test_qt_chrome', 'tests.test_windows_custom_frame',
         'tests.test_qt_desktop_surfaces', 'tests.test_window_state_restore',
+        'tests.test_qt_simulation_setup', 'tests.test_qt_device_lighting', 'tests.test_qt_optical_results',
+        'tests.test_qt_original_optical_workspace','tests.test_qt_workspace_start','tests.test_device_studio_help','tests.test_qt_setup_dispatch',
+        'tests.test_qt_startup_transition',
     ],
     'release-and-data': [
         'tests.test_app_version', 'tests.test_desktop_runtime',
@@ -46,6 +52,14 @@ GROUPS = {
         'tests.test_contour_learning', 'tests.test_airhole_field_objective',
         'tests.test_target_fields', 'tests.test_field_ml',
         'tests.test_field_target_integration',
+    ],
+    'device-electrical-and-coupled': [
+        'tests.test_simulation_setup_state', 'tests.test_electrical_solver',
+        'tests.test_electrical_material_library', 'tests.test_electrical_optics',
+        'tests.test_electrical_terminal_studies', 'tests.test_electrical_integration',
+        'tests.test_custom_electrical_device', 'tests.test_custom_device_project',
+        'tests.test_custom_device_optics', 'tests.test_contact_optics',
+        'tests.test_optical_unit_cell', 'tests.test_pc_array', 'tests.test_pc_optical_defaults', 'tests.test_pc_library_roundtrip',
     ],
 }
 
@@ -298,7 +312,7 @@ def main():
             print((output / (name + '.log')).read_text(encoding='utf-8', errors='replace')[-7000:], flush=True)
             break
     check_source(inventory)
-    summary = dict(version='1.3.2', source_tree_sha256=source_tree_sha256,
+    summary = dict(version='1.3.3', source_tree_sha256=source_tree_sha256,
                    tests_run=sum(result['tests_run'] for result in results.values()),
                    failures=sum(result['failures'] for result in results.values()),
                    errors=sum(result['errors'] for result in results.values()),

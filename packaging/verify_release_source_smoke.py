@@ -12,6 +12,8 @@ from stage_release import digest, inventory, tree_digest, write_json
 ROOT = Path(__file__).resolve().parent
 SOURCE = ROOT/'source'
 DEPENDENCIES = Path(os.environ.get('ODS_RELEASE_DEPENDENCIES', ROOT.parent/'s4_ui_redesign'))
+OFFICIAL_RUNTIME = Path(os.environ['ODS_OFFICIAL_RUNTIME'])
+os.environ['S4_DLL_DIRS'] = str(OFFICIAL_RUNTIME)
 
 
 def main():
@@ -37,7 +39,7 @@ def main():
     launcher = ('import runpy,sys; sys.path.append(sys.argv.pop(1)); '
                 'sys.argv[0]=sys.argv.pop(1); runpy.run_path(sys.argv[0],run_name="__main__")')
     with (output/'console.log').open('w',encoding='utf-8') as log:
-        child = subprocess.Popen([sys.executable,'-c',launcher,str(DEPENDENCIES/'cad_runtime'),
+        child = subprocess.Popen([sys.executable,'-c',launcher,str(OFFICIAL_RUNTIME/'cad_runtime'),
             str(SOURCE/'installer_smoke.py'),str(report_path),
             '--library',str(session/'User Data')],cwd=SOURCE,env=env,stdout=log,
             stderr=subprocess.STDOUT,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
@@ -57,7 +59,7 @@ def main():
     speed = report.get('checks',{}).get('simulation_speed_and_scan_storage',{})
     maximize = report.get('checks',{}).get('maximize_restore_painting',{})
     passed = bool(exit_code == 0 and report.get('passed') is True and report.get('frozen') is False
-                  and report.get('version') == '1.3.2'
+                  and report.get('version') == '1.3.3'
                   and len(report.get('checks',{})) >= 9 and fields.get('passed') is True
                   and fields['detail'].get('selected_csv_verified') is True
                   and fields['detail'].get('volume_depths') == 5
@@ -67,7 +69,7 @@ def main():
                       'exact_disk_backed_spectrum', 'compact_scan_roundtrip', 'contour_label_parity'))
                   and speed['detail'].get('field_sample_count') == 3
                   and maximize.get('passed') is True
-                  and maximize.get('detail',{}).get('maximized_opaque_workspace') is True
+                  and maximize.get('detail',{}).get('maximized_transparency_policy_verified') is True
                   and maximize.get('detail',{}).get('restored_glass_policy') is True
                   and maximize.get('detail',{}).get('looks') == ['glass_dark', 'glass_light'])
     verification = dict(status='passed' if passed else 'failed',passed=passed,exit_code=exit_code,

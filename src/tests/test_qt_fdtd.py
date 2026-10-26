@@ -3,11 +3,14 @@ import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
 import unittest
-from unittest.mock import patch
+import tempfile
+from pathlib import Path
+from unittest.mock import Mock, patch
 from types import SimpleNamespace
 from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtTest import QSignalSpy
 from PyQt6.QtWidgets import QApplication
-from qt_fdtd import FDTDPage, MeepRuntimeSettings
+from qt_fdtd import FDTDPage, MeepRuntimeSettings, MeepWorker
 
 
 class Store(QObject):
@@ -80,6 +83,36 @@ class PanelTests(unittest.TestCase):
         self.assertEqual(page.status.text(), 'A useful solver error')
         self.assertFalse(page._active)
         page.deleteLater()
+
+    def test_worker_reports_original_failure_when_cleanup_and_recording_fail(self):
+        with tempfile.TemporaryDirectory() as folder:
+            library = Mock(runs=Path(folder))
+            library.files_for.return_value = []
+            library.record.side_effect = [None, OSError('library disk full')]
+            managed = Mock()
+            managed.stream.side_effect = RuntimeError('solver connection lost')
+            managed.terminate.side_effect = OSError('process cleanup denied')
+            worker = MeepWorker('fdtd', {}, {}, library)
+            failed = QSignalSpy(worker.failed)
+            completed = QSignalSpy(worker.completed)
+            with patch('qt_fdtd.meep_runtime.load_config', return_value={}), \
+                 patch('qt_fdtd.meep_runtime.probe', return_value={'available': True}), \
+                 patch('qt_fdtd.build_job', return_value={}), \
+                 patch('qt_fdtd.meep_runtime.copy_runner', return_value=Path(folder)/'runner.py'), \
+                 patch('qt_fdtd.meep_runtime.linux_path', side_effect=lambda path, config: str(path)), \
+                 patch('qt_fdtd.meep_runtime.command', return_value=[]), \
+                 patch('qt_fdtd.meep_runtime.ManagedProcess', return_value=managed):
+                worker.start()
+                self.assertTrue(worker.wait(5000), 'Meep worker did not finish')
+                self.app.processEvents()
+            self.assertEqual(len(failed), 1)
+            self.assertEqual(len(completed), 0)
+            error = failed[0][0]
+            self.assertTrue(error.startswith('solver connection lost'))
+            self.assertIn('process cleanup denied', error)
+            self.assertIn('library disk full', error)
+            managed.terminate.assert_called_once_with(force=True)
+            self.assertEqual(library.record.call_count, 2)
 
     def test_settings_does_not_probe_or_install_on_open(self):
         with patch('meep_runtime.probe') as probe, patch('meep_runtime.install_command') as install:

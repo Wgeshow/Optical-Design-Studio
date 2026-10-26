@@ -112,6 +112,89 @@ struct FieldCache{
 	FieldCache *next;
 };
 
+// Dielectric Fourier operators do not depend on frequency or illumination.
+// This simulation-owned cache is bounded and invalidated on material,
+// geometry, basis, lattice and options changes. Modes are never cached
+// between different frequencies.
+struct EpsilonCache{
+	S4_LayerID layer;
+	int n;
+	std::complex<double> *data; // Epsilon_inv[n*n], Epsilon2[4*n*n]
+	EpsilonCache *next;
+};
+
+static bool EpsilonCacheEnabled(const S4_Simulation *S){
+	const char *disabled = getenv("S4_DISABLE_EPSILON_CACHE");
+	return !S->options.use_less_memory && !(disabled && *disabled && strcmp(disabled, "0"));
+}
+
+static bool RestoreEpsilonCache(S4_Simulation *S, const S4_Layer *L, LayerModes *modes){
+	if(!EpsilonCacheEnabled(S)){ return false; }
+	const S4_LayerID id = (S4_LayerID)(L-S->layer);
+	for(EpsilonCache *entry = S->epsilon_cache; entry; entry = entry->next){
+		if(entry->layer == id && entry->n == S->n_G){
+			const size_t nn = size_t(S->n_G)*S->n_G;
+			memcpy(modes->Epsilon_inv, entry->data, sizeof(std::complex<double>)*nn);
+			memcpy(modes->Epsilon2, entry->data+nn, sizeof(std::complex<double>)*4*nn);
+			++S->epsilon_cache_hits;
+			return true;
+		}
+	}
+	++S->epsilon_cache_misses;
+	return false;
+}
+
+static void StoreEpsilonCache(S4_Simulation *S, const S4_Layer *L, const LayerModes *modes){
+	if(!EpsilonCacheEnabled(S)){ return; }
+	const size_t nn = size_t(S->n_G)*S->n_G;
+	const size_t limit = size_t(128)*1024*1024;
+	if(nn > (limit-sizeof(EpsilonCache))/(5*sizeof(std::complex<double>))){ return; }
+	const size_t bytes = sizeof(EpsilonCache)+5*nn*sizeof(std::complex<double>);
+	if(bytes > limit-S->epsilon_cache_bytes){ return; }
+	EpsilonCache *entry = (EpsilonCache*)S4_malloc(bytes);
+	if(!entry){ return; }
+	entry->data = (std::complex<double>*)(entry+1);
+	entry->layer = (S4_LayerID)(L-S->layer);
+	entry->n = S->n_G;
+	memcpy(entry->data, modes->Epsilon_inv, sizeof(std::complex<double>)*nn);
+	memcpy(entry->data+nn, modes->Epsilon2, sizeof(std::complex<double>)*4*nn);
+	entry->next = S->epsilon_cache;
+	S->epsilon_cache = entry;
+	S->epsilon_cache_bytes += bytes;
+}
+
+// Conservative structural proof before the numerical symmetry check. Tiny
+// translations, rotations, tensor terms, or incidence angles are not rounded
+// to zero. Unsupported symmetric arrangements simply use the general solver.
+static const int *Simulation_MirrorBasis(const S4_Simulation *S, bool require_enabled = true){
+	const char *enabled = getenv("S4_MIRROR_SYMMETRY");
+	if(require_enabled && (!enabled || strcmp(enabled, "1"))){ return NULL; }
+	if(S->k[0] != 0. || S->k[1] != 0. || S->omega[1] != 0. ||
+		S->Lr[1] != 0. || S->Lr[2] != 0. ||
+		!(S->Lr[0] > 0.) || !(S->Lr[3] > 0.)){
+		return NULL;
+	}
+	for(int i = 0; i < S->n_materials; ++i){
+		if(S->material[i].type != 0){ return NULL; }
+	}
+	for(int i = 0; i < S->n_layers; ++i){
+		const S4_Layer *layer = &S->layer[i];
+		if(layer->copy >= 0){ layer = &S->layer[layer->copy]; }
+		for(int j = 0; j < layer->pattern.nshapes; ++j){
+			const shape *item = &layer->pattern.shapes[j];
+			if(item->center[0] != 0. || item->center[1] != 0.){ return NULL; }
+			if(item->type == CIRCLE){ continue; }
+			if((item->type == ELLIPSE || item->type == RECTANGLE) && item->angle == 0.){ continue; }
+			return NULL;
+		}
+	}
+	return S->G;
+}
+
+int S4_Simulation_IsMirrorEligible(const S4_Simulation *S){
+	return S && S->G && Simulation_MirrorBasis(S, false) != NULL;
+}
+
 // Private functions
 
 // If layer_solution is null, only computes layer_modes if it is non-NULL.
@@ -228,6 +311,9 @@ S4_Simulation* S4_Simulation_New(const S4_real *Lr, unsigned int nG, int *G){
 	S->options.lanczos_smoothing_power = 1;
 
 	S->field_cache = NULL;
+	S->epsilon_cache = NULL;
+	S->epsilon_cache_bytes = 0;
+	S->epsilon_cache_hits = S->epsilon_cache_misses = 0;
 	
 	S->msg = NULL;
 	S->msgdata = NULL;
@@ -368,7 +454,9 @@ S4_message_handler S4_Simulation_SetMessageHandler(
 int S4_Simulation_SetLattice(S4_Simulation *S, const S4_real *Lr){
 	if(NULL == S){ return -1; }
 	if(NULL == Lr){ return -2; }
+	S4_Simulation_DestroyLayerModes(S, -1);
 	Simulation_DestroySolution(S);
+	Simulation_InvalidateFieldCache(S);
 	memcpy(S->Lr, Lr, sizeof(S4_real) * 4);
 	int ret = S4_Lattice_Reciprocate(S->Lr, S->Lk);
 	if(1 == ret){
@@ -396,6 +484,7 @@ int S4_Simulation_SetBases(S4_Simulation *S, unsigned int nG, int *G){
 		return ret;
 	}
 
+	S4_Simulation_DestroyLayerModes(S, -1);
 	Simulation_DestroySolution(S);
 	Simulation_InvalidateFieldCache(S);
 
@@ -444,7 +533,7 @@ int S4_Simulation_SetFrequency(S4_Simulation *S, const S4_real *freq_complex){
 	S4_TRACE("> S4_Simulation_SetFrequency(S=%p, freq=(%f,%f))\n", S, freq_complex[0], freq_complex[1]);
 	S4_Simulation_DestroyLayerModes(S, -1);
 	Simulation_DestroySolution(S);
-	Simulation_InvalidateFieldCache(S);
+	// Frequency changes invalidate modes, but not dielectric or geometry data.
 	S->omega[0] = 2*M_PI*freq_complex[0];
 	S->omega[1] = 2*M_PI*freq_complex[1];
 	S4_TRACE("< S4_Simulation_SetFrequency\n");
@@ -671,7 +760,9 @@ S4_LayerID S4_Simulation_SetLayer(
 		}
 		copy = S->layer[copy].copy;
 	}
+	S4_Simulation_DestroyLayerModes(S, -1);
 	Simulation_DestroySolution(S);
+	Simulation_InvalidateFieldCache(S);
 	S4_Layer *L = NULL;
 	if(id < 0){
 		if(NULL != S->msg){
@@ -767,6 +858,8 @@ int S4_Layer_ClearRegions(
 ){
 	if(NULL == S){ return -1; }
 	if(id < 0 || id >= S->n_layers){ return -2; }
+	Simulation_DestroySolution(S);
+	Simulation_InvalidateFieldCache(S);
 	S4_Layer *L = &S->layer[id];
 	L->pattern.nshapes = 0;
 	if(NULL != L->pattern.shapes){
@@ -992,6 +1085,7 @@ int Simulation_RemoveLayerPatterns(S4_Simulation *S, S4_Layer *layer){
 	}
 
 	Simulation_DestroySolution(S);
+	Simulation_InvalidateFieldCache(S);
 
 	layer->pattern.nshapes = 0;
 	if(NULL != layer->pattern.shapes){
@@ -1035,6 +1129,7 @@ int Simulation_SetNumG(S4_Simulation *S, int n){
 		return ret;
 	}
 
+	S4_Simulation_DestroyLayerModes(S, -1);
 	Simulation_DestroySolution(S);
 	Simulation_InvalidateFieldCache(S);
 
@@ -1587,7 +1682,7 @@ int Simulation_ComputeLayerSolution(S4_Simulation *S, S4_Layer *L, LayerModes **
 				std::complex<double>(S->omega[0], S->omega[1]),
 				lthick, lq, lepsinv, lepstype, lkp, lphi,
 				pab,
-				work, iwork, lwork
+				work, iwork, lwork, Simulation_MirrorBasis(S)
 			);
 			S4_free(iwork);
 			S4_free(work);
@@ -1810,6 +1905,79 @@ double Simulation_GetUnitCellSize(const S4_Simulation *S){
 	}
 }
 
+// Shared by modal and eigenfree paths: no eigenproblem is evaluated here.
+static void GenerateLayerEpsilon(S4_Simulation *S, S4_Layer *L, LayerModes *pB){
+	const int n = S->n_G, n2 = 2*n;
+	if(L->pattern.nshapes == 0){
+		const S4_Material *M = &S->material[L->material];
+	if(0 == M->type){
+		const std::complex<double> eps(M->eps.s[0], M->eps.s[1]);
+		RNP::TBLAS::SetMatrix<'A'>(n,n,0.,1./eps,pB->Epsilon_inv,n);
+		RNP::TBLAS::SetMatrix<'A'>(n2,n2,0.,eps,pB->Epsilon2,n2);
+	}else{
+		RNP::TBLAS::SetMatrix<'A'>(n,n,0.,1./std::complex<double>(M->eps.abcde[8],M->eps.abcde[9]),pB->Epsilon_inv,n);
+		RNP::TBLAS::SetMatrix<'A'>(n,n,0.,std::complex<double>(M->eps.abcde[0],M->eps.abcde[1]),&pB->Epsilon2[0+0*n2],n2);
+		RNP::TBLAS::SetMatrix<'A'>(n,n,0.,std::complex<double>(M->eps.abcde[4],M->eps.abcde[5]),&pB->Epsilon2[n+0*n2],n2);
+		RNP::TBLAS::SetMatrix<'A'>(n,n,0.,std::complex<double>(M->eps.abcde[2],M->eps.abcde[3]),&pB->Epsilon2[0+n*n2],n2);
+		RNP::TBLAS::SetMatrix<'A'>(n,n,0.,std::complex<double>(M->eps.abcde[6],M->eps.abcde[7]),&pB->Epsilon2[n+n*n2],n2);
+	}
+	}else{
+		if(!RestoreEpsilonCache(S, L, pB)){
+		if(S->options.use_experimental_fmm){
+			FMMGetEpsilon_Experimental(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
+		}else{
+			if(S->options.use_discretized_epsilon){
+				if(S->options.use_subpixel_smoothing){
+					FMMGetEpsilon_Kottke(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
+				}else{ // not using subpixel smoothing
+					FMMGetEpsilon_FFT(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
+					if(S->options.use_polarization_basis){
+						if(S->options.use_jones_vector_basis){
+							FMMGetEpsilon_PolBasisJones(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
+						}else if(S->options.use_normal_vector_basis){
+							FMMGetEpsilon_PolBasisNV(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
+						}else{
+							FMMGetEpsilon_PolBasisVL(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
+						}
+					}
+				}
+			}else{
+				FMMGetEpsilon_ClosedForm(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
+				if(S->options.use_polarization_basis){
+					if(S->options.use_jones_vector_basis){
+						FMMGetEpsilon_PolBasisJones(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
+					}else if(S->options.use_normal_vector_basis){
+						FMMGetEpsilon_PolBasisNV(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
+					}else{
+						FMMGetEpsilon_PolBasisVL(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
+					}
+				}
+			}
+		}
+		StoreEpsilonCache(S, L, pB);
+		}
+	}
+}
+
+int S4_Simulation_GetLayerOperators(S4_Simulation *S, S4_LayerID id,
+	size_t n, double *epsilon_inv, double *epsilon2){
+	if(!S){ return -1; }
+	if(id < 0 || id >= S->n_layers){ return -2; }
+	if(!epsilon_inv || !epsilon2){ return -3; }
+	int ret = S->solution ? 0 : Simulation_InitSolution(S);
+	if(ret){ return ret; }
+	// Initialization may trim the requested Fourier count to a complete shell.
+	// Validate the caller's matrix dimensions against that retained count.
+	if(n != (size_t)S->n_G){ return -3; }
+	S4_Layer *layer = &S->layer[id];
+	if(layer->copy >= 0){ layer = &S->layer[layer->copy]; }
+	LayerModes temporary = {};
+	temporary.Epsilon_inv = reinterpret_cast<std::complex<double>*>(epsilon_inv);
+	temporary.Epsilon2 = reinterpret_cast<std::complex<double>*>(epsilon2);
+	GenerateLayerEpsilon(S, layer, &temporary);
+	return 0;
+}
+
 int Simulation_ComputeLayerModes(S4_Simulation *S, S4_Layer *L, LayerModes **layer_modes){
 	S4_TRACE("> Simulation_ComputeLayerModes(S=%p, L=%p (%s), modes=%p (%p)) [omega=%f]\n", S, L, (NULL != L && NULL != L->name ? L->name : ""), layer_modes, (NULL != layer_modes ? *layer_modes : NULL), S->omega[0]);
 	if(NULL == S){
@@ -1872,6 +2040,8 @@ int Simulation_ComputeLayerModes(S4_Simulation *S, S4_Layer *L, LayerModes **lay
 		pB->kp = NULL;
 	}
 
+	GenerateLayerEpsilon(S, L, pB);
+
 	// Outline of the epsilon matrix generation code below:
 	//
 	// If no shapes
@@ -1903,17 +2073,10 @@ int Simulation_ComputeLayerModes(S4_Simulation *S, S4_Layer *L, LayerModes **lay
 		}
 		if(0 == M->type){
 			std::complex<double> eps_scalar(M->eps.s[0], M->eps.s[1]);
-			RNP::TBLAS::SetMatrix<'A'>(n,n,0.,1./eps_scalar,pB->Epsilon_inv, n);
-			RNP::TBLAS::SetMatrix<'A'>(n2,n2,0.,eps_scalar,pB->Epsilon2, n2);
 			SolveLayerEigensystem_uniform(
 				std::complex<double>(S->omega[0],S->omega[1]), n, S->kx, S->ky,
 				eps_scalar, pB->q, pB->kp, pB->phi);
 		}else{
-			RNP::TBLAS::SetMatrix<'A'>(n,n,0.,1./std::complex<double>(M->eps.abcde[8],M->eps.abcde[9]),pB->Epsilon_inv, n);
-			RNP::TBLAS::SetMatrix<'A'>(n,n,0.,std::complex<double>(M->eps.abcde[0],M->eps.abcde[1]),&pB->Epsilon2[0+0*n2], n2);
-			RNP::TBLAS::SetMatrix<'A'>(n,n,0.,std::complex<double>(M->eps.abcde[4],M->eps.abcde[5]),&pB->Epsilon2[n+0*n2], n2);
-			RNP::TBLAS::SetMatrix<'A'>(n,n,0.,std::complex<double>(M->eps.abcde[2],M->eps.abcde[3]),&pB->Epsilon2[0+n*n2], n2);
-			RNP::TBLAS::SetMatrix<'A'>(n,n,0.,std::complex<double>(M->eps.abcde[6],M->eps.abcde[7]),&pB->Epsilon2[n+n*n2], n2);
 
 			S4_VERB(1, "Solving eigensystem of layer: %s\n", NULL != L->name ? L->name : "");
 			SolveLayerEigensystem(
@@ -1922,37 +2085,6 @@ int Simulation_ComputeLayerModes(S4_Simulation *S, S4_Layer *L, LayerModes **lay
 		}
 	}else{ // not a uniform layer
 		S4_VERB(1, "Generating epsilon matrix of layer: %s\n", NULL != L->name ? L->name : "");
-		if(S->options.use_experimental_fmm){
-			FMMGetEpsilon_Experimental(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
-		}else{
-			if(S->options.use_discretized_epsilon){
-				if(S->options.use_subpixel_smoothing){
-					FMMGetEpsilon_Kottke(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
-				}else{ // not using subpixel smoothing
-					FMMGetEpsilon_FFT(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
-					if(S->options.use_polarization_basis){
-						if(S->options.use_jones_vector_basis){
-							FMMGetEpsilon_PolBasisJones(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
-						}else if(S->options.use_normal_vector_basis){
-							FMMGetEpsilon_PolBasisNV(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
-						}else{
-							FMMGetEpsilon_PolBasisVL(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
-						}
-					}
-				}
-			}else{
-				FMMGetEpsilon_ClosedForm(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
-				if(S->options.use_polarization_basis){
-					if(S->options.use_jones_vector_basis){
-						FMMGetEpsilon_PolBasisJones(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
-					}else if(S->options.use_normal_vector_basis){
-						FMMGetEpsilon_PolBasisNV(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
-					}else{
-						FMMGetEpsilon_PolBasisVL(S, L, n, pB->Epsilon2, pB->Epsilon_inv);
-					}
-				}
-			}
-		}
 //std::cerr << pB->Epsilon2[0] << "\t" << pB->Epsilon2[1] << "\t" << pB->Epsilon_inv[0] << "\t" << pB->Epsilon_inv[1] << std::endl;
 		S4_VERB(1, "Solving eigensystem of layer: %s\n", NULL != L->name ? L->name : "");
 		{
@@ -1965,7 +2097,7 @@ int Simulation_ComputeLayerModes(S4_Simulation *S, S4_Layer *L, LayerModes **lay
 				S->kx, S->ky,
 				pB->Epsilon_inv, pB->Epsilon2, pB->epstype,
 				pB->q, pB->kp, pB->phi,
-				&dum, rwork, lwork
+				&dum, rwork, lwork, Simulation_MirrorBasis(S)
 			);
 			lwork = (int)(dum.real() + 0.5);
 			work = (std::complex<double>*)S4_malloc(sizeof(std::complex<double>) * lwork);
@@ -1974,7 +2106,7 @@ int Simulation_ComputeLayerModes(S4_Simulation *S, S4_Layer *L, LayerModes **lay
 				S->kx, S->ky,
 				pB->Epsilon_inv, pB->Epsilon2, pB->epstype,
 				pB->q, pB->kp, pB->phi,
-				work, rwork, lwork
+				work, rwork, lwork, Simulation_MirrorBasis(S)
 			);
 			S4_free(work);
 			S4_free(rwork);
@@ -2946,6 +3078,46 @@ int Simulation_GetField(S4_Simulation *S, const double r[3], double fE[6], doubl
 	S4_TRACE("< Simulation_GetField\n");
 	return 0;
 }
+int S4_Simulation_GetFieldCoefficientsMany(
+	S4_Simulation *S, size_t nz, const S4_real *z, S4_real *coefficients
+){
+	if(NULL == S){ return -1; }
+	if(nz == 0){ return 0; }
+	if(NULL == z){ return -3; }
+	if(NULL == coefficients){ return -4; }
+	if(S->n_layers == 0){ return 14; }
+	int ret = NULL == S->solution ? Simulation_InitSolution(S) : 0;
+	if(ret){ return ret; }
+	const size_t n = S->n_G;
+	std::complex<double> *ab = (std::complex<double>*)S4_malloc(sizeof(std::complex<double>)*20*n);
+	if(NULL == ab){ return 1; }
+	std::complex<double> *output = reinterpret_cast<std::complex<double>*>(coefficients);
+	for(size_t iz = 0; iz < nz; ++iz){
+		if(!std::isfinite(z[iz])){ ret = -3; break; }
+		// Preserve the scalar API's choice of the upper layer at an interface.
+		double top = 0., dz = z[iz];
+		int il = 0;
+		while(il < S->n_layers && z[iz] > top + S->layer[il].thickness){
+			top += S->layer[il].thickness;
+			if(il+1 == S->n_layers){ break; }
+			dz -= S->layer[il].thickness;
+			++il;
+		}
+		S4_Layer *L = &S->layer[il];
+		LayerModes *modes;
+		std::complex<double> *solution;
+		ret = Simulation_GetLayerSolution(S, L, &modes, &solution);
+		if(ret){ break; }
+		RNP::TBLAS::Copy(4*n, solution,1, ab,1);
+		TranslateAmplitudes(n, modes->q, L->thickness, dz, ab);
+		GetFieldCoefficients(n, S->kx, S->ky, std::complex<double>(S->omega[0],S->omega[1]),
+			modes->q, modes->kp, modes->phi, modes->Epsilon_inv, modes->epstype,
+			ab, output + iz*6*n, ab + 4*n);
+	}
+	S4_free(ab);
+	return ret;
+}
+
 int Simulation_GetFieldPlane(S4_Simulation *S, int nxy[2], double zz, double *E, double *H){
 	S4_TRACE("> Simulation_GetFieldPlane(S=%p, nxy=%p (%d,%d), z=%f, E=%p, H=%p)\n",
 		S, nxy, (NULL == nxy ? 0 : nxy[0]), (NULL == nxy ? 0 : nxy[1]), zz, E, H);
@@ -3342,8 +3514,13 @@ int Simulation_MakeExcitationPlanewave(S4_Simulation *S, const double angle[2], 
 	const double s_s = sin(pol_s[1]);
 	const double c_p = cos(pol_p[1]);
 	const double s_p = sin(pol_p[1]);
-	S->k[0] = c1*s0*root_eps;
-	S->k[1] = s1*s0*root_eps;
+	const double kx_fraction = c1*s0*root_eps;
+	const double ky_fraction = s1*s0*root_eps;
+	if(S->k[0] != kx_fraction || S->k[1] != ky_fraction){
+		S4_Simulation_DestroyLayerModes(S, -1);
+	}
+	S->k[0] = kx_fraction;
+	S->k[1] = ky_fraction;
 
 	S->exc.sub.planewave.hx[0] = -c0*c1*pol_s[0]*c_s - s1*pol_p[0]*c_p;
 	S->exc.sub.planewave.hx[1] = -c0*c1*pol_s[0]*s_s - s1*pol_p[0]*s_p;
@@ -3389,6 +3566,9 @@ int S4_Simulation_ExcitationDipole(S4_Simulation *S, const double k[2], const ch
 	Simulation_DestroySolution(S);
 	S->exc.type = 1;
 
+	if(S->k[0] != k[0] || S->k[1] != k[1]){
+		S4_Simulation_DestroyLayerModes(S, -1);
+	}
 	S->k[0] = k[0];
 	S->k[1] = k[1];
 	S->exc.sub.dipole.pos[0] = pos[0];
@@ -3432,6 +3612,12 @@ int S4_Simulation_ExcitationExterior(S4_Simulation *S, int n, const int *exg, co
 
 void Simulation_InvalidateFieldCache(S4_Simulation *S){
 	S4_TRACE("> Simulation_InvalidateFieldCache(S=%p) [omega=%f]\n", S, S->omega[0]);
+	while(NULL != S->epsilon_cache){
+		EpsilonCache *entry = S->epsilon_cache;
+		S->epsilon_cache = entry->next;
+		S4_free(entry);
+	}
+	S->epsilon_cache_bytes = 0;
 	while(NULL != S->field_cache){
 		FieldCache *t = S->field_cache;
 		S->field_cache = S->field_cache->next;
@@ -3470,9 +3656,8 @@ void Simulation_AddFieldToCache(S4_Simulation *S, const S4_Layer *layer, size_t 
 void Simulation_SetExcitationType(S4_Simulation *S, int type){
 	S4_TRACE("> Simulation_SetExcitationType(S=%p, type=%d\n", S, type);
 	if(1 == S->exc.type){
-		if(NULL != S->exc.layer){
-			free(S->exc.layer);
-		}
+		// A dipole's layer is borrowed from S->layer, never separately owned.
+		S->exc.layer = NULL;
 	}else if(2 == S->exc.type){
 		if(NULL != S->exc.sub.exterior.Gindex1){ free(S->exc.sub.exterior.Gindex1); }
 		if(NULL != S->exc.sub.exterior.coeff){ free(S->exc.sub.exterior.coeff); }

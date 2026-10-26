@@ -38,6 +38,72 @@ class LibraryTests(unittest.TestCase):
         self.assertEqual(presets[second]['project']['materials'][0]['A'], 3.7)
         self.assertEqual(presets[first]['notes'], '300 K')
 
+    def test_damaged_presets_do_not_hide_valid_materials_or_block_snapshot(self):
+        key = self.library.save_preset(MATERIALS[1], 'Valid material', 'notes')
+        damaged = self.library.presets_dir / 'broken.json'
+        damaged.write_text('{', encoding='utf-8')
+        invalid = self.library.presets_dir / 'invalid.json'
+        write_json(invalid, dict(id='invalid', label='Invalid', created='', project=dict(materials=[])))
+        with self.assertLogs('data_library', level='WARNING'):
+            presets = self.library.presets()
+        self.assertEqual(list(presets), [key])
+        self.assertEqual(self.library.snapshot(self.project)['materials'], self.project['materials'])
+        self.assertEqual({item['path'] for item in self.library.diagnostics}, {str(damaged), str(invalid)})
+        self.assertEqual(damaged.read_text(encoding='utf-8'), '{')
+
+    def test_incomplete_legacy_run_metadata_remains_usable(self):
+        directory = self.library.runs / 'legacy'
+        directory.mkdir()
+        write_json(directory / 'library_record.json', dict(title='Legacy work'))
+        record = self.library.entries()[0]
+        self.assertEqual(record['id'], 'legacy')
+        self.assertEqual(record['title'], 'Legacy work')
+        self.assertIsInstance(record['created'], str)
+        self.assertEqual(record['status'], 'saved')
+        self.assertEqual(self.library.record(directory, notes='Recovered')['notes'], 'Recovered')
+
+    def test_invalid_utf8_and_nonmapping_presets_are_isolated_and_repairable(self):
+        key = self.library.save_preset(MATERIALS[1], 'Valid material')
+        valid = self.library.presets()[key]
+        invalid_utf8 = self.library.presets_dir / 'utf8.json'
+        invalid_utf8.write_bytes(b'\xff\xfe')
+        nonmapping = self.library.presets_dir / 'list.json'
+        write_json(nonmapping, [])
+        with self.assertLogs('data_library', level='WARNING'):
+            self.assertEqual(list(self.library.presets()), [key])
+        self.assertEqual(len(self.library.diagnostics), 2)
+        repaired = dict(valid, id='repaired', label='Repaired')
+        write_json(invalid_utf8, repaired)
+        repaired_list = dict(valid, id='repaired-list', label='Repaired list')
+        write_json(nonmapping, repaired_list)
+        self.assertEqual(len(self.library.presets()), 3)
+        self.assertEqual(self.library.diagnostics, [])
+
+    def test_run_metadata_warning_clears_after_repair(self):
+        directory = self.library.runs / 'repairable'
+        directory.mkdir()
+        metadata = directory / 'library_record.json'
+        write_json(metadata, [])
+        with self.assertLogs('data_library', level='WARNING'):
+            self.library.entries()
+        self.assertEqual(len(self.library.diagnostics), 1)
+        write_json(metadata, dict(title='Recovered'))
+        self.assertEqual(self.library.entries()[0]['title'], 'Recovered')
+        self.assertEqual(self.library.diagnostics, [])
+
+    def test_invalid_run_metadata_does_not_break_other_entries(self):
+        for identifier, record in [('valid', dict(created='2026-01-01', title='Valid')),
+                                   ('list', []), ('wrong-date', dict(created=123))]:
+            directory = self.library.runs / identifier
+            directory.mkdir()
+            write_json(directory / 'library_record.json', record)
+        with self.assertLogs('data_library', level='WARNING'):
+            entries = self.library.entries()
+        self.assertEqual(entries[0]['id'], 'valid')
+        self.assertEqual(len(entries), 3)
+        self.assertEqual({r['status'] for r in entries[1:]}, {'inspect files'})
+        self.assertEqual(len(self.library.diagnostics), 2)
+
     def test_table_project_portable_without_upload(self):
         path = self.dispersive()
         expected = prepare(self.project['materials'], LAYERS, PATTERNS, [path], SETTINGS)
@@ -127,6 +193,17 @@ class LibraryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Unsafe'):
             other.import_bundle(bad)
         self.assertFalse((self.root / 'outside.txt').exists())
+
+    def test_invalid_run_metadata_bundle_rejected_before_merge(self):
+        directory = self.library.runs / 'invalid'
+        directory.mkdir()
+        write_json(directory / 'library_record.json', dict(created=123))
+        with self.assertLogs('data_library', level='WARNING'):
+            bundle = self.library.export()
+        other = DataLibrary(self.root / 'two')
+        with self.assertRaisesRegex(ValueError, 'created'):
+            other.import_bundle(bundle)
+        self.assertEqual(list(other.runs.iterdir()), [])
 
     def test_embedded_table_corruption_rejected(self):
         path = self.dispersive()

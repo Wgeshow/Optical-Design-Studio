@@ -3,13 +3,13 @@ import json
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
+from field_storage import load_field_frame
 
 
 def load_volume(directory):
     directory = Path(directory)
     metadata = json.loads((directory / 'field_model.json').read_text(encoding='utf-8'))
-    frame = pd.read_csv(directory / 'electric_fields.csv')
+    frame = load_field_frame(directory)
     frame = frame.loc[frame['plane'] == 'volume_samples'].copy()
     if frame.empty:
         raise ValueError('This snapshot has no volume samples. Calculate field maps first.')

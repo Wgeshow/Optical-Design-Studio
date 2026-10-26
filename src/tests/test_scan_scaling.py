@@ -193,7 +193,10 @@ class NativeStorageTests(unittest.TestCase):
                     fresh=Path(d)/f'fresh{i}';reused=Path(d)/f'reused{i}'
                     execute_fields(local,perf,settings,fresh)
                     session(local,perf,settings,reused)
-                    self.assertEqual((fresh/'electric_fields.csv').read_text(),(reused/'electric_fields.csv').read_text())
+                    from field_storage import load_field_arrays
+                    import numpy as np
+                    for key in ('xyz','E','H','plane','layer','material'):
+                        np.testing.assert_array_equal(load_field_arrays(fresh)[key],load_field_arrays(reused)[key])
             finally:session.close()
         self.assertEqual(mp.active_children(),[])
 

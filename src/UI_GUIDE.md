@@ -2,6 +2,10 @@
 
 For the Windows portable release, extract the complete ZIP and run **Optical Design Studio.exe**. For source, use `launch_qt_gui.cmd` on Windows or `bash launch_qt_gui.sh` after Linux setup. The ready-to-run portable release targets Windows x64; source runs need their documented native runtime and dependencies.
 
+At startup choose **Device Studio** for editable finite-device geometry, Optical/Electrical/Coupled setup, electrical materials and linked saved results, or **Original Optical Studio** for the original optical layer/region tables, S4 scans, Fields, saved work and searches. **Menu → Switch workspace…** keeps the applied project/settings and does not rerun calculations. Both workspaces belong to the same application/library.
+
+See [DEVICE_STUDIO_GUIDE.md](DEVICE_STUDIO_GUIDE.md) for the new 20-section setup, PC-area/cell distinction, contacts/doping, shaded previews, I–V/C–V model scope, presets and complete exports. Original S4/manual Fields compile the optical layer/region tables. An active PC area uses one PC-pitch cell with one air hole; other designs keep the original lattice. Canonical polygons/contact pads and arbitrary Device Studio crop settings are not added automatically. The original optical controls remain documented below.
+
 | Tab | Use it to |
 | --- | --- |
 | **Structure** | Assemble the shared layer stack, lattice, holes, and material regions |

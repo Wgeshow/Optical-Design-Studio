@@ -3,8 +3,11 @@ from pathlib import Path
 import hashlib
 import json
 import shutil
+import sys
 
 root=Path(__file__).resolve().parent
+sys.path.insert(0,str(root.parent))
+from field_storage import field_data_path, export_field_csv
 source=root.parent.parent/'ui_redesign_20261008'/'silicon-help-simulation'
 destination=root/'silicon-reference-run'
 provenance=json.loads((source/'provenance.json').read_text(encoding='utf-8'))
@@ -24,6 +27,13 @@ def copy(original,name):
     files.append(dict(file=name,source=str(original.resolve()),bytes=target.stat().st_size,
                       sha256=hashlib.sha256(target.read_bytes()).hexdigest()))
 
+
+def copy_fields(directory,name):
+    original=field_data_path(directory)
+    target=export_field_csv(directory,destination/name)
+    files.append(dict(file=name,source=str(original.resolve()),bytes=target.stat().st_size,
+                      sha256=hashlib.sha256(target.read_bytes()).hexdigest()))
+
 for name in ('provenance.json','scientific-validation.json','backend-events.json','run_and_capture.py'):
     copy(source/name,name)
 for name in provenance['images']+['actual-electric-field-maps.png','actual-spectrum-export.png']:
@@ -31,7 +41,8 @@ for name in provenance['images']+['actual-electric-field-maps.png','actual-spect
     copy(source/name,name)
 for name in ('results.csv','project.json','job.json','diagnostics.json','desktop_request.json','backend_stderr.txt'):
     copy(run/name,name)
-for name in ('electric_fields.csv','field_model.json','field_features.json','field_diagnostics.json','airhole_field_metrics.json'):
+copy_fields(field,'electric_fields.csv')
+for name in ('field_model.json','field_features.json','field_diagnostics.json','airhole_field_metrics.json'):
     if (field/name).is_file():copy(field/name,name)
 samples=json.loads((run/'fields'/'samples.json').read_text(encoding='utf-8'))
 copy(run/'fields'/'samples.json','field-samples-source.json')
@@ -40,7 +51,7 @@ for index,sample in enumerate(samples['samples'],1):
     directory=Path(sample['directory']).resolve()
     if not directory.is_relative_to(run):raise RuntimeError('Unexpected wavelength field source')
     name=f'all-wavelength-fields/sample-{index:06d}.csv'
-    copy(directory/'electric_fields.csv',name)
+    copy_fields(directory,name)
     portable_samples.append(dict(point_index=sample['point_index'],wavelength_nm=sample['wavelength_nm'],
         angle_deg=sample['angle_deg'],file=name))
 (destination/'field-samples.json').write_text(json.dumps(dict(status=samples['status'],settings=samples['settings'],samples=portable_samples),indent=2),encoding='utf-8')

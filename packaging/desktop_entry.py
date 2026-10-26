@@ -30,13 +30,17 @@ if __name__ == '__main__':
             report.with_suffix('.failure.txt').write_text(traceback.format_exc(), encoding='utf-8')
             raise
     if '--native-startup-test' in sys.argv:
+        import argparse
+        native_parser=argparse.ArgumentParser(add_help=False)
+        native_parser.add_argument('--workspace',choices=['device','original'],default='device')
+        native_options,_=native_parser.parse_known_args()
         report = Path(sys.argv[sys.argv.index('--native-startup-test') + 1]).resolve()
         report.parent.mkdir(parents=True, exist_ok=True)
         os.environ['QT_QPA_PLATFORM'] = 'windows'
         os.environ['S4_LIBRARY_ROOT'] = str(report.parent/'User Data')
         try:
             from installer_smoke import run_native_startup
-            raise SystemExit(run_native_startup(report))
+            raise SystemExit(run_native_startup(report,workspace=native_options.workspace))
         except Exception:
             report.with_suffix('.failure.txt').write_text(traceback.format_exc(), encoding='utf-8')
             raise

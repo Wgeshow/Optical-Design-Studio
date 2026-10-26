@@ -157,8 +157,8 @@ class NativeFieldDescriptorTests(unittest.TestCase):
             self.assertAlmostEqual(result['global_metrics']['mean_poynting']['z'],.5,places=7)
             self.assertAlmostEqual(result['global_metrics']['mean_poynting']['x'],0.,places=7)
             self.assertTrue(result['magnetic_fields_available'])
-            with (Path(directory)/'electric_fields.csv').open(newline='') as stream:
-                rows=list(csv.DictReader(stream))
+            from field_storage import load_field_frame
+            rows=load_field_frame(directory).to_dict('records')
             self.assertIn('Hy_imag',rows[0])
             self.assertAlmostEqual(float(rows[0]['Sz']),.5,places=7)
 

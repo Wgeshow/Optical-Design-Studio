@@ -1289,13 +1289,25 @@ static int S4L_Simulation_GetNumG(lua_State *L){
 	lua_pushinteger(L, Simulation_GetNumG(S, NULL));
 	return 1;
 }
+static void S4L_InvalidateOptions(S4_Simulation *S){
+	/* Frequency changes retain geometry/operator caches. An option change
+	 * must explicitly discard them, together with modes and solved fields. */
+	S4_Simulation_DestroyLayerModes(S, -1);
+	Simulation_DestroySolution(S);
+	Simulation_InvalidateFieldCache(S);
+}
+
 static int S4L_Simulation_SetResolution(lua_State *L){
+	int resolution;
 	S4_Simulation *S = S4L_get_simulation(L, 1);
 	luaL_argcheck(L, S != NULL, 1, "SetResolution: 'S4_Simulation' object expected.");
-	S->options.resolution = luaL_checkinteger(L, 2);
-	if(S->options.resolution < 2){
+	resolution = luaL_checkinteger(L, 2);
+	if(resolution < 2){
 		S4L_error(L, "SetResolution: Resolution must be at least 2.");
+		return 0;
 	}
+	S4L_InvalidateOptions(S);
+	S->options.resolution = resolution;
 	return 0;
 }
 static int S4L_Simulation_AddMaterial(lua_State *L){
@@ -2329,6 +2341,7 @@ static int S4L_Simulation_EnableBasisFieldDump(lua_State *L){
 static int S4L_Simulation_UseDiscretizedEpsilon(lua_State *L){
 	S4_Simulation *S = S4L_get_simulation(L, 1);
 	luaL_argcheck(L, S != NULL, 1, "UseDiscretizedEpsilon: 'S4_Simulation' object expected.");
+	S4L_InvalidateOptions(S);
 
 	if(lua_gettop(L) > 1){
 		S->options.use_discretized_epsilon = lua_toboolean(L, 2);
@@ -2340,6 +2353,7 @@ static int S4L_Simulation_UseDiscretizedEpsilon(lua_State *L){
 static int S4L_Simulation_UseSubpixelSmoothing(lua_State *L){
 	S4_Simulation *S = S4L_get_simulation(L, 1);
 	luaL_argcheck(L, S != NULL, 1, "UseSubpixelSmoothing: 'S4_Simulation' object expected.");
+	S4L_InvalidateOptions(S);
 
 	if(lua_gettop(L) > 1){
 		S->options.use_subpixel_smoothing = lua_toboolean(L, 2);
@@ -2351,6 +2365,7 @@ static int S4L_Simulation_UseSubpixelSmoothing(lua_State *L){
 static int S4L_Simulation_UseLanczosSmoothing(lua_State *L){
 	S4_Simulation *S = S4L_get_simulation(L, 1);
 	luaL_argcheck(L, S != NULL, 1, "UseLanczosSmoothing: 'S4_Simulation' object expected.");
+	S4L_InvalidateOptions(S);
 
 	if(lua_gettop(L) > 1){
 		S->options.use_Lanczos_smoothing = lua_toboolean(L, 2);
@@ -2371,6 +2386,7 @@ static int S4L_Simulation_SetLanczosSmoothingWidth(lua_State *L){
 
 	prevwidth = S->options.lanczos_smoothing_width;
 	prevpower = S->options.lanczos_smoothing_power;
+	S4L_InvalidateOptions(S);
 
 	if(lua_gettop(L) > 2){
 		S->options.lanczos_smoothing_width = width;
@@ -2387,6 +2403,7 @@ static int S4L_Simulation_SetLanczosSmoothingWidth(lua_State *L){
 static int S4L_Simulation_UsePolarizationDecomposition(lua_State *L){
 	S4_Simulation *S = S4L_get_simulation(L, 1);
 	luaL_argcheck(L, S != NULL, 1, "UsePolarizationDecomposition: 'S4_Simulation' object expected.");
+	S4L_InvalidateOptions(S);
 
 	if(lua_gettop(L) > 1){
 		S->options.use_polarization_basis = lua_toboolean(L, 2);
@@ -2398,6 +2415,7 @@ static int S4L_Simulation_UsePolarizationDecomposition(lua_State *L){
 static int S4L_Simulation_UseJonesVectorBasis(lua_State *L){
 	S4_Simulation *S = S4L_get_simulation(L, 1);
 	luaL_argcheck(L, S != NULL, 1, "UseJonesVectorBasis: 'S4_Simulation' object expected.");
+	S4L_InvalidateOptions(S);
 
 	if(lua_gettop(L) > 1){
 		S->options.use_jones_vector_basis = lua_toboolean(L, 2);
@@ -2409,6 +2427,7 @@ static int S4L_Simulation_UseJonesVectorBasis(lua_State *L){
 static int S4L_Simulation_UseNormalVectorBasis(lua_State *L){
 	S4_Simulation *S = S4L_get_simulation(L, 1);
 	luaL_argcheck(L, S != NULL, 1, "UseNormalVectorBasis: 'S4_Simulation' object expected.");
+	S4L_InvalidateOptions(S);
 
 	if(lua_gettop(L) > 1){
 		S->options.use_normal_vector_basis = lua_toboolean(L, 2);
@@ -2420,6 +2439,7 @@ static int S4L_Simulation_UseNormalVectorBasis(lua_State *L){
 static int S4L_Simulation_UseExperimentalFMM(lua_State *L){
 	S4_Simulation *S = S4L_get_simulation(L, 1);
 	luaL_argcheck(L, S != NULL, 1, "UseExperimentalFMM: 'S4_Simulation' object expected.");
+	S4L_InvalidateOptions(S);
 
 	if(lua_gettop(L) > 1){
 		S->options.use_experimental_fmm = lua_toboolean(L, 2);
@@ -2433,6 +2453,7 @@ static int S4L_Simulation_SetBasisFieldDumpPrefix(lua_State *L){
 	const char *prefix = NULL;
 	S4_Simulation *S = S4L_get_simulation(L, 1);
 	luaL_argcheck(L, S != NULL, 1, "SetBasisFieldDumpPrefix: 'S4_Simulation' object expected.");
+	S4L_InvalidateOptions(S);
 
 	if(lua_gettop(L) < 2 || LUA_TBOOLEAN == lua_type(L, 2)){
 		if(NULL != S->options.vector_field_dump_filename_prefix){
@@ -2455,6 +2476,7 @@ static int S4L_Simulation_SetLatticeTruncation(lua_State *L){
 	S4_Simulation *S = S4L_get_simulation(L, 1);
 	luaL_argcheck(L, S != NULL, 1, "SetLatticeTruncation: 'S4_Simulation' object expected.");
 	truncation_type = luaL_checklstring(L, 2, NULL);
+	S4L_InvalidateOptions(S);
 
 	if(0 == strcmp("Circular", truncation_type)){
 		S->options.lattice_truncation = 0;
@@ -2475,6 +2497,7 @@ static int S4L_Simulation_SetVerbosity(lua_State *L){
 
 	if(verbosity < 0){ verbosity = 0; }
 	if(verbosity > 9){ verbosity = 9; }
+	S4L_InvalidateOptions(S);
 	S->options.verbosity = verbosity;
 
 	return 0;
@@ -2483,6 +2506,7 @@ static int S4L_Simulation_SetVerbosity(lua_State *L){
 static int S4L_Simulation_UseLessMemory(lua_State *L){
 	S4_Simulation *S = S4L_get_simulation(L, 1);
 	luaL_argcheck(L, S != NULL, 1, "UseLessMemory: 'S4_Simulation' object expected.");
+	S4L_InvalidateOptions(S);
 
 	if(lua_gettop(L) > 1){
 		S->options.use_less_memory = lua_toboolean(L, 2);

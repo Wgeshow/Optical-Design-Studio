@@ -5,6 +5,7 @@ Physical area uses supplied pixel weights, including nonuniform depth spacing.
 Raw amplitudes remain separate and unchanged; every threshold is retained.
 """
 import math
+from functools import lru_cache
 import numpy as np
 
 def _regions_reference(mask,periodic_x=False,periodic_y=False):
@@ -117,9 +118,41 @@ def sweep(amplitude,step=.1,pixel_area=None,x=None,y=None,periodic_x=False,perio
                                 area_fraction=previous['area_fraction'],regions=stable_items))
             continue
         last_count=active_count;stable_items=None
-        labels,n=regions(a>=threshold,periodic_x,periodic_y);current=np.zeros_like(prev);items=[]
+        labels,n=regions(a>=threshold,periodic_x,periodic_y);items=[]
+        # Reduce all connected regions together, rather than scanning the full
+        # image once per region. Connectivity/lineage and lossless runs remain
+        # identical to the four-neighbor reference implementation.
+        jj,ii=np.nonzero(labels);ids=labels[jj,ii];w=area[jj,ii]
+        physicals=np.bincount(ids,weights=w,minlength=n+1)
+        pixels=np.bincount(ids,minlength=n+1)
+        xsum=np.bincount(ids,weights=w*xs[ii],minlength=n+1)
+        ysum=np.bincount(ids,weights=w*ys[jj],minlength=n+1)
+        asum=np.bincount(ids,weights=w*a[jj,ii],minlength=n+1)
+        xmin=np.full(n+1,np.inf);xmax=np.full(n+1,-np.inf)
+        ymin=np.full(n+1,np.inf);ymax=np.full(n+1,-np.inf);peak=np.zeros(n+1)
+        np.minimum.at(xmin,ids,xs[ii]);np.maximum.at(xmax,ids,xs[ii])
+        np.minimum.at(ymin,ids,ys[jj]);np.maximum.at(ymax,ids,ys[jj])
+        np.maximum.at(peak,ids,a[jj,ii])
+        parent_sets=[[] for _ in range(n+1)]
+        # Integer pairs avoid NumPy's much slower structured-row sort. The
+        # stride is fixed before any tracks are born at this threshold.
+        stride=next_id+1
+        pairs=np.unique(ids.astype(np.int64)*stride+prev[jj,ii])
+        for pair in pairs:
+            label,parent=divmod(int(pair),stride)
+            if parent:parent_sets[int(label)].append(int(parent))
+        padded=np.pad(labels,((0,0),(1,1)))
+        run_rows,run_starts=np.where((labels>0)&(padded[:,:-2]!=labels))
+        _,run_stops=np.where((labels>0)&(padded[:,2:]!=labels))
+        runs=[[] for _ in range(n+1)]
+        for row,start,stop,label in zip(run_rows,run_starts,run_stops,labels[run_rows,run_starts]):
+            runs[int(label)].append([int(row),int(start),int(stop-start+1)])
+        wraps_x=np.zeros(n+1,dtype=bool);wraps_y=np.zeros(n+1,dtype=bool)
+        if periodic_x:wraps_x[np.intersect1d(labels[:,0],labels[:,-1])]=True
+        if periodic_y:wraps_y[np.intersect1d(labels[0,:],labels[-1,:])]=True
+        current_ids=np.zeros(n+1,dtype=np.int32)
         for label in range(1,n+1):
-            mask=labels==label;parents=sorted(int(k) for k in np.unique(prev[mask]) if k)
+            parents=parent_sets[label]
             if len(parents)==1:track_id=parents[0]
             else:
                 next_id+=1;track_id=next_id
@@ -127,24 +160,15 @@ def sweep(amplitude,step=.1,pixel_area=None,x=None,y=None,periodic_x=False,perio
                 births+=int(not parents);merges+=int(bool(parents))
                 tracks[track_id]=dict(id=track_id,event=event,parents=parents,birth_level=float(threshold),last_level=float(threshold))
                 for p in parents:tracks[p]['merged_at']=float(threshold);tracks[p]['merged_into']=track_id
-            current[mask]=track_id;tracks[track_id]['last_level']=float(threshold)
-            jj,ii=np.where(mask);w=area[mask];physical=float(w.sum());
-            # Pixel-center extents and centroid; seam-spanning periodic regions explicitly flagged.
-            wrap_x=bool(periodic_x and np.any(mask[:,0]) and np.any(mask[:,-1]));wrap_y=bool(periodic_y and np.any(mask[0,:]) and np.any(mask[-1,:]))
-            # Lossless row runs preserve each pixel-defined shape at every level.
-            runs=[]
-            row_mask=np.zeros(nx+2,dtype=np.int8)
-            for row in np.unique(jj):
-                row_mask[1:-1]=mask[row]
-                change=np.diff(row_mask)
-                for start,stop in zip(np.where(change==1)[0],np.where(change==-1)[0]):
-                    runs.append([int(row),int(start),int(stop-start)])
+            current_ids[label]=track_id;tracks[track_id]['last_level']=float(threshold)
+            physical=float(physicals[label])
             items.append(dict(id=track_id,parents=parents,area=physical,area_fraction=physical/total_area,
-                centroid_x=float(np.average(xs[ii],weights=w)),centroid_y=float(np.average(ys[jj],weights=w)),
-                xmin=float(xs[ii].min()),xmax=float(xs[ii].max()),ymin=float(ys[jj].min()),ymax=float(ys[jj].max()),
-                pixel_runs=runs,peak=float(a[mask].max()),mean=float(np.average(a[mask],weights=w)),pixels=int(mask.sum()),wrap_x=wrap_x,wrap_y=wrap_y))
+                centroid_x=float(xsum[label]/physical),centroid_y=float(ysum[label]/physical),
+                xmin=float(xmin[label]),xmax=float(xmax[label]),ymin=float(ymin[label]),ymax=float(ymax[label]),
+                pixel_runs=runs[label],peak=float(peak[label]),mean=float(asum[label]/physical),
+                pixels=int(pixels[label]),wrap_x=bool(wraps_x[label]),wrap_y=bool(wraps_y[label])))
         records.append(dict(level=float(threshold),region_count=n,area_fraction=float(area[labels>0].sum()/total_area),regions=items))
-        prev=current
+        prev=current_ids[labels]
     for t in tracks.values():t['persistence']=t['birth_level']-t.get('merged_at',minimum)
     return dict(schema_version=1,step=float(step),minimum=minimum,maximum=maximum,negligible=False,
                 connectivity='four-neighbor',periodic_x=bool(periodic_x),periodic_y=bool(periodic_y),
@@ -163,48 +187,77 @@ def feature_values(result,prefix='contour_v1.'):
     return out
 
 
+@lru_cache(maxsize=32)
+def _shape_moments(ny,nx):
+    # Only one coordinate axis is needed for separable circular moments.
+    return {(axis,harmonic):np.exp(2j*np.pi*harmonic*(np.arange(size)+.5)/size)
+            for axis,size in [('x',nx),('y',ny)] for harmonic in (1,2)}
+
+
 def shape_features(result, amplitude, prefix):
     """Bounded spatial signatures preserve weak regions alongside absolute sweeps."""
     out=feature_values(result,prefix)
     a=np.asarray(amplitude,float);ny,nx=a.shape
-    yy,xx=np.meshgrid((np.arange(ny)+.5)/ny,(np.arange(nx)+.5)/nx,indexing='ij')
     # Keep both level-set occupancy and periodic spatial moments. No maximum-only image.
     levels=np.r_[np.arange(17)*result['step'],np.linspace(0,result['maximum'],17)]
-    moments={(axis,harmonic):np.exp(2j*np.pi*harmonic*coords)
-             for axis,coords in [('x',xx),('y',yy)] for harmonic in (1,2)}
+    moments=_shape_moments(ny,nx)
+    # Occupancy masks are reduced to one-dimensional marginals before the
+    # Fourier moments, eliminating repeated complex full-image temporaries.
     for k,level in enumerate(levels):
         mask=a>=level;out[prefix+'shape.'+str(k)+'.area']=float(mask.mean())
-        for axis,coords in [('x',xx),('y',yy)]:
+        for axis,marginal in [('x',mask.sum(axis=0)),('y',mask.sum(axis=1))]:
             for harmonic in (1,2):
-                z=np.mean(mask*moments[axis,harmonic])
+                z=np.sum(marginal*moments[axis,harmonic])/(nx*ny)
                 out[prefix+'shape.'+str(k)+'.'+axis+str(harmonic)+'.cos']=float(z.real)
                 out[prefix+'shape.'+str(k)+'.'+axis+str(harmonic)+'.sin']=float(z.imag)
     return out
 
 
 def describe_csv(directory, step=.1):
-    """Track actual saved XY slices and XZ sections without interpolating depth."""
-    import csv,json
+    """Compatibility entry point for binary arrays and legacy CSV field records."""
+    from field_storage import load_field_arrays
+    return describe_arrays(directory, load_field_arrays(directory), step)
+
+
+def describe_arrays(directory, arrays, step=.1):
+    """Track complete XY slices and XZ sections directly from complex arrays.
+
+    Sample ordering, row-major contour IDs and per-layer pixel areas match the
+    legacy CSV descriptor; no interpolation or threshold omission is applied.
+    """
+    import json
     from pathlib import Path
     directory=Path(directory);groups={}
-    with (directory/'electric_fields.csv').open(encoding='utf-8-sig',newline='') as stream:
-        for r in csv.DictReader(stream):
-            plane=r['plane']
-            if plane not in ('volume_samples','xz'):continue
-            key=(plane,r['layer'],float(r['z_um']) if plane=='volume_samples' else None)
-            groups.setdefault(key,[]).append(r)
-            if plane=='xz':groups.setdefault(('xz','__stack__',None),[]).append(r)
+    xyz=np.asarray(arrays['xyz'],dtype=float);electric=np.asarray(arrays['E'],dtype=complex)
+    planes=np.asarray(arrays['plane']);layer_ids=np.asarray(arrays['layer'],dtype=np.intp)
+    layer_names=list(map(str,arrays['layer_names']))
+    for layer_id in np.unique(layer_ids[(planes==0)|(planes==2)]):
+        if layer_id<0 or layer_id>=len(layer_names):raise ValueError('Unexpected contour layer')
+        name=layer_names[layer_id]
+        indices=np.flatnonzero((planes==0)&(layer_ids==layer_id))
+        if len(indices):
+            zs,inverse=np.unique(xyz[indices,2],return_inverse=True)
+            ordered=np.argsort(inverse,kind='stable')
+            offsets=np.r_[0,np.cumsum(np.bincount(inverse))]
+            for i,z in enumerate(zs):
+                groups['volume_samples',name,float(z)]=indices[ordered[offsets[i]:offsets[i+1]]]
+        indices=np.flatnonzero((planes==2)&(layer_ids==layer_id))
+        if len(indices):groups['xz',name,None]=indices
+    indices=np.flatnonzero(planes==2)
+    if len(indices):groups['xz','__stack__',None]=indices
     saved=json.loads((directory/'field_model.json').read_text(encoding='utf-8'))
     model=saved['model'];grid=saved.get('settings',{}).get('grid',8)
     result={'schema_version':1,'step':step,'grid':grid,'views':{},'features':{}}
     layers=[l['name'] for l in model['layers'][1:-1] if l['thickness']>0]
     slices={}
-    for (plane,layer,z),rows in sorted(groups.items()):
-        xs=sorted({float(r['x_um']) for r in rows});ys=sorted({float(r['y_um'] if plane=='volume_samples' else r['z_um']) for r in rows})
-        if len(rows)!=len(xs)*len(ys):raise ValueError('Incomplete contour map')
-        e=np.zeros((len(ys),len(xs),3),complex);xi={v:i for i,v in enumerate(xs)};yi={v:i for i,v in enumerate(ys)}
-        for r in rows:
-            e[yi[float(r['y_um'] if plane=='volume_samples' else r['z_um'])],xi[float(r['x_um'])]]=[complex(float(r[c+'_real']),float(r[c+'_imag'])) for c in ('Ex','Ey','Ez')]
+    for (plane,layer,z),indices in sorted(groups.items()):
+        xs,xi=np.unique(xyz[indices,0],return_inverse=True)
+        ys,yi=np.unique(xyz[indices,1 if plane=='volume_samples' else 2],return_inverse=True)
+        cells=yi*len(xs)+xi
+        if len(indices)!=len(xs)*len(ys) or len(np.unique(cells))!=len(indices):raise ValueError('Incomplete contour map')
+        e=np.empty((len(ys)*len(xs),3),complex)
+        e[cells]=electric[indices]
+        e=e.reshape(len(ys),len(xs),3)
         index=slices.get(layer,0)
         if plane=='volume_samples':slices[layer]=index+1
         name='stack.xz' if layer=='__stack__' else 'layer'+str(layers.index(layer))+'.'+('xy'+str(index) if plane=='volume_samples' else 'xz')
@@ -212,9 +265,11 @@ def describe_csv(directory, step=.1):
         dx=model['ax']/len(xs)
         if layer=='__stack__':
             thickness={l['name']:l['thickness'] for l in model['layers']}
-            depth_count={n:len({float(r['z_um']) for r in rows if r['layer']==n}) for n in layers}
-            row_layer={float(r['z_um']):r['layer'] for r in rows}
-            dy=np.array([thickness[row_layer[z]]/depth_count[row_layer[z]] for z in ys])[:,None]
+            row_layers=np.empty(len(ys),dtype=np.intp)
+            row_layers[yi]=layer_ids[indices]
+            depth_count=np.bincount(row_layers,minlength=len(layer_names))
+            widths=np.array([thickness[n] for n in layer_names],dtype=float)
+            dy=(widths[row_layers]/depth_count[row_layers])[:,None]
         else:
             dy=model['ay']/len(ys) if plane=='volume_samples' else next(l['thickness'] for l in model['layers'] if l['name']==layer)/len(ys)
         for i,c in enumerate(('Ex','Ey','Ez','total')):

@@ -30,7 +30,7 @@ def frost_texture(mode, text_color, alpha):
 
 
 class WorkspacePanel(QFrame):
-    """B uses a solid surface; glass uses translucent gradients and edge light."""
+    """One translucent neutral surface, with crisp controls painted above it."""
     def __init__(self,parent=None):
         super().__init__(parent)
         self.setObjectName('builderPanel')
@@ -44,34 +44,33 @@ class WorkspacePanel(QFrame):
         rectangle=QRectF(self.rect()).adjusted(.7,.7,-.7,-.7)
         gradient=QLinearGradient(rectangle.topLeft(),rectangle.bottomRight())
         glass=manager.style=='glass'
-        upper=QColor(blend_color(c['panel'],c['text'],.015));upper.setAlpha(clamp_alpha(manager.glass_opacity*1.84) if glass else 255)
-        lower=QColor(c['panel']);lower.setAlpha(clamp_alpha((manager.glass_opacity-18)*1.75) if glass else 255)
+        upper=QColor(c['panel'] if glass else blend_color(c['panel'],c['text'],.015));upper.setAlpha(clamp_alpha(manager.glass_opacity*2.55) if glass else 255)
+        lower=QColor(c['panel']);lower.setAlpha(upper.alpha())
         gradient.setColorAt(0,upper);gradient.setColorAt(1,lower)
-        painter.setBrush(gradient);painter.setPen(QPen(QColor(c['border']),1))
-        painter.drawRoundedRect(rectangle,10,10)
+        edge=QColor(c['border']);edge.setAlpha(55 if glass else 255)
+        painter.setBrush(gradient);painter.setPen(QPen(edge,1))
+        radius=10 if glass else 4
+        painter.drawRoundedRect(rectangle,radius,radius)
         if glass:
-            # The compositor blurs windows behind the app. This subtle grain
-            # stays beneath child controls so text and input fields stay crisp.
+            # Edge light gives the clear surface depth without a second tint
+            # layer or grain obscuring the underlying desktop.
             from PyQt6.QtGui import QPainterPath
             clip=QPainterPath();clip.addRoundedRect(rectangle,10,10)
             painter.save();painter.setClipPath(clip)
             sheen=QLinearGradient(rectangle.topLeft(),rectangle.bottomLeft())
             detail_scale=min(1,manager.glass_opacity/65)
-            white=QColor(c['text']);white.setAlpha(clamp_alpha((13 if manager.mode=='dark' else 42)*detail_scale))
+            white=QColor('#ffffff');white.setAlpha(clamp_alpha(8*detail_scale))
             sheen.setColorAt(0,white);white.setAlpha(0);sheen.setColorAt(.55,white)
             painter.fillRect(rectangle,sheen)
-            grain_alpha=clamp_alpha((3 if manager.mode=='dark' else 6)*detail_scale)
-            if grain_alpha:
-                painter.fillRect(rectangle,QBrush(frost_texture(manager.mode,c['text'],grain_alpha)))
             painter.restore()
-        highlight=QColor(c['text']);highlight.setAlpha((42 if manager.mode=='dark' else 80) if glass else 12)
+        highlight=QColor('#ffffff' if glass else c['text']);highlight.setAlpha(40 if glass else 12)
         painter.setBrush(QColor(0,0,0,0));painter.setPen(QPen(highlight,.7))
-        painter.drawRoundedRect(rectangle.adjusted(1,1,-1,-1),9,9)
+        painter.drawRoundedRect(rectangle.adjusted(1,1,-1,-1),max(2,radius-1),max(2,radius-1))
         painter.end()
 
 
 class WorkspaceBackground(QWidget):
-    """One root tint; nested glass workspaces remain completely transparent."""
+    """Clear native root; nested glass workspaces remain transparent."""
     def __init__(self,parent=None, *, desktop_root=False):
         super().__init__(parent)
         self.desktop_root=desktop_root
@@ -83,23 +82,16 @@ class WorkspaceBackground(QWidget):
         if theme_manager().style=='glass':
             if self.desktop_root:
                 adapter=getattr(self.window(),'_desktop_glass',None)
-                if adapter is not None and adapter.active:
+                if adapter is not None and (adapter.active or getattr(adapter, 'alpha_active', False)):
                     # A previous opaque B/fallback frame can remain in Qt's
                     # raster buffer. Replace its alpha instead of tinting over
                     # old pixels when switching into desktop glass.
                     painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
-                    painter.fillRect(self.rect(),Qt.GlobalColor.transparent)
-                    manager=theme_manager()
-                    tint=QColor(COLORS[manager.mode]['bg'])
-                    # Panel opacity also adjusts the main desktop tint, without
-                    # fading labels or controls through whole-window opacity.
-                    opacity=manager.glass_opacity
-                    # Preserve the existing tint above 65%, then fade smoothly
-                    # to a genuinely clear workspace at the new zero endpoint.
-                    tint.setAlpha(clamp_alpha(20*opacity/65 if opacity<65 else 20+(opacity-65)*1.4))
-                    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-                    painter.setPen(Qt.PenStyle.NoPen);painter.setBrush(tint)
-                    painter.drawRoundedRect(QRectF(self.rect()),16,16)
+                    tint=QColor(COLORS[theme_manager().mode]['bg'])
+                    tint.setAlpha(96 if theme_manager().mode=='dark' else 112)
+                    painter.fillRect(self.rect(),tint)
+                    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
+                    painter.fillRect(self.rect(),QBrush(frost_texture(theme_manager().mode,COLORS[theme_manager().mode]['text'],5)))
                 else:
                     # Offscreen captures and unsupported desktops cannot show
                     # a compositor backdrop. Keep their preview readable.

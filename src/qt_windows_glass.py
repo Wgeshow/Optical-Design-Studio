@@ -1,19 +1,14 @@
-"""Desktop Acrylic for the Windows Qt raster window, preserving custom chrome.
+"""Frosted desktop Acrylic for the Windows Qt raster window and custom chrome.
 
 Prepare the widget before ``winId()`` (and therefore WindowsCustomFrame), then
 construct WindowsDesktopGlass after WindowsCustomFrame and call apply for each
 appearance change. The alpha channel stays allocated for the window lifetime;
 ordinary themes paint it opaque. No whole-window opacity is used.
 
-The documented Windows 11 backdrop API supplies real blur of other windows.
-Qt's raster backing store initially uses WS_EX_LAYERED, which prevents this
-backdrop from appearing. Clearing that flag before the DWM request lets DWM
-compose the material; Qt may restore the flag on its next alpha-buffer flush.
-Keep the caption/resize styles and FramelessWindowHint owned by custom chrome.
-Maximized/fullscreen windows use the theme's opaque workspace fallback: Qt
-reallocates its layered alpha buffer during these transitions, and removing
-WS_EX_LAYERED at that point can leave DWM displaying a blank client surface.
-Restoring the window enables Desktop Acrylic again.
+Windows draws the blurred Acrylic backdrop beneath tinted Qt surfaces. Keep
+WS_EX_LAYERED under Qt's ownership in every state: Qt reallocates its alpha
+buffer during maximize/restore and native flag mutation can blank the client.
+The caption/resize styles and FramelessWindowHint remain owned by custom chrome.
 
 References:
 https://doc.qt.io/qt-6/qwidget.html#creating-translucent-windows
@@ -51,14 +46,21 @@ class _Margins(ctypes.Structure):
     _fields_ = [(name, ctypes.c_int) for name in ('left', 'right', 'top', 'bottom')]
 
 
-class WindowsDesktopGlass(QObject):
-    """Apply the supported compositor material after Qt finishes showing.
+class _AccentPolicy(ctypes.Structure):
+    _fields_=[('state',ctypes.c_int),('flags',ctypes.c_int),('color',wintypes.DWORD),('animation',ctypes.c_int)]
 
-    ``active`` means the native Desktop Acrylic request was accepted. Windows
-    itself can substitute an opaque material for accessibility, power, remote
-    session or transparency preferences; this flag is not visual proof. The
-    module never changes those preferences. Unsupported hosts retain Qt alpha
-    transparency so the caller can paint an honest fallback.
+
+class _CompositionAttribute(ctypes.Structure):
+    _fields_=[('attribute',ctypes.c_int),('data',ctypes.c_void_p),('size',ctypes.c_size_t)]
+
+
+class WindowsDesktopGlass(QObject):
+    """Configure clear composition after Qt finishes showing.
+
+    ``active`` records accepted normal-window compositor configuration;
+    ``alpha_active`` also covers maximized/fullscreen Qt alpha painting.
+    Neither flag alone is visual proof. Unsupported hosts paint an opaque
+    fallback, and no system transparency preference is changed.
     """
     changed = pyqtSignal()
 
@@ -66,14 +68,17 @@ class WindowsDesktopGlass(QObject):
         super().__init__(window)
         self.window = window
         self.active = False
+        self.alpha_active = False
+        self._composition_available = False
         self.enabled = False
         self.mode = 'dark'
         self.supported = False
-        self.reason = 'Desktop Acrylic requires Windows 11 build 22621 or later.'
+        self.reason = 'Desktop glass requires Windows 11 build 22621 or later.'
         self.last_hresult = {}
         self.hwnd = 0
         self._old_proc = None
         self._callback = None
+        self._native_configuration = None
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._apply_native)
@@ -105,10 +110,14 @@ class WindowsDesktopGlass(QObject):
             self.dwm.DwmExtendFrameIntoClientArea.restype = ctypes.c_long
             self.dwm.DwmIsCompositionEnabled.argtypes = [ctypes.POINTER(wintypes.BOOL)]
             self.dwm.DwmIsCompositionEnabled.restype = ctypes.c_long
+            self._accent_api=getattr(self.user,'SetWindowCompositionAttribute',None)
+            if self._accent_api is not None:
+                self._accent_api.argtypes=[wintypes.HWND,ctypes.POINTER(_CompositionAttribute)]
+                self._accent_api.restype=wintypes.BOOL
             self.supported = True
-            self.reason = 'Desktop Acrylic is available.'
+            self.reason = 'Frosted desktop Acrylic is available.'
         except (OSError, AttributeError):
-            self.reason = 'Windows DWM backdrop functions are unavailable.'
+            self.reason = 'Windows desktop compositor functions are unavailable.'
 
     def apply(self, enabled=False, mode='dark'):
         """Select the desired look; applying after Show avoids Qt resetting it."""
@@ -125,15 +134,32 @@ class WindowsDesktopGlass(QObject):
         return self.supported and self.enabled
 
     def _use_native_glass(self):
-        """Avoid changing the layered alpha contract on a maximized surface."""
-        return self.enabled and not (self.window.isMaximized() or self.window.isFullScreen())
+        """Acrylic uses the same compositor configuration in every state."""
+        return self.enabled
 
     def _sync_suspension(self):
-        suspended = self.enabled and not self._use_native_glass()
+        suspended = False
         self.window.setProperty('desktopGlassSuspended', suspended)
         if suspended:
             self._set_active(False)
+        self._sync_alpha()
         return suspended
+
+    def _sync_alpha(self):
+        """Transparent painting and native Acrylic are separate capabilities.
+
+        Qt's enlarged layered backing store retains per-pixel alpha.
+        Never fade the whole window: labels and controls retain their pixels.
+        """
+        alpha = self.supported and self.enabled and self._composition_available and self.active
+        if self.alpha_active != alpha:
+            self.alpha_active = alpha
+            self.window.setProperty('desktopGlassAlphaActive', alpha)
+            self.changed.emit()
+            self.window.update()
+            central = getattr(self.window, 'centralWidget', lambda: None)()
+            if central is not None:
+                central.update()
 
     def _set_active(self, active):
         active = bool(active)
@@ -141,6 +167,7 @@ class WindowsDesktopGlass(QObject):
             self.active = active
             self.window.setProperty('desktopGlassActive', active)
             self.changed.emit()
+        self._sync_alpha()
         self.window.update()
         central = getattr(self.window, 'centralWidget', lambda: None)()
         if central is not None:
@@ -168,6 +195,7 @@ class WindowsDesktopGlass(QObject):
             elif message in (0x0320, 0x031A, 0x001A):
                 # WM_DWMCOMPOSITIONCHANGED, WM_THEMECHANGED, WM_SETTINGCHANGE.
                 try:
+                    if message == 0x0320:self._native_configuration=None
                     self._timer.start(50)
                 except RuntimeError:
                     pass
@@ -185,63 +213,65 @@ class WindowsDesktopGlass(QObject):
             self._install_native_notifications(hwnd)
             composition = wintypes.BOOL()
             composition_hr = self.dwm.DwmIsCompositionEnabled(ctypes.byref(composition))
+            self._composition_available = composition_hr == 0 and bool(composition.value)
+            self._sync_alpha()
             if composition_hr != 0 or not composition.value:
-                self.reason = 'Desktop composition is currently unavailable; Qt alpha fallback is active.'
+                self._native_configuration=None
+                self.reason = 'Desktop composition is unavailable; opaque fallback is active.'
                 self._set_active(False)
                 return
             use_glass = self._use_native_glass()
-            if use_glass:
-                exstyle = self.user.GetWindowLongW(hwnd, -20)
-                if exstyle & 0x00080000:  # WS_EX_LAYERED, never WS_EX_TRANSPARENT.
-                    self.user.SetWindowLongW(hwnd, -20, exstyle & ~0x00080000)
-                margins = _Margins(-1, -1, -1, -1)
-            else:
-                margins = _Margins(0, 0, 0, 0)
+            configuration=(hwnd,use_glass,self.mode)
+            if self._native_configuration==configuration:
+                return
+            # Qt owns its layered backing store in every window state.
+            accent_api=getattr(self,'_accent_api',None)
+            margins = _Margins(*((-1,-1,-1,-1) if use_glass else (0,0,0,0)))
             dark = wintypes.BOOL(self.mode == 'dark')
-            backdrop = ctypes.c_int(3 if use_glass else 1)  # TRANSIENTWINDOW / NONE.
+            backdrop = ctypes.c_int(3 if use_glass and accent_api is None else 1)
             self.last_hresult = {
                 'composition': int(composition_hr),
                 'dark_mode': int(self.dwm.DwmSetWindowAttribute(hwnd, 20, ctypes.byref(dark), ctypes.sizeof(dark))),
                 'extend_frame': int(self.dwm.DwmExtendFrameIntoClientArea(hwnd, ctypes.byref(margins))),
                 'system_backdrop': int(self.dwm.DwmSetWindowAttribute(hwnd, 38, ctypes.byref(backdrop), ctypes.sizeof(backdrop))),
             }
+            if accent_api is not None:
+                # Qt owns a layered raster HWND. Its Acrylic accent supplies
+                # live blur; DWMWA_SYSTEMBACKDROP alone may paint an opaque
+                # fallback on that HWND. Never change its layered style.
+                tint=0x46191614 if self.mode=='dark' else 0x50F6F4F3
+                accent=_AccentPolicy(4 if use_glass else 0,0,tint,0)
+                attribute=_CompositionAttribute(19,ctypes.cast(ctypes.pointer(accent),ctypes.c_void_p),ctypes.sizeof(accent))
+                self.last_hresult['acrylic_accent']=0 if accent_api(hwnd,ctypes.byref(attribute)) else -1
             # The frame adapter keeps WS_CAPTION/WS_THICKFRAME, so Windows can
             # retain its rounded outer HWND and native resize/Snap contract.
             corner = ctypes.c_int(2)  # DWMWCP_ROUND.
             self.last_hresult['rounded_corner'] = int(self.dwm.DwmSetWindowAttribute(
                 hwnd, 33, ctypes.byref(corner), ctypes.sizeof(corner)))
-            accepted = self.last_hresult['extend_frame'] == 0 and self.last_hresult['system_backdrop'] == 0
-            self.reason = ('Maximized/fullscreen window uses an opaque workspace to preserve Qt painting.'
-                           if suspended else
-                           'Desktop Acrylic requested successfully; Windows controls material fallback.'
+            accepted = self.last_hresult['extend_frame'] == 0 and self.last_hresult['system_backdrop'] == 0 and self.last_hresult.get('acrylic_accent',0)==0
+            self._native_configuration=configuration if accepted else None
+            self.reason = ('Frosted desktop Acrylic is configured.'
                            if accepted and use_glass else
-                           'Desktop Acrylic is disabled.' if not self.enabled else
-                           'Windows rejected Desktop Acrylic; Qt alpha fallback is active.')
+                           'Desktop glass is disabled.' if not self.enabled else
+                           'Windows rejected Acrylic configuration; opaque fallback is active.')
             self._set_active(accepted and use_glass)
         except (OSError, RuntimeError, ValueError) as error:
-            self.reason = 'Desktop Acrylic could not be applied: ' + str(error)
+            self._composition_available = False
+            self._native_configuration=None
+            self.reason = 'Frosted desktop Acrylic could not be applied: ' + str(error)
             self._set_active(False)
 
     def eventFilter(self, watched, event):
         if watched is self.window:
             if event.type() == QEvent.Type.WindowStateChange:
-                # Switch the root paint to opaque before the enlarged raster
-                # buffer's first flush. Keep Qt's layered flag intact, and
-                # retire/re-enable the DWM backdrop once state processing ends.
+                # Resizing/maximizing does not change HWND backdrop attributes.
+                # Avoid reentering DWM during Qt's backing-store transition.
                 self._sync_suspension()
-                if self.supported:
-                    self._timer.start(0)
             elif not self.supported:
                 return super().eventFilter(watched, event)
             elif event.type() == QEvent.Type.Show:
                 self._timer.start(0)
             elif event.type() == QEvent.Type.WinIdChange:
+                self._native_configuration=None
                 self._timer.start(50)
-            elif event.type() == QEvent.Type.Resize and self.enabled:
-                # Reapply after Qt recreates/reallocates its raster backing store.
-                if self._use_native_glass():
-                    self._timer.start(75)
-                else:
-                    self._set_active(False)
-                    self._timer.start(0)
         return super().eventFilter(watched, event)

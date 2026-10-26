@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from data_library import read_json, write_json
+from field_storage import load_field_frame
 from model import MAT_COLS
 from peak_optimizer import BOUND_COLS
 from peak_search_ui import ALL_KEYS, ALL_DEFAULTS
@@ -48,6 +49,7 @@ def csv_choices(filenames):
                 'design_results.csv': 'Optimization results · all designs',
                 'target_results.csv': 'Target search · ranked designs',
                 'electric_fields.csv': 'Electric & magnetic field samples',
+                'electric_fields.npz': 'Electric & magnetic field samples',
                 'field_training.csv': 'Field measurements used by machine learning',
                 'field_comparison_metrics.csv': 'Field comparison measurements',
                 'design_conditions.csv': 'Complete design conditions'}
@@ -163,7 +165,7 @@ def build_library_ui(library, source_root, compute_lock, load_project, structure
         directory = library.directory(identifier)
         record = read_json(directory / 'library_record.json')
         files = [p.relative_to(directory).as_posix() for p in sorted(directory.rglob('*'), key=natural_key) if p.is_file() and not p.is_symlink()]
-        csvs = [name for name in files if name.endswith('.csv')]
+        csvs = [name for name in files if name.endswith('.csv') or Path(name).name == 'electric_fields.npz']
         preferred = next((name for name in ('target_results.csv', 'design_results.csv', 'results.csv', 'best_spectrum.csv') if name in csvs), csvs[0] if csvs else None)
         details = dict(record=record, files=files)
         for name in ('search_summary.json', 'diagnostics.json'):
@@ -188,9 +190,9 @@ def build_library_ui(library, source_root, compute_lock, load_project, structure
             return pd.DataFrame(), None, None
         directory = library.directory(identifier)
         path = (directory / filename).resolve()
-        if not path.is_relative_to(directory) or path.suffix != '.csv' or not path.is_file():
-            raise gr.Error('Choose a CSV from this saved entry')
-        df = pd.read_csv(path, nrows=5000)
+        if not path.is_relative_to(directory) or not (path.suffix == '.csv' or path.name == 'electric_fields.npz') or not path.is_file():
+            raise gr.Error('Choose a data file from this saved entry')
+        df = load_field_frame(path.parent).iloc[:5000] if path.name == 'electric_fields.npz' else pd.read_csv(path, nrows=5000)
         fig = None
         x = 'wavelength_nm' if 'wavelength_nm' in df else None
         if 'angle_deg' in df and df.angle_deg.nunique() > 1 and (not x or df[x].nunique() <= 1):
@@ -298,7 +300,7 @@ def build_library_ui(library, source_root, compute_lock, load_project, structure
         with gr.Accordion('View numeric results', open=False):
             table = gr.Dataframe(interactive=False, label='Result preview · first 5,000 rows', max_height=420)
         with gr.Row():
-            download = gr.File(label='Download complete result CSV', interactive=False)
+            download = gr.File(label='Download complete result data', interactive=False)
             export_one = gr.Button('Download this saved run as ZIP')
         one_bundle = gr.File(label='Saved run ZIP · includes its data and materials', interactive=False)
         with gr.Accordion('Back up, share or import a library', open=False):

@@ -25,6 +25,7 @@
 #include <cstring>
 #include <float.h>
 #include "rcwa.h"
+#include "structural_solve.h"
 #include "fmm/fft_iface.h"
 #include <TBLAS.h>
 #ifdef HAVE_BLAS
@@ -45,6 +46,7 @@
 # include <IO.h>
 #endif
 #include <cstdio>
+#include "mirror_symmetry.h"
 
 #include <numalloc.h>
 
@@ -202,6 +204,13 @@ static int Invert(size_t n, std::complex<double> *a, size_t lda, std::complex<do
 }
 
 static void Mult(size_t n, const double &alpha, const std::complex<double> *a, size_t lda, std::complex<double> *b, size_t ldb, const double &beta, std::complex<double> *c, size_t ldc){
+#ifdef HAVE_S4_ACCEL
+	// Optional scattering dispatch: thresholds and the per-worker GPU flag
+	// remain enforced by S4Accel, including CPU fallback. Default is unchanged.
+	const char *gpu_scattering = std::getenv("S4_GPU_SCATTERING_GEMM");
+	if(gpu_scattering && 0 == std::strcmp(gpu_scattering,"1") &&
+		S4Accel::Gemm('N','N',n,n,n,alpha,a,lda,b,ldb,beta,c,ldc)){ return; }
+#endif
 	zgemm_("N","N", n, n, n, alpha, a, lda, b, ldb, beta, c, ldc);
 }
 static void Mult(size_t n, size_t m, const double &alpha, const std::complex<double> *a, size_t lda, std::complex<double> *b, const double &beta, std::complex<double> *c){
@@ -694,9 +703,11 @@ void SolveLayerEigensystem(
 	std::complex<double> *phi, // size (2*glist.n)^2
 	std::complex<double> *work_,
 	double *rwork_,
-	size_t lwork
+	size_t lwork,
+	const int *mirror_g
 ){
 	const size_t n2 = 2*n;
+	const bool try_mirror = mirror_g && S4Mirror::Enabled();
 	
 #ifdef HAVE_LAPACK
 	bool isreal = (n > 10);
@@ -716,7 +727,7 @@ void SolveLayerEigensystem(
 			}
 		}
 	}
-	if(isreal && 0 == omega.imag() && EPSILON2_TYPE_FULL == epstype){
+	if(!try_mirror && isreal && 0 == omega.imag() && EPSILON2_TYPE_FULL == epstype){
 		SolveLayerEigensystem_real(
 			omega.real(), n, kx, ky, Epsilon_inv, Epsilon2,
 			q, kp, phi, work_, rwork_, lwork
@@ -824,7 +835,11 @@ void SolveLayerEigensystem(
 	RNP::TBLAS::CopyMatrix<'A'>(n2,n2, op,n2, op_save,n2);
 # endif
 #endif
-	int info = RNP::Eigensystem(n2, op, n2, q, NULL, 1, phi, n2, eigenwork, rwork, eigenlwork);
+	S4Mirror::Basis mirror_basis;
+	const bool used_mirror = try_mirror && mirror_basis.Build(n,mirror_g,kx,ky)
+		&& S4Mirror::Eigensystem(mirror_basis,op,q,phi);
+	if(try_mirror) S4Mirror::Diagnostic(used_mirror ? "eigensystem: four sectors" : "eigensystem: dense fallback");
+	int info = used_mirror ? 0 : RNP::Eigensystem(n2, op, n2, q, NULL, 1, phi, n2, eigenwork, rwork, eigenlwork);
 	if(0 != info){
 		fprintf(stderr, "Layer eigensystem returned info = %d\n", info);
 	}
@@ -1187,7 +1202,8 @@ int SolveAll(
 	std::complex<double> *ab, // length 2*n*nlayers
 	std::complex<double> *work_, // length lwork
 	size_t *iwork, // length n2*nlayers
-	size_t lwork // set to -1 for query into iwork[0], at least 6*n2^2*nlayers
+	size_t lwork, // set to -1 for query into iwork[0], at least 6*n2^2*nlayers
+	const int *mirror_g
 ){
 	const size_t n2 = 2*n;
 	const size_t n4 = 2*n2;
@@ -1196,6 +1212,26 @@ int SolveAll(
 	if((size_t)-1 == lwork){
 		iwork[0] = minwork;
 		return 0;
+	}
+	// Keep the public workspace contract even when the optimized solve does
+	// not need the dense workspace supplied by the caller.
+	if((work_ != NULL || lwork != 0) && lwork < minwork){ return -15; }
+	if(mirror_g && S4Mirror::Enabled() && nlayers==3){
+		S4Mirror::Basis basis;
+		const bool exterior_scalar =
+			(EPSILON2_TYPE_BLKDIAG1_SCALAR==epstype[0] || EPSILON2_TYPE_BLKDIAG2_SCALAR==epstype[0]) &&
+			(EPSILON2_TYPE_BLKDIAG1_SCALAR==epstype[2] || EPSILON2_TYPE_BLKDIAG2_SCALAR==epstype[2]);
+		if(exterior_scalar && basis.Build(n,mirror_g,kx,ky)){
+			// Uniform layers need not store kp. Assemble it in private scratch.
+			std::vector<S4Mirror::Z> outer0,outer2;
+			const S4Mirror::Z *operators[3]={kp[0],kp[1],kp[2]};
+			if(!operators[0]){ outer0.resize(n22); MakeKPMatrix(omega,n,kx,ky,Epsilon_inv[0],epstype[0],NULL,outer0.data(),n2); operators[0]=outer0.data(); }
+			if(!operators[2]){ outer2.resize(n22); MakeKPMatrix(omega,n,kx,ky,Epsilon_inv[2],epstype[2],NULL,outer2.data(),n2); operators[2]=outer2.data(); }
+			if(S4Mirror::ThreeLayer(basis,thickness,q,operators,phi,ab)){
+				S4Mirror::Diagnostic("scattering: four-sector three-layer boundary solve"); return 0;
+			}
+		}
+		S4Mirror::Diagnostic("scattering: dense fallback");
 	}
 	typedef std::complex<double> doublecomplex;
 	doublecomplex *work = work_;
@@ -1374,7 +1410,21 @@ printf("Could not allocate %d\n", (int)minwork); fflush(stdout);
 #endif
 			int solve_info;
 			// Make Q in in1
-			RNP::LinearSolve<'N'>(n2, n2, t1, n2, in1, n2, &solve_info, iwork);
+			// For uniform scalar layers phi is identity and kp consists of
+			// independent 2x2 blocks indexed by (g,g+n). Use the same coupled
+			// equations without a dense factorization. Scratch t2 keeps the
+			// dense fallback inputs intact if any block cannot be solved.
+#ifndef S4_DISABLE_STRUCTURAL_FASTPATHS
+			if(NULL == phi[ip] &&
+				(EPSILON2_TYPE_BLKDIAG1_SCALAR == epstype[ip] || EPSILON2_TYPE_BLKDIAG2_SCALAR == epstype[ip]) &&
+				S4Structural::SolveUniformBlocks(n, n2, t1, n2, in1, n2, t2, n2)){
+				RNP::TBLAS::CopyMatrix<'A'>(n2,n2, t2,n2, in1,n2);
+				solve_info = 0;
+			}else
+#endif
+			{
+				RNP::LinearSolve<'N'>(n2, n2, t1, n2, in1, n2, &solve_info, iwork);
+			}
 			//SingularLinearSolve(n2,n2,n2, t1,n2, in1,n2, DBL_EPSILON);
 			// Now perform the diagonal scalings
 			for(size_t i = 0; i < n2; ++i){
@@ -1530,7 +1580,11 @@ printf("Could not allocate %d\n", (int)minwork); fflush(stdout);
 		}else{
 			Copy(n2, n2, Sab, n4, t1, n2); // t1 = Sab
 			Copy(n2, n2, Sbb, n4, Q, n2); // Q = Sbb, t1 = Sab
-			LUSolve(n2, n2, Pprev, n2, ipivP-n2, Q, n2); // Q = inv(P) Sbb, t1 = Sab
+			// At i=2, Pprev is the known identity from the first step.
+#ifndef S4_DISABLE_STRUCTURAL_FASTPATHS
+			if(i > 2)
+#endif
+			{ LUSolve(n2, n2, Pprev, n2, ipivP-n2, Q, n2); } // Q = inv(P) Sbb
 //	PrintMatrix("t1(Sab)", n2,n2, Sab, n4);
 //	PrintMatrix("         Sbb", n2,n2, Sbb, n4);
 //	PrintMatrix("invPprev Sbb", n2,n2, Q, n2);
@@ -1550,7 +1604,10 @@ printf("Could not allocate %d\n", (int)minwork); fflush(stdout);
 	//		PrintMatrix("P", n2,n2, P, n2);
 		}
 //	PrintMatrix("P", n2,n2, P, n2);
-		LUFactor(n2, P, n2, ipivP);
+#ifndef S4_DISABLE_STRUCTURAL_FASTPATHS
+		if(i > 1) // The first pivot block is exactly identity.
+#endif
+		{ LUFactor(n2, P, n2, ipivP); }
 //	PrintMatrix("Pfactored", n2,n2, P, n2);
 //	for(size_t i = 0; i < n2; ++i){
 //		printf(" %d", ((int*)ipivP)[i]);
@@ -1651,7 +1708,11 @@ printf("Could not allocate %d\n", (int)minwork); fflush(stdout);
 		//   [ ------+------------------------- ]
 		//   [       |                          ]
 		Mult(n2, n2, 1., Sbb, n4, bjp1, 0., t1);
+#ifndef S4_DISABLE_STRUCTURAL_FASTPATHS
+		if(j > 1){ // P is identity at j=1; its pivot array is not needed.
+#else
 		if(j > 0){
+#endif
 			LUSolve(n2, 1, P, n2, ipivP, t1, n2);
 		}
 		Axpy(n2, 1., t1, 1, bjm1, 1);
@@ -2072,6 +2133,41 @@ void GetFieldAtPoint(
 		rcwa_free(eh);
 	}
 }
+void GetFieldCoefficients(
+	size_t n, const double *kx, const double *ky,
+	std::complex<double> omega, const std::complex<double> *q,
+	const std::complex<double> *kp, const std::complex<double> *phi,
+	const std::complex<double> *epsilon_inv, int epstype,
+	const std::complex<double> *ab, std::complex<double> *output,
+	std::complex<double> *eh
+){
+	const size_t n2 = 2*n;
+	GetInPlaneFieldVector(n, kx, ky, omega, q, epsilon_inv, epstype, kp, phi, ab, eh);
+	const std::complex<double> *hx = &eh[3*n2];
+	const std::complex<double> *hy = hx + n;
+	const std::complex<double> *ney = &eh[4*n2];
+	const std::complex<double> *ex = ney + n;
+	for(size_t i = 0; i < n; ++i){
+		eh[i] = ky[i]*hx[i] - kx[i]*hy[i];
+	}
+	if(EPSILON2_TYPE_BLKDIAG1_SCALAR == epstype || EPSILON2_TYPE_BLKDIAG2_SCALAR == epstype){
+		for(size_t i = 0; i < n; ++i){ eh[n+i] = epsilon_inv[0]*eh[i]; }
+	}else{
+		RNP::TBLAS::MultMV<'N'>(n,n, std::complex<double>(1.),epsilon_inv,n,
+			eh,1, std::complex<double>(0.),&eh[n],1);
+	}
+	for(size_t i = 0; i < n; ++i){
+		output[6*i+0] = ex[i];
+		output[6*i+1] = -ney[i];
+		output[6*i+2] = eh[n+i]/omega;
+		output[6*i+3] = hx[i];
+		output[6*i+4] = hy[i];
+		// GetFields is the canonical convention. The legacy grid API has
+		// the opposite Hz sign and must not be used as the reference here.
+		output[6*i+5] = (-kx[i]*ney[i] - ky[i]*ex[i])/omega;
+	}
+}
+
 void GetFieldOnGrid(
 	size_t n, // glist.n
 	int *G,

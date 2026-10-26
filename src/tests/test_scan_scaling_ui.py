@@ -81,6 +81,8 @@ class LargeScanUiTests(unittest.TestCase):
                     self.assertLessEqual(page.field_sample.count(),200)
                     self.assertEqual(page.field_position.maximum(),100001)
                     self.assertLess(page.field_sample.model().sample.cache_info().currsize,100)
+                    render.assert_not_called()
+                    page.show();page.result_tabs.setCurrentWidget(page.generated_fields);APP.processEvents()
                     page.field_position.setValue(100001)
                     self.assertEqual(page.field_sample.model().offset+page.field_sample.currentIndex(),100000)
                     self.assertEqual(Path(render.call_args.args[0]),fields/'samples'/'100001')

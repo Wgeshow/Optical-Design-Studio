@@ -96,11 +96,21 @@ class CampaignTests(unittest.TestCase):
   self.assertEqual(len(training_observations(rows,self.cfg)),120)
  def test_full_grid_over_ten_thousand_is_exhaustive(self):
   from ai_campaign import candidates
-  cfg=prepare_campaign(self.base,dict(self.cfg,mode='Full range scan',new_budget=0,bounds=[dict(Parameter='thickness',Target='Device',Min=.20,Max=.30,Step=.000005,Choices='')]))
-  self.assertEqual(cfg['design_count'],20001)
+  import itertools
+  # The Cartesian product may exceed 10,000; each materialized dimension
+  # must still respect the separate design-bound allocation safety limit.
+  bounds=[dict(Parameter='thickness',Target='Device',Min=.20,Max=.30,Step=.0005,Choices=''),
+          dict(Parameter='radius',Target='1',Min=.10,Max=.20,Step=.001,Choices='')]
+  cfg=prepare_campaign(self.base,dict(self.cfg,mode='Full range scan',new_budget=0,bounds=bounds))
+  self.assertEqual([len(d['values']) for d in cfg['dimensions']],[201,101])
+  self.assertEqual(cfg['design_count'],20301)
   values=candidates(self.base,cfg,set(),cfg['design_count'],42)
-  self.assertEqual(len(values),20001)
-  self.assertEqual(len({tuple(v) for v in values}),20001)
+  self.assertEqual(len(values),20301)
+  self.assertEqual({tuple(v) for v in values},set(itertools.product(*(d['values'] for d in cfg['dimensions']))))
+
+ def test_full_grid_retains_per_dimension_allocation_safety_limit(self):
+  with self.assertRaisesRegex(ValueError,'20,001.*safety limit of 10,000'):
+   prepare_campaign(self.base,dict(self.cfg,mode='Full range scan',new_budget=0,bounds=[dict(Parameter='thickness',Target='Device',Min=.20,Max=.30,Step=.000005,Choices='')]))
 
  def test_changed_contours_and_rta_start_new_campaign(self):
   self.run_campaign('a');events=[]

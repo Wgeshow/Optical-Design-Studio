@@ -8,19 +8,26 @@ from pathlib import Path
 import shutil
 import zipfile
 
-from stage_release import digest, inventory, safe_relative, tree_digest, write_json
+from stage_release import digest, inventory, safe_relative, tree_digest, write_json, REQUIRED_RESOURCES, validate_runtime_resources
 
 BUILD = Path(__file__).resolve().parent
 ROOT = BUILD.parent
 SRC = BUILD/'source'
 APP = BUILD/'dist'/'Optical Design Studio'
-OUT = ROOT/'GitHub-Release-1.3.2'
-VERSION = '1.3.2'
+OUT = ROOT/'GitHub-Release-1.3.3'
+VERSION = '1.3.3'
 REQUIRED_FROZEN_MODULES = ('field_volume', 'qt_field_volume', 'qt_native_field_volume',
     'qt_native_figure', 'qt_native_plot', 'qt_structure_3d', 'qt_lattice_diagram',
     'qt_windows_glass', 'qt_help', 'qt_materials', 'qt_core', 'data_library',
     'field_solver', 'field_tracking', 'update_install', 'pyqtgraph', 'colorama',
-    'scan_storage', 'field_sampling', 'simulation_fields', 'contour_sweep')
+    'scan_storage', 'field_sampling', 'field_reconstruction', 'field_storage', 'direct_npz', 'simulation_fields', 'contour_sweep',
+    'eigenfree_scan', 's4_eigenfree_gpu', 'gpu_solver_runtime',
+    'qt_simulation_setup','simulation_setup_state','qt_device_lighting','qt_tool_workspace',
+    'qt_electrical_material_catalog','qt_results_workspace','qt_optical_results','qt_workspace_start','qt_electrical','qt_electrical_materials',
+    'qt_electrical_results','electrical_material_library','electrical_terminal_studies',
+    'device_model','device_project_bridge','custom_electrical_solver','custom_device_optics',
+    'electrical_optics','electrical_solver','electrical_preset','contact_optics','optical_unit_cell','pc_array',
+    'fdtd_model','meep_runtime','meep_managed','meep_bootstrap','structure_preview')
 FORBIDDEN_FILES = {'user data', 'data_library', 'runs', '.git', '.env',
     'portable_settings.json', 'desktop_preferences.ini', 'session.json', 'desktop_session.json'}
 
@@ -34,6 +41,7 @@ def verify_stage():
     current = inventory(SRC)
     if current != stage['files'] or tree_digest(current) != stage['source_tree_sha256']:
         raise ValueError('Source changed after staging; stage and verify a fresh snapshot.')
+    validate_runtime_resources(SRC)
     tests = json.loads((BUILD/'source-test-report.json').read_text(encoding='utf-8'))
     if not (tests['passed'] is True and tests['tests_run'] > 0 and tests['failures'] == 0 and tests['errors'] == 0
             and tests['source_tree_sha256'] == stage['source_tree_sha256']):
@@ -88,6 +96,14 @@ def verify_frozen():
             and audit['readable_source_files_verified'] == independent['readable_source_files_verified'] == expected_readable
             and audit['user_guide_sha256'] == stage['files']['USER_GUIDE.html']['sha256']):
         raise ValueError('Independent verification must include every readable source file and the corrected public guide.')
+    # Readable source alone cannot satisfy a runtime lookup beside a frozen
+    # module. The executable must receive its own identical catalog resource.
+    validate_runtime_resources(APP/'_internal')
+    for name in REQUIRED_RESOURCES:
+        record=stage['files'].get(name)
+        path=APP/'_internal'/name
+        if not record or digest(path)!=record['sha256'] or path.stat().st_size!=record['size']:
+            raise ValueError('Frozen native setup runtime resource differs from staged source: '+name)
     for executable in ('Optical Design Studio.exe', 'OpticalDesignBackend.exe'):
         if manifest['files'][executable]['sha256'] != digest(APP/executable):
             raise ValueError('An executable changed after independent verification: '+executable)
@@ -110,7 +126,7 @@ def verify_frozen():
             and speed.get('field_sample_count') == 3):
         raise ValueError('Simulation solve reuse, Fourier sampling and exact scan storage must pass inside the frozen app.')
     maximize = report['checks']['maximize_restore_painting']['detail']
-    if not (maximize.get('maximized_opaque_workspace') is True
+    if not (maximize.get('maximized_transparency_policy_verified') is True
             and maximize.get('restored_glass_policy') is True
             and maximize.get('looks') == ['glass_dark', 'glass_light']):
         raise ValueError('Maximized workspace painting and restored glass policy must pass inside the frozen app.')
@@ -206,7 +222,7 @@ def public_files():
         if archive.namelist() != ['s4-library-manifest.json'] or json.loads(archive.read(archive.namelist()[0])) != {'format': 's4-library', 'version': 1, 'files': {}}:
             raise ValueError('The public seed must be a manifest-only empty library.')
     for name in ('qt_native_figure.py', 'qt_native_field_volume.py', 'qt_windows_glass.py',
-                 'scan_storage.py', 'field_sampling.py', 'simulation_fields.py', 'contour_sweep.py'):
+                 'scan_storage.py', 'field_sampling.py', 'field_reconstruction.py', 'field_storage.py', 'direct_npz.py', 'simulation_fields.py', 'contour_sweep.py'):
         if '_internal/source/'+name not in files:
             raise ValueError('Missing readable source: '+name)
     for name in ('bundle.json', 'results.csv', 'electric_fields.csv', 'field-samples.json'):
@@ -274,7 +290,7 @@ def main():
     source_entries += [(BUILD/name, 'packaging/'+name) for name in
         ('OpticalDesignStudio.spec', 'desktop_entry.py', 'backend_entry.py', 'version_info.txt',
          'stage_release.py', 'build_release.py', 'test_release_source.py', 'verify_release.py',
-         'package_release.py', 'test_release_package_gates.py', 'test_packaging.py',
+         'package_release.py', 'test_release_package_gates.py', 'test_packaging.py', 'test_native_setup_packaging.py',
          'verify_release_source_smoke.py', 'audit_source_recipe.py', 'audit_release_archives.py', 'seed_library.zip',
          'stage-manifest.json', 'source-stage-manifest.json',
          'START_HERE.md', 'RELEASE_NOTES.md', 'THIRD_PARTY_NOTICES.md', 'SOURCE_README.md', 'BUILDING.md')]

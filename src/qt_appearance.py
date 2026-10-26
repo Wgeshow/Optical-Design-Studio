@@ -212,6 +212,7 @@ class AppearancePage(QWidget):
         self.glass_opacity.setRange(0,100)
         self.glass_opacity.setTracking(False)
         self.glass_opacity.setAccessibleName('Glass surface opacity percentage')
+        self.glass_opacity.setToolTip('Clear glass panels: 35% is the default. Lower values reveal more of the background; controls remain readable.')
         self.glass_value = QLabel()
         interface.addWidget(QLabel('Glass opacity'),1,0)
         interface.addWidget(self.glass_value,1,1)

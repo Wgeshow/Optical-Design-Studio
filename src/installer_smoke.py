@@ -23,14 +23,17 @@ def inspect_window_chrome(window):
     if not window.windowFlags() & Qt.WindowType.FramelessWindowHint:
         raise AssertionError('The application must draw its integrated custom title bar.')
     chrome = window.chrome
-    if not isinstance(chrome, WindowChrome) or chrome.height() != 50:
-        raise AssertionError('The reference 50-pixel title bar is missing.')
-    if chrome.width() != window.centralWidget().width()-16 or chrome.y() != 8:
-        raise AssertionError('The title bar does not fit the reference window inset.')
-    if chrome.title.text() != window.windowTitle():
-        raise AssertionError('The integrated title differs from the application title.')
+    if not isinstance(chrome, WindowChrome) or chrome.height() != 48:
+        raise AssertionError('The reference 48-pixel title bar is missing.')
+    if chrome.width() != window.centralWidget().width() or chrome.y() != 0:
+        raise AssertionError('The title bar does not fit the reference window width.')
+    expected_title='Original Optical Studio' if window.workspace_profile=='original' else 'Optical Design Studio'
+    if chrome.title.text() != expected_title:
+        raise AssertionError('The integrated title differs from the current workspace title.')
     redesigned = hasattr(window, 'project_header') and window.project_header.isVisible()
-    middle = [window.project_header] if redesigned else [chrome.file_button, chrome.view_button]
+    middle=[control for control in (getattr(window,'project_header',None),
+        getattr(window,'optical_workflow',None),chrome.file_button,chrome.view_button)
+        if control is not None and control.parentWidget() is chrome and control.isVisible()]
     controls = [chrome.logo, chrome.title, *middle,
                 chrome.minimize_button, chrome.maximize_button, chrome.close_button]
     if chrome.native_frame:
@@ -48,7 +51,7 @@ def inspect_window_chrome(window):
         label = control.accessibleName() or control.objectName() or type(control).__name__
         if not control.isVisible() or not chrome.rect().contains(control.geometry()):
             raise AssertionError('A title-bar control is hidden or clipped: ' + label)
-        if control.width() < control.minimumSizeHint().width():
+        if control is not getattr(window,'optical_workflow',None) and control.width() < control.minimumSizeHint().width():
             raise AssertionError('A title-bar control is narrower than its contents: ' + label)
     controls = sorted(controls, key=lambda control: control.geometry().left())
     for left, right in zip(controls, controls[1:]):
@@ -56,8 +59,8 @@ def inspect_window_chrome(window):
             raise AssertionError('Title-bar controls overlap.')
     if redesigned:
         navigation = window.project_button.parentWidget()
-        navigation_controls = [window.optical_workflow, window.project_button,
-                               window.project_save_button, chrome.file_button]
+        navigation_controls=[control for control in (window.optical_workflow,window.project_button,
+            window.project_save_button,chrome.file_button) if control.parentWidget() is navigation and control.isVisible()]
         for control in navigation_controls:
             if not control.isVisible() or not navigation.rect().contains(control.geometry()):
                 raise AssertionError('A navigation-bar control is hidden or clipped: ' +
@@ -116,7 +119,7 @@ def inspect_native_controls(window, store, application):
     from qt_native_field_volume import NativeVolumeCanvas
     from qt_native_figure import NativeFigureCanvas
 
-    builder=window.pages['Structure']
+    builder=window.pages['Structure']._legacy
     names=list(store.layers['Name'])
     assert [builder.layer_selector.itemData(i) for i in range(builder.layer_selector.count())]==names
     selected=next(row for row in store.layers.to_dict('records')[1:-1] if row['Thickness_um']>0)
@@ -179,7 +182,7 @@ def inspect_native_controls(window, store, application):
 
 
 def inspect_maximize_painting(window, application, output):
-    """Exercise actual maximize/restore state and the opaque workspace policy."""
+    """Exercise maximize/restore alpha painting and the opaque fallback."""
     from qt_common import theme_manager
 
     manager = theme_manager()
@@ -197,7 +200,10 @@ def inspect_maximize_painting(window, application, output):
                 assert window.property('desktopGlassSuspended')
             root = window.centralWidget()
             image = root.grab().toImage()
-            assert not image.isNull() and image.pixelColor(3, 3).alpha() == 255
+            assert not image.isNull()
+            expected_alpha = 0 if adapter.alpha_active else 255
+            actual_alpha = image.pixelColor(3, 3).alpha()
+            assert actual_alpha <= 1 if adapter.alpha_active else actual_alpha == expected_alpha
             # Check real controls/content as well as the background: a white
             # raster image with a valid window state must not pass this check.
             colors = {image.pixel(x, y) for y in range(4, image.height(), 16)
@@ -214,7 +220,7 @@ def inspect_maximize_painting(window, application, output):
                 assert not window.property('desktopGlassSuspended')
             assert adapter._use_native_glass()
             assert not root.grab().isNull()
-        return dict(maximized_opaque_workspace=True, restored_glass_policy=True,
+        return dict(maximized_transparency_policy_verified=True, restored_glass_policy=True,
                     looks=['glass_dark', 'glass_light'], snapshots=snapshots,
                     native_compositor_supported=adapter.supported,
                     validation='Qt state and rendered raster content; desktop compositor appearance requires a live Windows session')
@@ -225,15 +231,15 @@ def inspect_maximize_painting(window, application, output):
         settle_window_layout(application, window)
 
 
-def inspect_simulation_speed(result):
-    """Verify the installed backend uses shared solves and exact indexed data."""
+def inspect_simulation_speed(result,fields_result):
+    """Verify spectrum and fields are separate, with exact indexed data."""
     import numpy as np
     from scan_storage import FieldSampleIndex, ScanPoints, SpectrumResults, json_default, json_object
     from contour_sweep import regions, _regions_reference
 
     directory = Path(result['output']).parent
     spectrum = SpectrumResults(directory/'spectrum.sqlite')
-    index = FieldSampleIndex(directory/'fields')
+    index = FieldSampleIndex(Path(fields_result['directory'])/'fields')
     try:
         with (directory/'results.csv').open(newline='', encoding='utf-8') as stream:
             exported = [[float(value) for value in row.values()] for row in csv.DictReader(stream)]
@@ -243,13 +249,14 @@ def inspect_simulation_speed(result):
         for ordinal in range(len(index)):
             sample = index.sample(ordinal)
             saved = json.loads((Path(sample['directory'])/'field_diagnostics.json').read_text(encoding='utf-8'))
-            assert saved['reused_spectrum_solution'], saved
-            assert saved['sampling']['method'] == 'validated_fourier_planes', saved
+            assert not saved['reused_spectrum_solution'], saved
+            assert saved['sampling']['method'] in ('validated_fourier_planes', 'validated_native_coefficients'), saved
             assert saved['sampling']['plane_calls'] > 0, saved
             assert sample['wavelength_nm'] == spectrum[ordinal][1]
             diagnostics.append(saved['sampling'])
-        shared = result['info']['electric_fields']
-        assert shared['reused_spectrum_solution'] and shared['samples'] == len(index), shared
+        assert 'electric_fields' not in result['info'] and not (directory/'fields').exists()
+        shared = fields_result['summary']['electric_fields']
+        assert not shared['reused_spectrum_solution'] and shared['samples'] == len(index), shared
         points = ScanPoints(1500., .001, 100000, 0.)
         encoded = json.dumps(points, default=json_default)
         decoded = json.loads(encoded, object_hook=json_object)
@@ -260,7 +267,7 @@ def inspect_simulation_speed(result):
             expected, reference_count = _regions_reference(mask, periodic_x, periodic_y)
             np.testing.assert_array_equal(actual, expected)
             assert count == reference_count
-        return dict(shared_spectrum_solutions=True, validated_fourier_sampling=True,
+        return dict(spectrum_rta_only=True,separate_field_job=True, validated_fourier_sampling=True,
                     exact_disk_backed_spectrum=True, compact_scan_roundtrip=True,
                     contour_label_parity=True, field_sample_count=len(index), sampling=diagnostics)
     finally:
@@ -348,10 +355,10 @@ def run(report_path):
             window = OpticalStudio(store)
             window.resize(1460, 960)
             window.show()
-            expected = ['Structure', 'Materials', 'Simulate', 'Optimize', 'Fields', 'Saved work', 'Settings', 'About','AI Search']
+            expected = ['Structure', 'Materials', 'Simulate', 'Optimize', 'Fields', 'Saved work', 'Settings', 'About','AI Search','Results']
             if list(window.pages) != expected:
                 raise AssertionError('Some desktop pages are missing.')
-            if window.windowTitle() != 'Optical Design Studio':
+            if window.windowTitle() != 'Optical Design Studio · Device Studio':
                 raise AssertionError('Unexpected application title.')
             screenshots = []
             chrome_layouts = []
@@ -378,7 +385,16 @@ def run(report_path):
 
         check('desktop_pages_and_themes', render_interface)
         check('maximize_restore_painting', lambda: inspect_maximize_painting(window, application, report_path.parent))
-        check('native_reference_controls_and_graphs',lambda:inspect_native_controls(window,store,application))
+        def original_reference_controls():
+            previous=window.workspace_profile
+            try:
+                window.set_workspace_profile('original')
+                window._navigate_route(0)
+                application.processEvents()
+                return inspect_native_controls(window,store,application)
+            finally:
+                window.set_workspace_profile(previous)
+        check('native_reference_controls_and_graphs',original_reference_controls)
 
         def export_formats():
             import pandas as pd
@@ -440,6 +456,9 @@ def run(report_path):
 
         def backend_job(kind, options=None):
             project = store.portable_project()
+            options=dict(options or {})
+            if kind in ('simulation','fields','simulation_fields','index_shift','peaks','target','ai_search') and store.optical_geometry_source=='original_tables':
+                options.setdefault('optical_geometry_source','original_tables')
             # Check validation and launch using the exact same desktop contracts.
             _, spec = prepare_job(kind, project, options or {}, library)
             worker = BackendWorker(kind, project, options or {}, library)
@@ -472,6 +491,70 @@ def run(report_path):
             terminal['self_test_points'] = len(spec['model']['points'])
             return terminal
 
+        def exact_cutoff_and_phase():
+            import copy
+            import numpy as np
+            from field_storage import load_field_arrays
+            saved=store.project()
+            previous_profile=window.workspace_profile
+            try:
+                project=copy.deepcopy(saved)
+                project.update(materials=[dict(Name=name,Model='constant_nk',A=n,B=0.,DataFile='',WavelengthUnit='nm')
+                    for name,n in [('Air',1.),('GaAs',3.4),('SiO2',1.45)]],
+                    layers=[dict(Name=name,Thickness_um=d,Material=mat) for name,d,mat in
+                        [('AirAbove',0.,'Air'),('Device',.25,'GaAs'),('Substrate',0.,'SiO2')]],
+                    patterns=[dict(Shape='circle',Layer='Device',Material='Air',CenterX_um=0.,CenterY_um=0.,SizeX_um=.1,SizeY_um=0.,Angle_deg=0.)])
+                project['settings'].update(ax_um=.77,ay_um=.77,NumG=32,mode='Wavelength sweep',
+                    wl_start_nm=1116.4,wl_stop_nm=1116.6,wl_step_nm=.1,theta_deg=0.,phi_deg=0.,polarization='p')
+                project['performance'].update(solver_backend='native',mode='CPU only',workers=1,threads=1,require_gpu=False)
+                store.load_project(project)
+                window.set_workspace_profile('original')
+                window._navigate_route(2,7)
+                application.processEvents()
+                page=window.pages['Simulate']
+                page.measure_phase.setChecked(False)
+                page.measure_phase.click()
+                assert page.measure_phase.isChecked() and store.search_state['simulation']['measure_phase']
+                requested=[];original=store.start_run
+                store.start_run=lambda kind,options:requested.append((kind,options))
+                try:page.run()
+                finally:store.start_run=original
+                assert requested==[('simulation',{'measure_phase':True})]
+                assert page.measure_phase.isChecked()
+                cpu=backend_job(*requested[0])
+                assert cpu['info']['exact_cutoff_points']==1 and cpu['info']['unavailable_points']==0
+                def phase(event):
+                    with (Path(event['directory'])/'phase.csv').open(newline='',encoding='utf-8') as stream:
+                        rows=list(csv.DictReader(stream))
+                    assert len(rows)==3
+                    return np.array([[float(row[k]) for k in ('reflection_phase_deg','transmission_phase_deg')] for row in rows])
+                reference_phase=phase(cpu)
+                assert np.isfinite(reference_phase).all()
+                page.directory=Path(cpu['directory']);page.show_result(cpu)
+                assert len(page.phase_frame)==3 and page.measure_phase.isChecked()
+                cpu_fields=backend_job('fields',dict(wavelength_nm=1116.5,grid=5,depth_samples=7))
+                arrays=load_field_arrays(Path(cpu_fields['directory'])/'fields')
+                assert np.isfinite(arrays['E']).all() and np.isfinite(arrays['H']).all()
+                details=dict(phase_toggle_persisted=True,phase_samples=3,exact_cutoff_points=1,
+                    full_complex_fields_saved=True,complex_values=int(arrays['E'].size+arrays['H'].size),
+                    cutoff=cpu['info']['exact_cutoff_preview'][0])
+                if os.environ.get('S4_SELF_TEST_EIGENFREE')=='1':
+                    store.performance.update(solver_backend='eigenfree-gpu',require_gpu=True)
+                    gpu=backend_job('simulation',{'measure_phase':True})
+                    gpu_phase=phase(gpu)
+                    delta=(gpu_phase-reference_phase+180)%360-180
+                    assert np.max(abs(delta))<2e-8
+                    gpu_fields=backend_job('fields',dict(wavelength_nm=1116.5,grid=5,depth_samples=7))
+                    actual=load_field_arrays(Path(gpu_fields['directory'])/'fields')
+                    for key in ('E','H'):np.testing.assert_allclose(actual[key],arrays[key],atol=3e-10,rtol=3e-9)
+                    details.update(gpu_phase_verified=True,max_abs_gpu_phase_difference_deg=float(np.max(abs(delta))),
+                        max_abs_gpu_complex_field_difference=float(max(np.max(abs(actual[key]-arrays[key])) for key in ('E','H'))))
+                return details
+            finally:
+                store.load_project(saved)
+                window.set_workspace_profile(previous_profile)
+        check('exact_cutoff_and_phase',exact_cutoff_and_phase)
+
         spectrum_result = {}
 
         def cpu_spectrum():
@@ -492,15 +575,17 @@ def run(report_path):
             return dict(rows=rows, diagnostics=result['info'], output=result['output'])
 
         check('native_cpu_spectrum', cpu_spectrum)
-        check('simulation_speed_and_scan_storage', lambda: inspect_simulation_speed(spectrum_result))
+        check('simulation_speed_and_scan_storage', lambda: inspect_simulation_speed(spectrum_result,
+            backend_job('simulation_fields',dict(single_wavelength=False,spectrum_id=Path(spectrum_result['directory']).name,
+                electric_fields=dict(grid=3,depth_samples=3,contour_step=.1)))))
 
         def electric_fields():
             finite_layer = next(row['Name'] for row in store.project()['layers'][1:-1]
                                 if float(row['Thickness_um']) > 0)
             result = backend_job('fields', dict(wavelength_nm=1550, grid=3, depth_samples=5, layer=finite_layer))
             directory = Path(result['directory']) / 'fields'
-            with (directory/'electric_fields.csv').open(newline='', encoding='utf-8') as stream:
-                rows = list(csv.DictReader(stream))
+            from field_storage import load_field_frame, field_data_path
+            rows = load_field_frame(directory).to_dict('records')
             if not rows or not {'xy', 'xz', 'volume_samples'} <= {row['plane'] for row in rows}:
                 raise AssertionError('Electric-field planes were not generated.')
             magnitudes = [float(row['E2']) for row in rows]
@@ -527,8 +612,8 @@ def run(report_path):
                 assert snapshot_index>=0,expected_snapshot
                 viewer.snapshot.setCurrentIndex(snapshot_index)
                 assert viewer.snapshot.currentData()==expected_snapshot
-                selected_csv=_safe_directory(library,viewer.snapshot.currentData())/'electric_fields.csv'
-                assert selected_csv.resolve()==(directory/'electric_fields.csv').resolve()
+                selected_csv=field_data_path(_safe_directory(library,viewer.snapshot.currentData()))
+                assert selected_csv.resolve()==field_data_path(directory).resolve()
                 viewer.load()
                 assert viewer.data is not None, viewer.status.text()
                 assert viewer.snapshot.currentData()==expected_snapshot
@@ -610,6 +695,72 @@ def run(report_path):
 
         check('native_electric_field_maps_and_features', electric_fields)
 
+        if os.environ.get('S4_SELF_TEST_EIGENFREE') == '1':
+            def optimized_solver_workflows():
+                import copy
+                import numpy as np
+                from qt_core import desktop_performance
+                from field_storage import load_field_arrays
+                saved = store.project()
+                try:
+                    store.settings.update(NumG=25,wl_start_nm=1530,wl_stop_nm=1550,wl_step_nm=10)
+                    store.performance.update(solver_backend='native',mirror_symmetry=True,
+                        mode='CPU only',workers=1,threads=1,require_gpu=False)
+                    options = dict(electric_fields=dict(grid=3,depth_samples=3,contour_step=.1))
+                    reference = backend_job('simulation',options)
+                    reference_scan_fields = backend_job('simulation_fields',dict(options,single_wavelength=False,spectrum_id=Path(reference['directory']).name))
+                    reference_fields = backend_job('fields',dict(wavelength_nm=1550,grid=3,depth_samples=3))
+                    store.update_performance(dict(solver_backend='eigenfree-gpu',mirror_symmetry=True,
+                        eigenfree_symmetry=True,eigenfree_batch_size=32,require_gpu=True))
+                    restored = desktop_performance(copy.deepcopy(store.project()['performance']))
+                    assert restored['solver_backend'] == 'eigenfree-gpu'
+                    settings_page = window.pages['Settings']
+                    assert settings_page.controls['solver_backend'].currentData() == 'eigenfree-gpu'
+                    assert settings_page.controls['eigenfree_batch_size'].isEnabled()
+                    diagnostic = backend_job('diagnostic')
+                    assert diagnostic['info']['gpu_solved_points'] == 1
+                    result = backend_job('simulation',options)
+                    assert 'electric_fields' not in reference['info'] and 'electric_fields' not in result['info']
+                    result_scan_fields = backend_job('simulation_fields',dict(options,single_wavelength=False,spectrum_id=Path(result['directory']).name))
+                    assert result['info']['gpu_solved_points'] == 3
+                    assert result['info']['eigendecompositions'] == 0
+                    def spectrum(path):
+                        with Path(path).open(newline='',encoding='utf-8') as stream:
+                            return np.array([[float(r[k]) for k in ('R','T','A')] for r in csv.DictReader(stream)])
+                    expected,actual = spectrum(reference['output']),spectrum(result['output'])
+                    np.testing.assert_allclose(actual,expected,atol=1e-10,rtol=1e-8)
+                    max_fields,checked = 0.,0
+                    def compare(left,right):
+                        nonlocal max_fields,checked
+                        a,b = load_field_arrays(left),load_field_arrays(right)
+                        for key in ('xyz','plane','layer','material','layer_names','material_names'):
+                            np.testing.assert_array_equal(a[key],b[key])
+                        for key in ('E','H'):
+                            assert b[key].dtype == np.complex128
+                            np.testing.assert_allclose(a[key],b[key],atol=3e-10,rtol=3e-9)
+                            checked += b[key].size
+                            max_fields = max(max_fields,float(np.max(np.abs(a[key]-b[key]))))
+                    def samples(event):
+                        root = Path(event['summary']['electric_fields']['manifest']).parent
+                        data = json.loads((root/'samples.json').read_text())
+                        return [root/record['directory'] for record in data['samples']]
+                    left_samples,right_samples = samples(reference_scan_fields),samples(result_scan_fields)
+                    assert len(left_samples) == len(right_samples) == 3
+                    for left,right in zip(left_samples,right_samples):
+                        compare(left,right)
+                    fields = backend_job('fields',dict(wavelength_nm=1550,grid=3,depth_samples=3))
+                    compare(Path(reference_fields['directory'])/'fields',Path(fields['directory'])/'fields')
+                    info = json.loads((Path(fields['directory'])/'fields/field_diagnostics.json').read_text())
+                    assert info['solver_backend'] == 'eigenfree-gpu' and info['gpu_solved_points'] == 1
+                    return dict(solver_settings_restored=True,selected_gpu_diagnostic_passed=True,
+                        spectrum_rta_only=True,separate_scan_fields_passed=True,standalone_fields_passed=True,
+                        full_complex_field_values_checked=checked,max_abs_field_difference=max_fields,
+                        max_abs_rta_difference=float(np.max(np.abs(actual-expected))),
+                        diagnostics=result['info'])
+                finally:
+                    store.load_project(saved)
+            check('optimized_solver_workflows',optimized_solver_workflows)
+
         def ai_multi_hole():
             import copy
             from qt_multi_hole import MultiHoleDialog
@@ -672,10 +823,10 @@ def run(report_path):
             import PyQt6.QtCore
             import matplotlib
             import pyqtgraph,qt_native_figure,qt_native_field_volume,qt_native_plot
-            import field_sampling, scan_storage, simulation_fields
+            import field_sampling, field_storage, scan_storage, simulation_fields
             modules = [numpy, scipy, sklearn, PyQt6.QtCore, matplotlib,pyqtgraph,
                        qt_native_figure,qt_native_field_volume,qt_native_plot,
-                       field_sampling,scan_storage,simulation_fields]
+                       field_sampling,field_storage,scan_storage,simulation_fields]
             origins = {module.__name__: str(module.__file__) for module in modules}
             if report['frozen']:
                 root = Path(sys.executable).resolve().parent
@@ -699,12 +850,15 @@ def run(report_path):
     return 0 if report['passed'] else 1
 
 
-def run_native_startup(report_path):
+def run_native_startup(report_path, workspace='device'):
     """Verify the real main/event loop and compositor using an owned backdrop."""
+    if workspace not in ('device','original'):
+        raise ValueError('Native startup verification requires device or original workspace.')
     import ctypes
     from ctypes import wintypes as W
     from PyQt6.QtCore import QPoint, QTimer, Qt
-    from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget
+    from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QLineEdit
+    from PyQt6.QtTest import QTest
     from app_version import APP_VERSION
     from qt_common import preferences
 
@@ -712,7 +866,7 @@ def run_native_startup(report_path):
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report = dict(version=APP_VERSION, frozen=bool(getattr(sys, 'frozen', False)),
                   executable=str(Path(sys.executable).resolve()), platform='windows',
-                  checks={}, passed=False)
+                  workspace=workspace, checks={}, passed=False)
     background = None
     window = None
     application = None
@@ -732,6 +886,24 @@ def run_native_startup(report_path):
                                   ctypes.c_int, ctypes.c_int, W.UINT]
     user.SendMessageW.argtypes = [W.HWND, W.UINT, W.WPARAM, W.LPARAM]
     user.SendMessageW.restype = ctypes.c_ssize_t
+    dwm = ctypes.WinDLL('dwmapi')
+
+    def native_image(color):
+        # Only these two owned windows can appear in the capture. Reestablish
+        # their order after every Qt state transition and backdrop repaint.
+        background.setStyleSheet('background:' + color + ';')
+        background.repaint()
+        user.SetWindowPos(int(background.winId()), W.HWND(-1), 0, 0, 0, 0, 0x13)
+        user.SetWindowPos(int(window.winId()), W.HWND(-1), 0, 0, 0, 0, 0x13)
+        window.activateWindow()
+        user.SetForegroundWindow(int(window.winId()))
+        QTest.qWait(100)
+        dwm.DwmFlush()
+        top_left = window.mapToGlobal(QPoint(0, 0))
+        screen = window.windowHandle().screen()
+        image = screen.grabWindow(0, top_left.x(), top_left.y(), window.width(), window.height()).toImage()
+        assert not image.isNull(), 'No native compositor image.'
+        return image
 
     def prepare_saved_geometry():
         # The normal main creates the only QApplication. Its window factory
@@ -743,7 +915,7 @@ def run_native_startup(report_path):
         donor.move(20, 20)
         donor.setWindowState(Qt.WindowState.WindowMaximized)
         preferences().setValue('geometry', donor.saveGeometry())
-        preferences().setValue('glass_opacity', 76)
+        preferences().setValue('glass_opacity', 35)
         preferences().sync()
         donor.deleteLater()
 
@@ -760,6 +932,10 @@ def run_native_startup(report_path):
         application.quit()
 
     def capture(name, maximized):
+        user.SetWindowPos(int(background.winId()), W.HWND(-1), 0, 0, 0, 0, 0x13)
+        user.SetWindowPos(int(window.winId()), W.HWND(-1), 0, 0, 0, 0, 0x13)
+        QTest.qWait(100)
+        dwm.DwmFlush()
         hwnd = int(window.winId())
         report.setdefault('state_snapshots', []).append(dict(name=name, qt_maximized=window.isMaximized(),
             native_maximized=bool(user.IsZoomed(hwnd)), qt_visible=window.isVisible(),
@@ -767,6 +943,8 @@ def run_native_startup(report_path):
             preferences_file=window.preferences.fileName()))
         save()
         assert window.isVisible() and user.IsWindowVisible(hwnd), 'Window never became visible.'
+        assert window._construction_complete and window._startup_painted, 'The workspace was inspected before startup completed.'
+        assert window.workspace_profile==workspace, 'The selected workspace was not opened.'
         # Qt maximizes a frameless window by changing its geometry; Windows
         # need not set WS_MAXIMIZE/IsZoomed. Verify the actual native surface.
         assert window.isMaximized() == maximized, 'The saved Qt window state was not restored.'
@@ -781,47 +959,69 @@ def run_native_startup(report_path):
             available = window.windowHandle().screen().availableGeometry()
             assert abs(client.right-round(available.width()*dpr)) <= 1
             assert abs(client.bottom-round(available.height()*dpr)) <= 1
-        center = window.mapToGlobal(window.rect().center())
         # Convert via the native client origin for per-monitor DPI coordinates.
         user.ClientToScreen.argtypes = [W.HWND, ctypes.POINTER(W.POINT)]
         origin = W.POINT(0, 0)
         user.ClientToScreen(hwnd, ctypes.byref(origin))
-        hit = user.WindowFromPoint(W.POINT(origin.x+client.right//2, origin.y+client.bottom//2))
-        assert hit and int(user.GetAncestor(hit, 2) or hit) == hwnd, 'The rendered window is entirely transparent to native hit testing.'
+        fields = [field for field in window.findChildren(QLineEdit) if field.isVisible()]
+        assert fields, 'No visible input control.'
+        target = fields[0].mapTo(window, fields[0].rect().center())
+        hit = user.WindowFromPoint(W.POINT(origin.x+round(target.x()*dpr), origin.y+round(target.y()*dpr)))
+        assert hit and int(user.GetAncestor(hit, 2) or hit) == hwnd, 'The input control has no native hit target.'
+        caption = window.chrome.mapTo(window, QPoint(round(window.chrome.width()*.65), 25))
+        caption_hit = user.WindowFromPoint(W.POINT(origin.x+round(caption.x()*dpr), origin.y+round(caption.y()*dpr)))
+        assert caption_hit and int(user.GetAncestor(caption_hit, 2) or caption_hit) == hwnd, 'Empty caption space clicks through instead of allowing window drag.'
+        if not maximized:
+            edge_hit = user.WindowFromPoint(W.POINT(origin.x+2, origin.y+client.bottom//2))
+            assert edge_hit and int(user.GetAncestor(edge_hit, 2) or edge_hit) == hwnd, 'The resize edge clicks through.'
         raster = window.grab().toImage()
         raster.save(str(report_path.parent/(name+'-qt.png')))
         details = dict(qt_maximized=window.isMaximized(), native_maximized=bool(user.IsZoomed(hwnd)),
                        size=[window.width(), window.height()], native_client=[client.right, client.bottom],
                        frame_margins=[margins.left(), margins.top(), margins.right(), margins.bottom()],
-                       native_hit_matches_window=True)
+                       native_hit_matches_window=True, native_caption_hit_matches_window=True,
+                       native_resize_edge_verified=not maximized)
         if maximized:
-            assert window.centralWidget().grab().toImage().pixelColor(3, 3).alpha() == 255
-            top_left = window.mapToGlobal(QPoint(0, 0))
-            screen = window.windowHandle().screen()
-            native = screen.grabWindow(0, top_left.x(), top_left.y(), window.width(), window.height()).toImage()
-            assert not native.isNull(), 'No native compositor image.'
-            native = native.scaled(raster.size())
+            assert window._desktop_glass.alpha_active, 'Maximized alpha painting is unavailable.'
+            assert 80 <= window.centralWidget().grab().toImage().pixelColor(3, 3).alpha() < 255
+            assert window._desktop_glass.last_hresult['system_backdrop']==0
+            native = native_image('#b42828').scaled(raster.size())
             native.save(str(report_path.parent/(name+'-native.png')))
+            alternate = native_image('#2828b4').scaled(raster.size())
+            alternate.save(str(report_path.parent/(name+'-alternate-native.png')))
             matches = 0
             total = 0
-            for row in range(1, 13):
-                for column in range(1, 17):
-                    x = round(column*(raster.width()-1)/17)
-                    y = round(row*(raster.height()-1)/13)
+            transparent = 0
+            changed = 0
+            for row in range(1, 31):
+                for column in range(1, 41):
+                    x = round(column*(raster.width()-1)/41)
+                    y = round(row*(raster.height()-1)/31)
                     expected = raster.pixelColor(x, y)
                     actual = native.pixelColor(x, y)
+                    other = alternate.pixelColor(x, y)
                     if expected.alpha() == 255:
                         total += 1
-                        matches += max(abs(a-b) for a,b in zip(expected.getRgb()[:3], actual.getRgb()[:3])) <= 12
+                        accurate = max(abs(a-b) for a,b in zip(expected.getRgb()[:3], actual.getRgb()[:3])) <= 12
+                        stable = max(abs(a-b) for a,b in zip(actual.getRgb()[:3], other.getRgb()[:3])) <= 5
+                        matches += accurate and stable
+                    elif expected.alpha() <= 160:
+                        transparent += 1
+                        changed += max(abs(a-b) for a,b in zip(actual.getRgb()[:3], other.getRgb()[:3])) > 20
             assert total >= 100 and matches/total >= .85, 'The compositor is not displaying the painted controls.'
+            assert transparent >= 30 and changed/transparent >= .8, 'The workspace does not reveal the changing owned backdrop.'
             details['native_pixels_match_fraction'] = matches/total
+            details.update(qt_surface_alpha_preserved=True, visible_controls_verified=True,
+                           transparent_background_verified=True, transparent_samples=transparent,
+                           changed_background_fraction=changed/transparent)
         report['checks'][name] = dict(passed=True, detail=details)
         save()
 
     def step(index):
         nonlocal background
         names = ('initial_maximized_native_surface', 'restore_state', 'remaximize_native_surface',
-                 'system_restore_state', 'system_maximize_native_surface')
+                 'system_restore_state', 'system_maximize_native_surface',
+                 'native_caption_restore_state','native_caption_maximize_surface')
         try:
             if index == 0:
                 background = QWidget()
@@ -835,10 +1035,10 @@ def run_native_startup(report_path):
                 return
             capture(names[index-1], index % 2 == 1)
             if index == 1:
-                window.showNormal()
+                QTest.mouseClick(window.chrome.maximize_button,Qt.MouseButton.LeftButton)
                 QTimer.singleShot(400, lambda: step(2))
             elif index == 2:
-                window.showMaximized()
+                QTest.mouseClick(window.chrome.maximize_button,Qt.MouseButton.LeftButton)
                 QTimer.singleShot(400, lambda: step(3))
             elif index == 3:
                 user.SendMessageW(int(window.winId()), 0x0112, 0xF120, 0)
@@ -846,6 +1046,10 @@ def run_native_startup(report_path):
             elif index == 4:
                 user.SendMessageW(int(window.winId()), 0x0112, 0xF030, 0)
                 QTimer.singleShot(500, lambda: step(5))
+            elif index in (5,6):
+                user.SendMessageW(int(window.winId()),0x00A1,9,0)
+                user.SendMessageW(int(window.winId()),0x00A2,9,0)
+                QTimer.singleShot(500,lambda:step(index+1))
             else:
                 report['passed'] = True
                 save()
@@ -864,11 +1068,13 @@ def run_native_startup(report_path):
         assert application.platformName() == 'windows', 'This check requires the Windows Qt platform.'
         prepare_saved_geometry()
         window = original(*args, **kwargs)
-        QTimer.singleShot(700, lambda: step(0))
+        # Deferred construction returns a hidden, incomplete main window.
+        # Start native checks only after its restored state has really painted.
+        window.startupPainted.connect(lambda:QTimer.singleShot(300,lambda:step(0)))
         return window
     qt_app.OpticalStudio = instrumented
     try:
-        qt_app.main(['--library', str(Path(os.environ['S4_LIBRARY_ROOT'])), '--no-restore', '--look', 'glass_dark'])
+        qt_app.main(['--library', str(Path(os.environ['S4_LIBRARY_ROOT'])), '--no-restore', '--look', 'glass_dark', '--workspace',workspace])
     except Exception:
         report['error'] = traceback.format_exc()
         save()

@@ -1,0 +1,47 @@
+{
+  "version": "1.3.3",
+  "passed": true,
+  "source_tree_sha256": "307add90a2247f12ccf20c2eb41c542c0ef3ac0c987ad56cc9e54247c94efbf5",
+  "selected_baseline": "Optical Design Studio - Absolute Phase Fix (2026-10-13 snapshot)",
+  "selected_baseline_executables": {
+    "Optical Design Studio.exe": "8c45058390f24306bc6062af93c14cd443082e2c776d662aa57a3e0ad9fd35fd",
+    "OpticalDesignBackend.exe": "17033f65d6bb41f93c98b3528b819e69ee77681a8e56ee74a3ecd0c5af17aaa0"
+  },
+  "source_changes_from_selected_snapshot": [
+    "app_version.py (version and build date only)"
+  ],
+  "source_tests": 17,
+  "full_source_suite_rerun": false,
+  "frozen_gates": {
+    "frozen-selftest": {
+      "passed": true,
+      "checks": 12,
+      "report_sha256": "096d40b0af5887264661f108adadf5c7267ef890c2627c231223b8df0e9f051b"
+    },
+    "frozen-native-device": {
+      "passed": true,
+      "checks": 7,
+      "report_sha256": "c6e8e6a1bd8e971e6987df78226075b38d61ca24b51df06364f9aa0c6c5fad88"
+    },
+    "frozen-native-original": {
+      "passed": true,
+      "checks": 7,
+      "report_sha256": "eaf9913fab86252f7ce81ac8fc1a987e5b6d4a1b32bf5b989583751840347334"
+    }
+  },
+  "compiled_modules_verified_per_executable": 142,
+  "phase": {
+    "current_backend_jobs": 7,
+    "current_samples": 22,
+    "max_corrected_phase_error_rad": 9.921048172113442e-16,
+    "scope": "Targeted current frozen backend checks only; no inherited claim for the changed phase code and no full paper sweep rerun."
+  },
+  "executables": {
+    "Optical Design Studio.exe": "896fa54ed72a57b138d7dd6381b35fc13433fa4f35515a505b1a0ad598b1662c",
+    "OpticalDesignBackend.exe": "b6cc4883f87976310a1aabfd7a8b2474bb866ac091ee892b7199efcdbe5c52e5"
+  },
+  "limitations": [
+    "Published-paper absolute phase mismatch remains unresolved.",
+    "No new full convergence sweep or GPU performance validation."
+  ]
+}

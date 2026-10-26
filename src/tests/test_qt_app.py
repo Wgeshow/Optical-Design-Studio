@@ -44,15 +44,29 @@ from data_library import DataLibrary,read_json
 
 class DesktopApplicationTests(unittest.TestCase):
 
+    def test_builder_run_uses_selected_workflow_without_electrical_mesh_preflight_for_optics(self):
+        builder=self.window.pages['Structure']
+        for engine,page in ((0,self.window.optical_setup),(5,self.window.electrical_page),(6,self.window.coupled_page)):
+            self.window._navigate_route(2,engine);self.window._navigate_route(0)
+            with patch.object(builder,'apply_inspector',return_value=True),patch.object(builder,'validate_current',side_effect=AssertionError('An optical cell does not need the full electrical mesh')),patch.object(page,'run') as run:
+                self.window.run_button.click()
+                run.assert_called_once_with()
+            self.assertEqual(self.window.navigation.currentRow(),2)
+            self.assertEqual(self.window.simulation_engines.currentIndex(),engine)
+        self.window._navigate_route(0)
+        with patch.object(builder,'apply_inspector',return_value=False),patch.object(self.window.coupled_page,'run') as run:
+            self.window.run_button.click();run.assert_not_called()
+        self.assertEqual(self.window.navigation.currentRow(),0)
+
     def test_fixed_run_actions_dispatch_without_moving_with_panels(self):
         self.window._navigate_route(2,0)
         self.app.processEvents()
         origin=self.window.run_button.mapTo(self.window,self.window.run_button.rect().topLeft())
-        page=self.window.pages['Simulate']
-        page.workspace_splitter.setSizes([180,750,280])
+        page=self.window.optical_setup
+        page.select_section('optical.outputs')
         self.app.processEvents()
         self.assertEqual(origin,self.window.run_button.mapTo(self.window,self.window.run_button.rect().topLeft()))
-        self.assertEqual(self.window.run_button.width(),160)
+        self.assertEqual(self.window.run_button.width(),202)
         self.window.project_path=Path(self.temp.name)/('long-project-name-'*15+'.json')
         self.window._refresh_project_file();self.app.processEvents()
         self.assertEqual(origin,self.window.run_button.mapTo(self.window,self.window.run_button.rect().topLeft()))
@@ -78,7 +92,7 @@ class DesktopApplicationTests(unittest.TestCase):
         worker.cancel.assert_called_once_with()
         self.store._worker=None;self.store.busy=False
         self.window.busy_changed(False)
-        self.assertTrue(self.window.stop_button.isVisible())
+        self.assertFalse(self.window.stop_button.isVisible())
 
     @classmethod
 
@@ -228,7 +242,7 @@ class DesktopApplicationTests(unittest.TestCase):
 
                 for row in range(self.window.tool_navigation.count())}
 
-        expected={'Structure','Materials','S4 · RCWA','MEEP · FDTD',
+        expected={'Structure','Materials','S4 · RCWA','MEEP · FDTD','Electrical','Coupled',
 
                   'Simulation Sweep','AI Search','Field maps','Saved results',
 
@@ -238,7 +252,7 @@ class DesktopApplicationTests(unittest.TestCase):
 
         for label,(page,engine) in {
 
-                'S4 · RCWA':(2,0),'MEEP · FDTD':(2,1),
+                'S4 · RCWA':(2,0),'MEEP · FDTD':(2,1),'Electrical':(2,5),'Coupled':(2,6),
 
                 'Simulation Sweep':(3,None),'Field maps':(2,3),
 
@@ -268,7 +282,7 @@ class DesktopApplicationTests(unittest.TestCase):
 
         self.assertNotIn('PCSEL',self.window.pages)
 
-        self.assertEqual(self.window.stack.count(),9)
+        self.assertEqual(self.window.stack.count(),10)
 
         self.assertFalse(any('Laser' in label or 'PCSEL' in label for label,_,_ in self.window._tool_pages))
 
@@ -281,25 +295,34 @@ class DesktopApplicationTests(unittest.TestCase):
             self.assertTrue(self.window.sidebar.isHidden())
 
             expected_route=2 if page in (4,5) else page
-            self.assertEqual(self.window.optical_routes[self.window.optical_workflow.currentIndex()],expected_route)
+            self.assertEqual(self.window.optical_routes[self.window.optical_workflow.currentIndex()],2 if page==3 else expected_route)
 
-        self.assertEqual(self.window.optical_workflow.count(),7)
-
-        self.assertEqual(self.window.optical_workflow.tabText(5),'Settings')
-
-        self.assertEqual(self.window.optical_workflow.tabText(6),'Help')
+        self.window._navigate_route(0)
+        self.assertEqual([self.window.optical_workflow.tabText(i) for i in range(self.window.optical_workflow.count())],
+            ['Structure','Materials','Simulation','Results','Settings','Help'])
+        for engine in (0,5,6):
+            self.window._navigate_route(2,engine)
+            self.assertEqual([self.window.optical_workflow.tabText(i) for i in range(self.window.optical_workflow.count())],
+                ['Structure','Materials','Simulation','Results','Settings','Help'])
+            self.assertEqual(self.window.optical_routes,[0,1,2,9,6,7])
+        self.window._navigate_route(9)
+        self.assertIs(self.window.stack.currentWidget(),self.window.results_page)
+        self.assertEqual(self.window.optical_routes,[0,1,2,9,6,7])
 
         for width in (640,1460):
 
             self.window.resize(width,800)
 
-            for page in range(7):
-
-                self.window.optical_workflow.setCurrentIndex(page)
+            for label,route in [('Structure',0),('Materials',1),('Simulation',2),('Results',9),('Settings',6),('Help',7)]:
+                target=next(i for i in range(self.window.optical_workflow.count()) if self.window.optical_workflow.tabText(i)==label) if label!='Results' else None
+                if target is None:
+                    self.window._navigate_route(2,0)
+                    target=next(i for i in range(self.window.optical_workflow.count()) if self.window.optical_workflow.tabText(i)==label)
+                self.window.optical_workflow.setCurrentIndex(target)
 
                 self.app.processEvents()
 
-                self.assertEqual(self.window.stack.currentIndex(),self.window.optical_routes[page])
+                self.assertEqual(self.window.stack.currentIndex(),route)
 
                 self.assertFalse(self.window.sidebar.isVisible())
 
@@ -327,7 +350,7 @@ class DesktopApplicationTests(unittest.TestCase):
 
                 self.assertTrue(self.window.chrome.file_button.isVisible())
 
-                self.assertTrue(self.window.project_header.isVisible())
+                self.assertFalse(self.window.project_header.isVisible())
 
                 self.assertFalse(self.window.chrome.view_button.isVisible())
 
@@ -369,7 +392,8 @@ class DesktopApplicationTests(unittest.TestCase):
 
         self.wait_idle()
 
-        self.assertTrue((fields.field_directory/'electric_fields.csv').is_file())
+        from field_storage import field_data_exists
+        self.assertTrue(field_data_exists(fields.field_directory))
 
         self.assertGreaterEqual(len(fields.plot.figure.axes),4)
 

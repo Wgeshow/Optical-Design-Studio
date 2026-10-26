@@ -185,6 +185,7 @@ class MaterialsPage(QWidget):
     """Edits the same material collection used by all calculation pages."""
     def __init__(self, store, parent=None):
         super().__init__(parent)
+        self.setObjectName('materialsWorkspace')
         self.store = store
         self._presets = {}
         self._notes_material = None
@@ -307,6 +308,17 @@ class MaterialsPage(QWidget):
         self._build_import()
         self._build_manual()
         self._reference_layout(root,inspect,properties_panel,properties_layout,body,chart_layout,constants_title)
+        # Optical inspector tabs remain available through ``tabs``. The outer
+        # workspace switch gives the electrical catalog the whole page width.
+        self.optical_workspace=inspect
+        root.removeWidget(inspect)
+        self.workspace_tabs=QTabWidget();self.workspace_tabs.setObjectName('materialWorkspaces')
+        self.workspace_tabs.addTab(inspect,'Optical materials')
+        from qt_electrical_material_catalog import ElectricalMaterialCatalog
+        self.electrical_catalog=ElectricalMaterialCatalog(store)
+        self.electrical_tab_index=self.workspace_tabs.addTab(self.electrical_catalog,'Electrical materials')
+        self.workspace_tabs.setMinimumWidth(0)
+        root.insertWidget(0,self.workspace_tabs,1)
         self.status = ActionStatusLabel()
         self.status.setWordWrap(True)
         self.status.setTextFormat(Qt.TextFormat.PlainText)
@@ -473,6 +485,14 @@ class MaterialsPage(QWidget):
             data,_,_=material_data(self.store.library,(row,notes),self.store.materials,self.store.files,self.low.value(),self.high.value())
             export_frame(self,data,self.status,'optical-constants.csv')
         except Exception as exc:self.status.setText(str(exc))
+
+    def open_electrical_material(self,material_id=None):
+        self.workspace_tabs.setCurrentIndex(self.electrical_tab_index)
+        if material_id:self.electrical_catalog.select_material(material_id)
+
+    def open_optical_materials(self,inspector_index=0):
+        self.workspace_tabs.setCurrentIndex(0)
+        self.tabs.setCurrentIndex(inspector_index)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

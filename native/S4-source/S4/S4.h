@@ -20,6 +20,8 @@
 #ifndef S4_H_INCLUDED
 #define S4_H_INCLUDED
 
+#include <stddef.h>
+
 /************************* Fundamental types *************************/
 typedef double S4_real;
 
@@ -227,6 +229,15 @@ int S4_Simulation_ExcitationDipole(S4_Simulation *S, const double k[2], const ch
 /***********************************/
 int S4_Simulation_SolveLayer(S4_Simulation *S, S4_LayerID L);
 
+/* Export the same dielectric operators used by the modal solver, without
+ * computing eigenvalues or amplitudes. Buffers are column-major interleaved
+ * complex doubles: n*n and (2*n)*(2*n), respectively. */
+int S4_Simulation_IsMirrorEligible(const S4_Simulation *S);
+int S4_Simulation_GetLayerOperators(
+	S4_Simulation *S, S4_LayerID L, size_t n,
+	S4_real *epsilon_inv, S4_real *epsilon2
+);
+
 /****************************/
 /* Output related functions */
 /****************************/
@@ -249,6 +260,14 @@ int S4_Simulation_GetWaves(S4_Simulation *S, S4_LayerID layer, S4_real *wave);
 int S4_Simulation_GetFieldPlane(
 	S4_Simulation *S, const int nxy[2], const S4_real *xyz0,
 	S4_real *E, S4_real *H
+);
+
+// Packed native-endian complex128 coefficients, shape [nz,n_G,6], with
+// components Ex,Ey,Ez,Hx,Hy,Hz. The output buffer is 12*nz*n_G doubles.
+// To evaluate at x,y multiply each order by exp(i*(kx*x+ky*y)).
+// Layer selection and interface limits match Simulation_GetField.
+int S4_Simulation_GetFieldCoefficientsMany(
+	S4_Simulation *S, size_t nz, const S4_real *z, S4_real *coefficients
 );
 
 int S4_Simulation_GetEpsilon(

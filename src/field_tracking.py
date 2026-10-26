@@ -3,7 +3,6 @@
 Fractions refer to integrals of electric intensity, not stored optical energy.
 Comparisons align layers in fractional cell coordinates and fractional layer depth.
 """
-import csv
 import math
 from pathlib import Path
 import json
@@ -31,13 +30,10 @@ def _periodic_delta(a, b):
     return (a-b+.5) % 1. - .5
 
 
-def _statistics(rows, weights, ax, ay, start, thickness):
+def _statistics_arrays(xyz, electric, magnetic, intensity, loss, weights, ax, ay, start, thickness):
     weights = np.asarray(weights, dtype=float)
-    intensity = np.array([r['E2'] for r in rows])
     weighted = weights*intensity
     volume, total = float(weights.sum()), float(weighted.sum())
-    loss = np.array([r['loss_proxy'] for r in rows])
-    xyz = np.array([[r['x_um'], r['y_um'], r['z_um']] for r in rows])
     centroid, confidence, moments, spread = {}, {}, {}, {}
     for axis, period, col in [('x', ax, 0), ('y', ay, 1)]:
         fractions = xyz[:, col]/period
@@ -58,51 +54,55 @@ def _statistics(rows, weights, ax, ay, start, thickness):
                                   if zmean is not None else None)
     maximum = float(intensity.max())
     ties = np.flatnonzero(np.isclose(intensity, maximum, rtol=1e-9, atol=1e-12))
-    chosen = rows[int(ties[0])]
-    uniform = len(ties) == len(rows)
-    hotspot = dict(x_um=chosen['x_um'], y_um=chosen['y_um'], z_um=chosen['z_um'],
-                   x_fraction=chosen['x_um']/ax, y_fraction=chosen['y_um']/ay,
-                   z_layer_fraction=(chosen['z_um']-start)/thickness,
+    chosen = xyz[int(ties[0])]
+    uniform = len(ties) == len(xyz)
+    hotspot = dict(x_um=float(chosen[0]), y_um=float(chosen[1]), z_um=float(chosen[2]),
+                   x_fraction=float(chosen[0]/ax), y_fraction=float(chosen[1]/ay),
+                   z_layer_fraction=float((chosen[2]-start)/thickness),
                    tied_samples=int(len(ties)), unique=len(ties) == 1)
     if uniform:
         for name in ('x_um','y_um','z_um','x_fraction','y_fraction','z_layer_fraction'):
             hotspot[name] = None
-    components = {name: float(sum(w*abs(r['E'][i])**2 for w,r in zip(weights,rows))/total)
-                  if total > 0 else 0. for i,name in enumerate(('Ex','Ey','Ez'))}
-    output = dict(start_um=start, thickness_um=thickness, sample_count=len(rows),
+    component_integrals = np.sum(weights[:, None]*np.abs(electric)**2, axis=0)
+    components = {name: float(component_integrals[i]/total) if total > 0 else 0.
+                  for i,name in enumerate(('Ex','Ey','Ez'))}
+    output = dict(start_um=start, thickness_um=thickness, sample_count=len(xyz),
                   mean_E2=total/volume, max_E2=maximum, integrated_E2_um3=total,
                   mean_loss_proxy=float(np.sum(weights*loss)/volume),
                   integrated_loss_proxy_um3=float(np.sum(weights*loss)),
                   centroid=centroid, centroid_confidence=confidence,
                   circular_moments=moments, spread=spread, hotspot=hotspot,
                   component_fractions=components)
-    if all(r['H'] is not None for r in rows):
-        output['mean_poynting'] = {name: float(sum(w*r['S'][i] for w,r in zip(weights,rows))/volume)
-                                  for i,name in enumerate(('x','y','z'))}
+    if magnetic is not None:
+        flux = np.sum(weights[:, None]*(.5*np.cross(electric, magnetic.conj()).real), axis=0)/volume
+        output['mean_poynting'] = {name: float(flux[i]) for i,name in enumerate(('x','y','z'))}
     return output
 
 
-def _signature(rows, grid, depth_fractions, depth_weights, ax, ay, start, thickness):
+def _signature_arrays(xyz, electric, grid, depth_indices, depth_weights, ax, ay):
     """Mean complex E per bounded cell bin; no interpolation across interfaces."""
     count = min(grid, 6)
-    bins = {}
-    for row in rows:
-        ix = min(grid-1, int((row['x_um']/ax+.5)*grid))
-        iy = min(grid-1, int((row['y_um']/ay+.5)*grid))
-        iz = min(range(len(depth_fractions)), key=lambda k: abs(depth_fractions[k]-(row['z_um']-start)/thickness))
-        key = (iz, ix*count//grid, iy*count//grid)
-        bins.setdefault(key, []).append(row['E'])
-    values, weights = [], []
-    for key in sorted(bins):
-        samples = bins[key]
-        vector = np.mean(np.array(samples), axis=0)
-        values.append([float(c) for v in vector for c in (v.real,v.imag)])
-        weights.append(float(depth_weights[key[0]]*len(samples)/(grid*grid)))
-    return dict(bin_grid=count, values=values, weights=weights)
+    ix = np.minimum(grid-1, ((xyz[:, 0]/ax+.5)*grid).astype(np.intp))*count//grid
+    iy = np.minimum(grid-1, ((xyz[:, 1]/ay+.5)*grid).astype(np.intp))*count//grid
+    bins = (depth_indices*count+ix)*count+iy
+    counts = np.bincount(bins, minlength=len(depth_weights)*count*count)
+    present = np.flatnonzero(counts)
+    values = np.empty((len(present), 6), dtype=float)
+    for component in range(3):
+        values[:, 2*component] = np.bincount(bins, weights=electric[:, component].real,
+                                           minlength=len(counts))[present]/counts[present]
+        values[:, 2*component+1] = np.bincount(bins, weights=electric[:, component].imag,
+                                             minlength=len(counts))[present]/counts[present]
+    weights = np.asarray(depth_weights)[present//(count*count)]*counts[present]/(grid*grid)
+    return dict(bin_grid=count, values=values.tolist(), weights=weights.tolist())
 
 
-def enrich_fields(directory):
+def enrich_fields(directory, arrays=None, *, save=True):
     """Recompute v2 descriptors from complete raw data; legacy E-only CSVs are valid.
+
+    Pass field_storage's flat array mapping to avoid any raw-data reread. With
+    save=False the caller can attach run diagnostics before saving the result;
+    the complete contour artifact is still written in either mode.
 
     Original .25/.5/.75 samples use explicit nearest-depth-cell (Voronoi)
     quadrature weights .375/.25/.375. New midpoint samples have equal weights.
@@ -124,41 +124,52 @@ def enrich_fields(directory):
         start += thickness
     if not layer_list:
         raise ValueError('Field descriptors require finite-thickness layers')
-    groups = {name: [] for name,_,_ in layer_list}
-    loss_factors = {}
-    with (directory/'electric_fields.csv').open(newline='', encoding='utf-8-sig') as stream:
-        reader = csv.DictReader(stream)
-        has_h = all(name in reader.fieldnames for name in ('Hx_real','Hx_imag','Hy_real','Hy_imag','Hz_real','Hz_imag'))
-        for row in reader:
-            if row.get('plane') != 'volume_samples':
-                continue
-            name = row['layer']
-            if name not in groups:
-                raise ValueError('Field CSV contains an unexpected layer')
-            item = {key: _finite(row[key]) for key in ('x_um','y_um','z_um')}
-            item['E'] = [complex(_finite(row[k+'_real']), _finite(row[k+'_imag'])) for k in ('Ex','Ey','Ez')]
-            item['H'] = ([complex(_finite(row[k+'_real']), _finite(row[k+'_imag'])) for k in ('Hx','Hy','Hz')]
-                         if has_h else None)
-            item['S'] = ([.5*(item['E'][(i+1)%3]*item['H'][(i+2)%3].conjugate()
-                              - item['E'][(i+2)%3]*item['H'][(i+1)%3].conjugate()).real for i in range(3)] if has_h else None)
-            item['E2'] = float(sum(abs(v)**2 for v in item['E']))
-            if not math.isfinite(item['E2']):
-                raise ValueError('Nonfinite electric intensity')
-            item['material'] = row['material']
-            if row['material'] not in loss_factors:
-                loss_factors[row['material']] = max(0.,epsilon(materials[row['material']],wavelength).imag)
-            item['loss_proxy'] = loss_factors[row['material']]*item['E2']
-            groups[name].append(item)
-    statistics, signatures, all_rows, all_weights = {}, {}, [], []
+    if arrays is None:
+        from field_storage import load_field_arrays
+        arrays = load_field_arrays(directory)
+    volume_indices = np.flatnonzero(np.asarray(arrays['plane']) == 0)
+    xyz = np.asarray(arrays['xyz'], dtype=float)[volume_indices]
+    electric = np.asarray(arrays['E'], dtype=complex)[volume_indices]
+    has_h = arrays.get('H') is not None
+    magnetic = np.asarray(arrays['H'], dtype=complex)[volume_indices] if has_h else None
+    layer_ids = np.asarray(arrays['layer'], dtype=np.intp)[volume_indices]
+    material_ids = np.asarray(arrays['material'], dtype=np.intp)[volume_indices]
+    layer_names = list(map(str, arrays['layer_names']))
+    material_names = list(map(str, arrays['material_names']))
+    if xyz.shape != (len(volume_indices), 3) or electric.shape != xyz.shape or (has_h and magnetic.shape != xyz.shape):
+        raise ValueError('Invalid field vector array dimensions')
+    if not np.isfinite(xyz).all() or not np.isfinite(electric).all() or (has_h and not np.isfinite(magnetic).all()):
+        raise ValueError('Field data contains a nonfinite value')
+    if np.any(layer_ids < 0) or np.any(layer_ids >= len(layer_names)):
+        raise ValueError('Field data contains an unexpected layer')
+    if np.any(material_ids < 0) or np.any(material_ids >= len(material_names)):
+        raise ValueError('Field data contains an unexpected material')
+    known_layers = {name for name, _, _ in layer_list}
+    if any(layer_names[i] not in known_layers for i in np.unique(layer_ids)):
+        raise ValueError('Field data contains an unexpected layer')
+    loss_factors = np.zeros(len(material_names))
+    for i in np.unique(material_ids):
+        if material_names[i] not in materials:
+            raise ValueError('Field data contains an unexpected material')
+        loss_factors[i] = max(0., epsilon(materials[material_names[i]], wavelength).imag)
+    intensity = np.sum(np.abs(electric)**2, axis=1)
+    if not np.isfinite(intensity).all():
+        raise ValueError('Nonfinite electric intensity')
+    loss = loss_factors[material_ids]*intensity
+    statistics, signatures, all_indices, all_weights = {}, {}, [], []
     material_integrals = {name:dict(volume_um3=0.,integrated_E2_um3=0.,integrated_loss_proxy_um3=0.) for name in materials}
     sampling = None
     for name, zstart, thickness in layer_list:
-        rows = groups[name]
-        if not rows:
+        indices = np.flatnonzero(layer_ids == layer_names.index(name)) if name in layer_names else np.array([], dtype=np.intp)
+        if not len(indices):
             raise ValueError('Incomplete field data: missing volume samples for '+name)
-        xs = sorted({round(r['x_um']/ax, 10) for r in rows})
-        ys = sorted({round(r['y_um']/ay, 10) for r in rows})
-        fractions = sorted({round((r['z_um']-zstart)/thickness, 9) for r in rows})
+        points, fields = xyz[indices], electric[indices]
+        xfrac, yfrac = np.round(points[:, 0]/ax, 10), np.round(points[:, 1]/ay, 10)
+        zfrac = (points[:, 2]-zstart)/thickness
+        xs, xi = np.unique(xfrac, return_inverse=True)
+        ys, yi = np.unique(yfrac, return_inverse=True)
+        fractions, zi = np.unique(np.round(zfrac, 9), return_inverse=True)
+        fractions = fractions.tolist()
         grid = len(xs)
         expected_xy = [(i+.5)/grid-.5 for i in range(grid)]
         if len(ys) != grid or not np.allclose(xs,expected_xy,atol=1e-8,rtol=0) or not np.allclose(ys,expected_xy,atol=1e-8,rtol=0):
@@ -176,24 +187,29 @@ def enrich_fields(directory):
         if sampling is not None and sampling != (grid, method):
             raise ValueError('Layer field sampling grids are inconsistent')
         sampling = (grid, method)
-        positions = {(round(r['x_um']/ax,10),round(r['y_um']/ay,10),round((r['z_um']-zstart)/thickness,9)) for r in rows}
-        if len(rows) != grid*grid*depths or len(positions) != len(rows):
+        positions = (zi*grid+xi)*grid+yi
+        if len(indices) != grid*grid*depths or len(np.unique(positions)) != len(indices):
             raise ValueError('Incomplete field data: missing or duplicate grid points')
-        weights = [ax*ay*thickness*depth_weights[min(range(depths),key=lambda k:abs(fractions[k]-(r['z_um']-zstart)/thickness))]/(grid*grid) for r in rows]
-        statistics[name] = _statistics(rows,weights,ax,ay,zstart,thickness)
+        weights = ax*ay*thickness*np.asarray(depth_weights)[zi]/(grid*grid)
+        statistics[name] = _statistics_arrays(points, fields, magnetic[indices] if has_h else None,
+                                              intensity[indices], loss[indices], weights, ax, ay, zstart, thickness)
         pattern_materials = {p['material'] for p in model['patterns'] if p['layer'] == name}
-        pattern_integral = sum(w*r['E2'] for r,w in zip(rows,weights) if r['material'] in pattern_materials)
+        pattern_ids = [i for i,n in enumerate(material_names) if n in pattern_materials]
+        pattern_integral = float(np.sum((weights*intensity[indices])[np.isin(material_ids[indices], pattern_ids)]))
         statistics[name]['pattern_material_E2_fraction'] = (pattern_integral/statistics[name]['integrated_E2_um3']
                                                            if statistics[name]['integrated_E2_um3'] > 0 else 0.)
-        signatures[name] = _signature(rows,grid,fractions,depth_weights,ax,ay,zstart,thickness)
-        all_rows.extend(rows)
-        all_weights.extend(weights)
-        for row, weight in zip(rows,weights):
-            item = material_integrals.setdefault(row['material'], dict(volume_um3=0.,integrated_E2_um3=0.,integrated_loss_proxy_um3=0.))
-            item['volume_um3'] += weight
-            item['integrated_E2_um3'] += weight*row['E2']
-            item['integrated_loss_proxy_um3'] += weight*row['loss_proxy']
-    total = _statistics(all_rows,all_weights,ax,ay,0.,start)
+        signatures[name] = _signature_arrays(points, fields, grid, zi, depth_weights, ax, ay)
+        all_indices.append(indices)
+        all_weights.append(weights)
+    ordered = np.concatenate(all_indices)
+    weights = np.concatenate(all_weights)
+    total = _statistics_arrays(xyz[ordered], electric[ordered], magnetic[ordered] if has_h else None,
+                              intensity[ordered], loss[ordered], weights, ax, ay, 0., start)
+    for key, values in [('volume_um3', weights), ('integrated_E2_um3', weights*intensity[ordered]),
+                        ('integrated_loss_proxy_um3', weights*loss[ordered])]:
+        sums = np.bincount(material_ids[ordered], weights=values, minlength=len(material_names))
+        for i in np.unique(material_ids):
+            material_integrals[material_names[i]][key] = float(sums[i])
     for item in list(statistics.values())+list(material_integrals.values()):
         item['E2_fraction'] = item['integrated_E2_um3']/total['integrated_E2_um3'] if total['integrated_E2_um3'] > 0 else 0.
         item['loss_fraction'] = item['integrated_loss_proxy_um3']/total['integrated_loss_proxy_um3'] if total['integrated_loss_proxy_um3'] > 0 else 0.
@@ -212,8 +228,8 @@ def enrich_fields(directory):
                       mean_pcs_E2=sum(v['mean_E2']*v['thickness_um'] for v in selected)/selected_thickness,
                       mean_loss_proxy=sum(v['mean_loss_proxy']*v['thickness_um'] for v in selected)/selected_thickness,
                       definition=FIELD_DEFINITION)
-    from contour_sweep import describe_csv
-    contours=describe_csv(directory, cfg.get('contour_step', .1))
+    from contour_sweep import describe_arrays
+    contours=describe_arrays(directory, arrays, cfg.get('contour_step', .1))
     descriptor['contour_features']=contours['features']
     descriptor['contour_sampling']=dict(step=contours['step'],grid=contours['grid'])
     extra_path=directory/'airhole_field_metrics.json'
@@ -222,7 +238,8 @@ def enrich_fields(directory):
         if extra.get('schema_version') == 1:
             extra['contour_features']=contours['features']
             descriptor['airhole_views']=extra
-    write_json(directory/'field_features.json',descriptor)
+    if save:
+        write_json(directory/'field_features.json',descriptor,compact=True)
     return descriptor
 
 

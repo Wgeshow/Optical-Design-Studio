@@ -18,13 +18,14 @@ from matplotlib.figure import Figure
 COLORS = {
     'light': dict(bg='#f4f6fa', panel='#ffffff', field='#f8fafc', text='#202c40', muted='#5d6d83',
                   border='#dce3ed', accent='#2563eb', hover='#eef3fd', select='#e4edff', header='#f0f3f8', grid='#e2e8f0'),
-    'dark': dict(bg='#11191f', panel='#182229', field='#141e25', text='#e7eff5', muted='#9eafbc',
-                 border='#34434d', accent='#4199e1', hover='#203540', select='#204d64', header='#1b2b34', grid='#2c3e49'),
+    # Default dark roles sampled from the approved shared-builder mockup.
+    'dark': dict(bg='#0b1724', panel='#132332', field='#0d1b26', text='#dceafa', muted='#96afc2',
+                 border='#2b455b', accent='#28a8fa', hover='#1b354b', select='#123e71', header='#122231', grid='#20374a'),
 }
 BASE_COLORS = {key: dict(value) for key, value in COLORS.items()}
 GLASS_COLORS = {
-    'light': dict(bg='#dce8f4', panel='#eef5fc', field='#f8fbff', text='#142d45', muted='#4f6880', border='#b3cadc', accent='#087e9b', hover='#d8edf8', select='#c1e6f4', header='#e4f0fa', grid='#c5d5e5'),
-    'dark': dict(bg='#081b24', panel='#112832', field='#102630', text='#ecf6fc', muted='#acc2d0', border='#3b5966', accent='#34d2df', hover='#24404b', select='#17576a', header='#18333e', grid='#304853'),
+    'light': dict(bg='#f3f4f6', panel='#f8fafc', field='#ffffff', text='#202124', muted='#52565c', border='#b8bcc2', accent='#087e9b', hover='#edf0f3', select='#dcecf0', header='#f0f2f4', grid='#d9dce0'),
+    'dark': dict(bg='#141619', panel='#17191c', field='#24272b', text='#f5f6f7', muted='#c0c3c7', border='#72777e', accent='#34d2df', hover='#30343a', select='#23464b', header='#25282d', grid='#393d43'),
 }
 LOOKS = {'dark': ('B · Dark', 'b', 'dark'), 'light': ('B · Light', 'b', 'light'),
          'glass_dark': ('Glass · Dark', 'glass', 'dark'), 'glass_light': ('Glass · Light', 'glass', 'light')}
@@ -111,8 +112,8 @@ class ThemeManager(QObject):
             supplied=json.loads(str(self.settings.value('custom_ui_colors','{}')))
             self.custom_colors={look:{key:value for key,value in roles.items() if key in CUSTOM_COLOR_ROLES and isinstance(value,str) and re.fullmatch(r'#[0-9a-fA-F]{6}',value)} for look,roles in supplied.items() if look in LOOKS and isinstance(roles,dict)} if isinstance(supplied,dict) else {}
         except (ValueError,TypeError):self.custom_colors={}
-        try:self.glass_opacity=max(0,min(100,int(self.settings.value('glass_opacity',76))))
-        except (ValueError,TypeError):self.glass_opacity=76
+        try:self.glass_opacity=max(0,min(100,int(self.settings.value('glass_opacity',35))))
+        except (ValueError,TypeError):self.glass_opacity=35
         try:
             self.scale = max(70, min(140, int(self.settings.value('interface_scale', 100))))
         except (ValueError, TypeError):
@@ -135,10 +136,11 @@ class ThemeManager(QObject):
         c=dict((GLASS_COLORS if self.style=='glass' else BASE_COLORS)[self.mode])
         overrides=self.custom_colors.get(self.look,{})
         c.update(overrides)
-        c['hover']=blend_color(c['panel'],c['accent'],.10)
-        c['select']=blend_color(c['panel'],c['accent'],.23)
-        c['header']=blend_color(c['panel'],c['accent'],.045)
-        c['grid']=c['border']
+        if overrides or self.style=='glass' or self.mode!='dark':
+            c['hover']=blend_color(c['panel'],c['accent'],.10)
+            c['select']=blend_color(c['panel'],c['accent'],.23)
+            c['header']=blend_color(c['panel'],c['accent'],.045)
+            c['grid']=c['border']
         COLORS[self.mode].clear();COLORS[self.mode].update(c)
         return c
 
@@ -176,7 +178,9 @@ class ThemeManager(QObject):
         factor = self.window_density(width) if self.adaptive else 1.0
         if factor != self.window_factor:
             self.window_factor = factor
-            self.apply(self.mode, persist=False)
+            # Resize changes layout density, not appearance. Reapplying the
+            # stylesheet repolishes all table cells and rebuilds scientific
+            # plots on hidden tabs on the GUI thread.
 
     @property
     def effective_scale(self):
@@ -195,7 +199,8 @@ class ThemeManager(QObject):
     def scale_stylesheet(self, stylesheet):
         def size(match):
             value, unit = float(match[1]), match[2]
-            scaled = max(9, round(value*self.effective_scale, 1)) if unit == 'pt' else max(0, round(value*self.effective_scale))
+            text_scale=max(.70,min(1.40,self.scale/100))
+            scaled = max(9, round(value*text_scale, 1)) if unit == 'pt' else max(0, round(value*self.effective_scale))
             return f'{scaled:g}{unit}'
         return re.sub(r'(\d+(?:\.\d+)?)(pt|px)', size, stylesheet)
 
@@ -206,7 +211,8 @@ class ThemeManager(QObject):
             self.settings.sync()
         app = QApplication.instance()
         c = self.resolve_colors()
-        primary=QColor(c['accent']).darker(150).name() if self.mode=='dark' else c['accent']
+        primary=('#0769dc' if self.style=='b' and self.mode=='dark' and not self.custom_colors.get(self.look)
+                 else QColor(c['accent']).darker(150).name() if self.mode=='dark' else c['accent'])
         primary_text=color_foreground(primary)
         palette = QPalette()
         for role, color in ((QPalette.ColorRole.Window,c['bg']), (QPalette.ColorRole.WindowText,c['text']),
@@ -224,7 +230,11 @@ class ThemeManager(QObject):
                 import matplotlib
                 for name in ('DejaVuSans.ttf','DejaVuSans-Bold.ttf'):
                     QFontDatabase.addApplicationFont(str(Path(matplotlib.get_data_path())/'fonts'/'ttf'/name))
-                app.setFont(QFont('DejaVu Sans',10))
+                font_directory=Path(os.environ.get('WINDIR','C:/Windows'))/'Fonts'
+                system_fonts=[font_directory/name for name in ('segoeui.ttf','segoeuib.ttf','seguisb.ttf')]
+                font_ids=[QFontDatabase.addApplicationFont(str(path)) for path in system_fonts if path.is_file()]
+                loaded_segoe=any(identifier>=0 for identifier in font_ids)
+                app.setFont(QFont('Segoe UI' if loaded_segoe else 'DejaVu Sans',10))
                 app._s4_fonts_loaded=True
             if app.style().objectName().lower()!='fusion':app.setStyle('Fusion')
             if app.palette()!=palette:app.setPalette(palette)
@@ -338,6 +348,7 @@ class ThemeManager(QObject):
                 QCheckBox::indicator:hover {{ border-color:{c['accent']}; }}
                 QCheckBox::indicator:checked {{ background:{c['accent']}; border-color:{c['accent']}; image:url("{check_icon(color_foreground(c['accent']))}"); }}
                 QCheckBox::indicator:disabled {{ border-color:{c['border']}; background:{c['panel']}; }}
+                QCheckBox::indicator:checked:disabled {{ image:url("{check_icon(color_foreground(c['panel']))}"); }}
                 QSlider::groove:horizontal {{ height:5px; background:{c['border']}; border-radius:2px; }}
                 QSlider::sub-page:horizontal {{ background:{c['accent']}; border-radius:2px; }}
                 QSlider::handle:horizontal {{ background:{c['accent']}; width:16px; margin:-6px 0; border-radius:8px; }}
@@ -352,14 +363,16 @@ class ThemeManager(QObject):
             '''
             if self.style=='glass':
                 surface=QColor(c['panel']);surface.setAlpha(clamp_alpha(self.glass_opacity*2.55))
-                lower=QColor(c['header']);lower.setAlpha(clamp_alpha((self.glass_opacity-12)*2.55))
+                lower=QColor(c['header']);lower.setAlpha(surface.alpha())
                 upper_css=f'rgba({surface.red()},{surface.green()},{surface.blue()},{surface.alpha()})'
                 lower_css=f'rgba({lower.red()},{lower.green()},{lower.blue()},{lower.alpha()})'
                 stylesheet+=f'''
                     QMainWindow#opticalStudioWindow {{ background:transparent; }}
                     QScrollArea,QStackedWidget,QScrollArea > QWidget > QWidget {{ background:transparent; }}
                     QWidget#page {{ background:transparent; }}
-                    QGroupBox,QTabWidget::pane {{ background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 {upper_css},stop:1 {lower_css}); border:1px solid {c['border']}; }}
+                    QLabel {{ background:transparent; border:0; padding:0; }}
+                    QGroupBox::title {{ background:transparent; }}
+                    QGroupBox,QTabWidget::pane {{ background:transparent; border:1px solid {c['border']}; }}
                     QFrame#builderPanel {{ background:transparent; border:0; border-radius:14px; }}
                     QFrame#builderPanel QScrollArea,QFrame#builderPanel QScrollArea QWidget {{ background:transparent; }}
                     QFrame#builderPanel QLineEdit,QFrame#builderPanel QComboBox,QFrame#builderPanel QSpinBox,QFrame#builderPanel QDoubleSpinBox,QFrame#builderPanel QScrollArea QLineEdit,QFrame#builderPanel QScrollArea QComboBox,QFrame#builderPanel QScrollArea QSpinBox,QFrame#builderPanel QScrollArea QDoubleSpinBox {{ background:{c['field']}; }}
@@ -367,30 +380,52 @@ class ThemeManager(QObject):
                     QFrame#windowChrome,QFrame#workspaceFooter,QFrame#projectHeader {{ background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 {upper_css},stop:1 {lower_css}); }}
                     QFrame#windowChrome {{ background:transparent; border:0; border-radius:0; }}
                     QToolButton#captionControl,QToolButton#captionControl:hover {{ background:transparent; border:0; }}
+                    QToolButton#chromeAction {{ background:{c['field']}; border-radius:4px; }}
                     QTabBar#opticalWorkflowTabs {{ background:transparent; border:0; }}
                     QTabBar#opticalWorkflowTabs::tab {{ background:transparent; }}
                     QTabBar#opticalWorkflowTabs::tab:selected {{ background:{c['select']}; border-radius:8px; border-bottom:2px solid {c['accent']}; }}
                     QFrame#metricCard {{ background:{c['header']}; border:1px solid {c['border']}; border-radius:12px; }}
                     QSplitter::handle {{ background:transparent; }}
                 '''
-                gloss_top=blend_color(c['field'],c['text'],.12)
-                gloss_band=blend_color(c['field'],c['text'],.045)
-                gloss_bottom=blend_color(c['field'],c['bg'],.45)
-                gloss_primary=blend_color(c['panel'],c['accent'],.38)
-                gloss_primary_bottom=blend_color(c['panel'],c['accent'],.14)
-                gloss_text=color_foreground(gloss_primary_bottom)
-                input_top=blend_color(c['field'],c['text'],.08)
-                input_bottom=blend_color(c['field'],c['bg'],.18)
+                # Neutral opaque control plates preserve precision and contrast;
+                # clear panel surfaces carry the glass effect without stacked gloss.
                 stylesheet+=f'''
-                    QPushButton {{ background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 {gloss_top},stop:0.22 {gloss_band},stop:0.5 {c['field']},stop:1 {gloss_bottom}); border-top:1px solid {blend_color(c['border'],c['text'],.3)}; border-bottom:2px solid {c['bg']}; }}
-                    QPushButton:hover {{ border-color:{c['accent']}; background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 {blend_color(gloss_top,c['accent'],.16)},stop:0.25 {gloss_band},stop:1 {gloss_bottom}); }}
-                    QPushButton:pressed {{ background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 {gloss_bottom},stop:1 {gloss_top}); }}
-                    QPushButton[primary="true"],QFrame#builderPanel QPushButton[primary="true"],QFrame#builderPanel QPushButton#structureContinue {{ color:{gloss_text}; background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 {blend_color(gloss_primary,c['text'],.10)},stop:0.23 {gloss_primary},stop:1 {gloss_primary_bottom}); border:1px solid {c['accent']};border-top:1px solid {blend_color(c['accent'],c['text'],.38)};border-bottom:2px solid {c['bg']}; }}
-                    QPushButton[primary="true"]:hover,QFrame#builderPanel QPushButton[primary="true"]:hover {{ color:{gloss_text}; background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 {blend_color(gloss_primary,c['text'],.18)},stop:0.23 {gloss_primary},stop:1 {gloss_primary_bottom}); }}
-                    QPushButton[primary="true"]:pressed,QFrame#builderPanel QPushButton[primary="true"]:pressed {{ background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 {gloss_primary_bottom},stop:1 {gloss_primary}); }}
-                    QLineEdit,QSpinBox,QDoubleSpinBox,QComboBox,QFrame#builderPanel QLineEdit,QFrame#builderPanel QComboBox,QFrame#builderPanel QSpinBox,QFrame#builderPanel QDoubleSpinBox {{ background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 {input_top},stop:0.2 {c['field']},stop:1 {input_bottom});border-top:1px solid {blend_color(c['border'],c['text'],.22)}; }}
-                    QTabBar::tab:selected,QTabBar#opticalWorkflowTabs::tab:selected {{ background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 {blend_color(gloss_primary,c['text'],.12)},stop:0.23 {gloss_primary},stop:1 {gloss_primary_bottom}); color:{c['text']};border:1px solid {c['accent']};border-top:1px solid {blend_color(c['accent'],c['text'],.35)};border-bottom:2px solid {c['accent']};border-radius:7px; }}
-                    QPushButton:disabled {{ color:{c['muted']};background:{c['panel']};border:1px solid {c['border']}; }}
+                    QPushButton {{ background:{c['field']}; border:1px solid {c['border']}; }}
+                    QPushButton:hover {{ background:{c['hover']}; border-color:{c['accent']}; }}
+                    QPushButton:pressed {{ background:{c['select']}; }}
+                    QPushButton[primary="true"],QFrame#builderPanel QPushButton[primary="true"],QFrame#builderPanel QPushButton#structureContinue {{ background:{primary}; color:{primary_text}; border:1px solid {c['accent']}; }}
+                    QPushButton[primary="true"]:hover,QFrame#builderPanel QPushButton[primary="true"]:hover {{ background:{QColor(primary).lighter(115).name()}; color:{primary_text}; }}
+                    QPushButton[primary="true"]:pressed,QFrame#builderPanel QPushButton[primary="true"]:pressed {{ background:{primary}; color:{primary_text}; }}
+                    QLineEdit,QSpinBox,QDoubleSpinBox,QComboBox,QFrame#builderPanel QLineEdit,QFrame#builderPanel QComboBox,QFrame#builderPanel QSpinBox,QFrame#builderPanel QDoubleSpinBox {{ background:{c['field']}; }}
+                    QTabBar::tab:selected,QTabBar#opticalWorkflowTabs::tab:selected {{ background:{c['select']}; color:{c['text']}; border:1px solid {c['accent']}; border-radius:7px; }}
+                    QPushButton:disabled {{ color:{c['muted']}; background:{c['panel']}; border:1px solid {c['border']}; }}
+                '''
+            if self.style=='b' and self.mode=='dark':
+                stylesheet+=f'''
+                    QWidget {{ font-size:13px; }}
+                    QLabel#sectionTitle {{ font-size:14px; font-weight:600; color:{c['text']}; }}
+                    QLabel#windowTitle {{ font-size:20px; font-weight:600; }}
+                    QLabel#referenceWorkspaceContext {{ font-size:18px; font-weight:400; }}
+                    QFrame#windowChrome {{ border:0; border-bottom:1px solid {c['border']}; border-radius:0;
+                        background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #0a1926,stop:1 #183043); }}
+                    QFrame#projectHeader {{ border:0; border-bottom:1px solid {c['border']}; border-radius:0;
+                        background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #0b1b29,stop:1 #142b3b); }}
+                    QTabBar#opticalWorkflowTabs::tab {{ border:0; border-bottom:1px solid transparent;
+                        border-radius:3px; padding:10px 14px; margin:0 3px 0 0; font-size:12px; font-weight:400; color:{c['text']}; }}
+                    QTabBar#opticalWorkflowTabs::tab:selected {{ color:#eef6ff; font-weight:400; border-bottom:2px solid {c['accent']};
+                        background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #123f68,stop:1 #0b2a47); }}
+                    QFrame#builderPanel {{ border-radius:4px; }}
+                    QLineEdit,QSpinBox,QDoubleSpinBox,QComboBox {{ border-radius:3px; padding:3px 6px; min-height:19px; }}
+                    QSpinBox,QDoubleSpinBox {{ padding-right:20px; }}
+                    QGroupBox {{ border-radius:4px; margin-top:14px; padding:10px 10px 10px; }}
+                    QPushButton {{ border-radius:3px; padding:5px 10px; min-height:20px; font-weight:400; }}
+                    QTabBar::tab {{ border-radius:3px; padding:7px 12px; font-size:12px; font-weight:400; }}
+                    QFrame#workspaceFooter {{ border:0; border-top:1px solid {c['border']}; border-radius:0;
+                        background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #102330,stop:1 #172f40); }}
+                    QLabel#globalStatus {{ font-size:12px; color:#c3d9ed; }}
+                    QPushButton#referenceRun {{ font-size:14px; font-weight:500; min-height:30px; border-radius:4px;
+                        background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #076bd8,stop:1 #0756c3); }}
+                    QPushButton#referenceFooterAction {{ font-size:13px; min-height:30px; border-radius:4px; padding:6px 14px; }}
                 '''
             # Qt already accounts for monitor DPI; this is the independent user zoom.
             stylesheet = self.scale_stylesheet(stylesheet)
@@ -576,12 +611,11 @@ class PlotWidget(QWidget):
         if self.canvas is None:return
         # Live charts always fill their host. Physical paper dimensions are
         # applied only by publication_plot.export_figure.
-        self.canvas.setMinimumSize(0,0)
-        self.canvas.setMaximumSize(16777215,16777215)
-        self.canvas.updateGeometry()
+        if self.canvas.minimumWidth() or self.canvas.minimumHeight():self.canvas.setMinimumSize(0,0)
+        if self.canvas.maximumWidth()!=16777215 or self.canvas.maximumHeight()!=16777215:self.canvas.setMaximumSize(16777215,16777215)
 
     def eventFilter(self,watched,event):
-        if watched is self.canvas_host and event.type()==QEvent.Type.Resize:self.fit_canvas()
+        # The layout resizes its canvas without another geometry invalidation.
         return super().eventFilter(watched,event)
 
     def edit_figure_settings(self):
@@ -706,7 +740,7 @@ def completion_notice(text):
     action=match.group(1).lower()
     title='Completed' if action in ('complete','completed','finished') else action.capitalize()
     summary=text.split('. ',1)[0].split('\n',1)[0]
-    if len(summary)>145:summary=summary[:142].rstrip()+'…'
+    if len(summary)>145:summary=summary[:142].rstrip()+'â€¦'
     return title,summary
 
 

@@ -142,6 +142,24 @@ class NativeMaterialLibraryTests(unittest.TestCase):
         self.assertIsNone(page.selection.currentData())
         self.assertFalse(page.restore.isEnabled())
 
+    def test_library_reports_damaged_metadata_without_hiding_valid_work(self):
+        valid = self.store.library.runs/'valid_run'
+        valid.mkdir()
+        self.store.library.record(valid, title='Valid work')
+        broken = self.store.library.runs/'broken_run'
+        broken.mkdir()
+        metadata = broken/'library_record.json'
+        metadata.write_text('{broken')
+        with self.assertLogs('data_library', level='WARNING'):
+            page = self.page(LibraryPage)
+        self.assertEqual(page.entry_list.rowCount(), 2)
+        self.assertIn(str(metadata), page.metadata_warning.text())
+        self.assertFalse(page.metadata_warning.isHidden())
+        write_json(metadata, dict(title='Repaired work'))
+        page.refresh()
+        self.assertTrue(page.metadata_warning.isHidden())
+        self.assertEqual(page.entry_list.rowCount(), 2)
+
     def test_native_library_export_and_import_preserves_projects_and_materials(self):
         project_path = self.store.save_project()
         layers = self.store.layers.copy(deep=True)

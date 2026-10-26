@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from data_library import read_json,write_json
+from field_storage import field_data_exists, load_field_frame
 from model import MAT_COLS,LAYER_COLS,PAT_COLS,prepare,performance,number,integer
 from ml_optimizer import validate_ml
 from peak_optimizer import BOUND_COLS,parse_search
@@ -92,8 +93,7 @@ def target_project(project,holes,extra,target,tolerance,min_q,half_window,step,g
 
 
 def plot_fields(directory):
-    path=Path(directory)/'electric_fields.csv'
-    data=pd.read_csv(path)
+    data=load_field_frame(directory)
     model=read_json(Path(directory)/'field_model.json')['model']
     fig,axes=plt.subplots(1,2,figsize=(12,5))
     for axis,plane,vertical,components in ((axes[0],'xy','y_um',('Ex_real','Ey_real')),(axes[1],'xz','z_um',('Ex_real','Ez_real'))):
@@ -172,7 +172,7 @@ def build_target_ui(app,materials,layers,patterns,uploads,settings,perf_inputs, 
                 elif event['kind']=='search_complete':
                     directory=Path(event['directory'])
                     summary=event['summary']
-                    fig=plot_fields(directory/'recommended_fields') if (directory/'recommended_fields/electric_fields.csv').exists() else None
+                    fig=plot_fields(directory/'recommended_fields') if field_data_exists(directory/'recommended_fields') else None
                     table=pd.read_csv(directory/'target_results.csv')
                     result_path=directory/'recommended_design.json'
                     text=f"**{summary['status'].title()}.** Reused {summary['reused_training_records']} compatible saved spectra and {summary['reused_field_records']} field datasets; {summary['new_evaluations']} new evaluations. "

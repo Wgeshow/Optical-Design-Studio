@@ -1,10 +1,10 @@
 """Saved-data plots for AI Search. No solver work occurs while inspecting results."""
 from pathlib import Path
 import numpy as np
-import pandas as pd
 from matplotlib.figure import Figure
 from matplotlib.patches import Circle
 from data_library import read_json
+from field_storage import load_field_frame
 
 
 def amplitude_map(frame,component):
@@ -13,7 +13,7 @@ def amplitude_map(frame,component):
 
 
 def field_figure(record,component='total',layer=None,threshold=0.,moving=False,step=.1):
-    path=Path(record['field_directory']);frame=pd.read_csv(path/'electric_fields.csv');model=read_json(path/'field_model.json')['model']
+    path=Path(record['field_directory']);frame=load_field_frame(path);model=read_json(path/'field_model.json')['model']
     names=[l['name'] for l in model['layers'][1:-1] if l['thickness']>0];layer=layer if layer in names else names[0]
     xy=frame[(frame.plane=='volume_samples')&(frame.layer==layer)].copy();depths=sorted(xy.z_um.unique());mid=depths[len(depths)//2];xy=xy[np.isclose(xy.z_um,mid)].copy()
     xy['amplitude']=amplitude_map(xy,component);xz=frame[frame.plane=='xz'].copy();xz['amplitude']=amplitude_map(xz,component)

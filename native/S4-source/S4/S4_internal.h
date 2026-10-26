@@ -93,6 +93,7 @@ typedef struct{
 // be arbitrary. For non-copy layers, copy should be NULL.
 
 struct FieldCache;
+struct EpsilonCache;
 
 typedef struct Excitation_Planewave_{
 	double hx[2],hy[2]; // re,im components of H_x,H_y field
@@ -148,6 +149,9 @@ struct S4_Simulation_{
 	S4_Options options;
 
 	struct FieldCache *field_cache; // Internal cache of vector field FT when using polarization bases
+	struct EpsilonCache *epsilon_cache; // Frequency-independent dielectric operators
+	size_t epsilon_cache_bytes;
+	size_t epsilon_cache_hits, epsilon_cache_misses;
 	
 	S4_message_handler msg;
 	void *msgdata;
@@ -236,9 +240,9 @@ int Simulation_MakeExcitationDipole(S4_Simulation *S, const double k[2], const c
 
 
 // Internal functions
+void Simulation_InvalidateFieldCache(S4_Simulation *S);
 #ifdef __cplusplus
 // Field cache manipulation
-void Simulation_InvalidateFieldCache(S4_Simulation *S);
 std::complex<double>* Simulation_GetCachedField(const S4_Simulation *S, const S4_Layer *layer);
 void Simulation_AddFieldToCache(S4_Simulation *S, const S4_Layer *layer, size_t n, const std::complex<double> *P, size_t Plen);
 #endif

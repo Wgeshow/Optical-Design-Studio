@@ -3,7 +3,7 @@ import copy
 from pathlib import Path
 from matplotlib.figure import Figure
 import pandas as pd
-from PyQt6.QtCore import QSignalBlocker
+from PyQt6.QtCore import QSignalBlocker, pyqtSignal
 from PyQt6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QTabWidget,QFileDialog,QLineEdit,QCheckBox,QComboBox,QLabel,QPushButton
 from qt_compute import _RunPage,_group,_combo,_check,_button,_value,_set_value,_on_edit,_scroll,_ResponsiveSplitter
 from qt_common import number,integer,table,fill_table,PlotWidget
@@ -16,6 +16,7 @@ from ai_campaign import DEFAULTS
 from ai_campaign_plots import field_figure,line_figure,rta_figure,validation_figure
 
 class AISearchPage(_RunPage):
+    routeRequested=pyqtSignal(str)
     def __init__(self,store,parent=None):
         super().__init__(store,'AI Search','Scan parameter ranges, train from S4 fields, and search with an optional simulation limit.',{'ai_search'},parent)
         self.records=[];self._loading=True;self.campaign=None;self.fields_cache={};self.contour_cache={}
@@ -76,16 +77,21 @@ class AISearchPage(_RunPage):
         self.result_tabs.currentChanged.connect(self.draw_volume)
         self.contour_page=QWidget();cl=QVBoxLayout(self.contour_page);self.contour_view=QComboBox();cl.addWidget(self.contour_view);self.contour_status=QLabel();self.contour_status.setWordWrap(True);cl.addWidget(self.contour_status);self.contour_table=table(['Amplitude','Regions','Area fraction']);cl.addWidget(self.contour_table);self.result_tabs.addTab(self.contour_page,'Contour scan')
         self.contour_view.currentIndexChanged.connect(self.draw_contours);self.result_tabs.currentChanged.connect(self.draw_contours)
-        self.result_tabs.removeTab(self.result_tabs.indexOf(self.field_plot))
-        self.field_plot.setMinimumHeight(240);output.addWidget(self.field_plot,3);self.field_plot.show()
-        self.result_tabs.setMinimumHeight(190);output.addWidget(self.result_tabs,2)
+        self.field_plot.setMinimumHeight(320)
+        self.result_tabs.setMinimumHeight(320);output.addWidget(self.result_tabs,1)
         self.moving=_check('Moving ceiling',False);self.threshold=number(0,0,10000,3);self.threshold.setSingleStep(.1);bar=QHBoxLayout();bar.addWidget(self.moving);bar.addWidget(QLabel('Contour amplitude'));bar.addWidget(self.threshold);output.addLayout(bar)
         self.apply=_button('Use selected design in Structure',self.apply_selected);self.apply.setEnabled(False);self.inspect_note=QLabel('All field components use incident amplitude. Test designs are for validation; predictions are not measured results.');self.inspect_note.setWordWrap(True);output.addWidget(self.inspect_note)
         from qt_result_export import export_run
         inspector=WorkspacePanel();inspector_layout=QVBoxLayout(inspector)
         title=QLabel('Search progress & candidates');title.setObjectName('sectionTitle');inspector_layout.addWidget(title)
         inspector_layout.addWidget(self.summary)
-        self.result_tabs.removeTab(self.result_tabs.indexOf(self.results));inspector_layout.addWidget(self.results,1);self.results.show()
+        from qt_custom_device import DeviceCanvas
+        self.device_preview=DeviceCanvas('3d');self.device_preview.compact_preview=True
+        self.device_preview.setMinimumHeight(220);self.device_preview.setMaximumHeight(300)
+        inspector_layout.addWidget(self.device_preview)
+        preview_label=QLabel('Shared input device · measured fields are shown in the result tabs');preview_label.setWordWrap(True);inspector_layout.addWidget(preview_label)
+        inspector_layout.addWidget(_button('Edit shared optical setup',lambda:self.routeRequested.emit('optical.overview')))
+        inspector_layout.addStretch()
         inspector_layout.addWidget(self.apply)
         inspector_layout.addWidget(_button('Export campaign…',lambda:export_run(self,self.directory,self.status)))
         self.campaign_actions=self.actions('Start search',lambda:self.run('search'));controls.addWidget(self.campaign_actions)
@@ -100,6 +106,14 @@ class AISearchPage(_RunPage):
         self.restore('project');self._loading=False
         for b in self.stops:b.setText('Pause and save')
         self.enabling()
+        self.tool_tabs={'setup':[(self.setup_tabs,0)],'training':[(self.setup_tabs,1)],'search':[(self.setup_tabs,2)],
+            'fields':[(self.result_tabs,0)],'depth':[(self.result_tabs,1)],'rta':[(self.result_tabs,2)],
+            'prediction':[(self.result_tabs,3)],'designs':[(self.result_tabs,4)],'validation':[(self.result_tabs,5)],
+            'volume':[(self.result_tabs,6)],'contours':[(self.result_tabs,7)]}
+        self.store.changed.connect(self._refresh_device_preview)
+        self._refresh_device_preview()
+        from qt_tool_workspace import polish_tool_workspace
+        polish_tool_workspace(self)
         for explanation in (note,hint,self.inspect_note):
             explanation.hide();explanation.parentWidget().setToolTip(explanation.text())
         self.plan_label.setText('')
@@ -109,6 +123,14 @@ class AISearchPage(_RunPage):
             try:
                 path=Path(self.resume.text());self.directory=path.parent;self.load_campaign(read_json(path))
             except Exception as exc:self.status.setText('Could not reopen saved campaign: '+str(exc))
+
+    def _refresh_device_preview(self,*_):
+        self.device_preview.set_device(self.store.device or {})
+        self.device_preview.optical_unit_cell=self.store.settings.get('optical_unit_cell',{})
+
+    def select_tool_tab(self,route):
+        from qt_tool_workspace import select_tool_tab
+        return select_tool_tab(self,route)
 
     def enabling(self,*_):
         full=self.controls['mode'].currentData()=='Full range scan'

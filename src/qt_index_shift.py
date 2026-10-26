@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 from matplotlib.figure import Figure
 from matplotlib.ticker import PercentFormatter
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QGroupBox,QTabWidget,QTableWidget,QTableWidgetItem,QHeaderView,QFileDialog
 from qt_compute import _ResponsiveSplitter,_scroll,_RunPage,_combo,_check,_label,_button,_group,_value,_set_value,_on_edit
 from qt_common import number,integer,PlotWidget,table,fill_table
@@ -29,6 +29,7 @@ class _ResponsePlot(PlotWidget):
         if self.toolbar:self.toolbar.hide()
 
 class IndexShiftPage(_RunPage):
+    routeRequested=pyqtSignal(str)
     def __init__(self,store,parent=None):
         super().__init__(store,'Refractive-index shift','Sweep a manual Δn or calculate material index and absorption changes from carrier concentrations.',{'index_shift'},parent)
         self.loading=False
@@ -64,6 +65,7 @@ class IndexShiftPage(_RunPage):
         tracking,_=_group('Sampled resonance tracking',[(label,self.controls[key]) for label,key in [('Response','response'),('Feature','feature'),('Reference λ (nm)','reference_nm'),('Search radius (nm)','tracking_window_nm')]])
         tracking.setToolTip('Track the nearest sampled peak or dip inside the search radius. Wavelength range, incident light, basis and performance are shared with S4 · RCWA. A zero-shift baseline is included.')
         controls.addWidget(tracking)
+        controls.addWidget(_button('Edit shared optical sampling',lambda:self.routeRequested.emit('optical.sweep')))
         self.window_label=_label('',True);controls.addWidget(self.window_label)
         controls.addWidget(_label('Set the wavelength range and incident light on the S4 · RCWA tab. A Δn=0 baseline is always included. Basis and performance settings are shared.',True))
         controls.addStretch()
@@ -104,6 +106,7 @@ class IndexShiftPage(_RunPage):
         self.feature_table=table([])
         self.readout_table=table([])
         tabs=QTabWidget();tabs.addTab(self.plot,'Response plot');tabs.addTab(self.readout_table,'Fixed-wavelength data');tabs.addTab(self.feature_table,'Resonance shifts')
+        self.result_tabs=tabs
         output.addWidget(tabs,1)
         self.result_note=_label('No sweep yet. Shared sweeps report Δλ/Δn in nm/RIU; independent sweeps report the shift for each combination.',True)
         detail_layout.addWidget(self.result_note)
@@ -131,6 +134,13 @@ class IndexShiftPage(_RunPage):
         for widget in self.controls.values(): _on_edit(widget,self.changed)
         store.changed.connect(self.refresh)
         self.refresh()
+        self.tool_tabs={'setup':[], 'response':[(self.result_tabs,0)],'fixed':[(self.result_tabs,1)],'shifts':[(self.result_tabs,2)]}
+        from qt_tool_workspace import polish_tool_workspace
+        polish_tool_workspace(self)
+
+    def select_tool_tab(self,route):
+        from qt_tool_workspace import select_tool_tab
+        return select_tool_tab(self,route)
 
     def layer_records(self):
         records=[]
