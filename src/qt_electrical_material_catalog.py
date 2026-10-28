@@ -190,7 +190,7 @@ class ElectricalMaterialCatalog(QWidget):
             value=dialog.material();self.store.set_electrical_materials(merge_materials(self._library(),[value]))
             self.refresh(selected=value['id']);self.status.setText(f"Saved {value['name']} ({value['id']}).")
 
-    def add_material(self):self._edit(new_material())
+    def add_material(self):self._edit(None)
 
     def edit_material(self):
         ident=self.selected_material_id()

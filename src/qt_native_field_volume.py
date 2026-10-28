@@ -45,18 +45,24 @@ class NativeSurfaceMesh:
     def __init__(self, faces, fraction, canvas=None, visible=True):
         self.faces=np.array(faces,dtype=float,copy=True).reshape(-1,3,3)
         self.faces.setflags(write=False)
-        self.fraction=float(fraction);self.canvas=canvas;self.visible=bool(visible)
+        self.fractions=np.array(np.broadcast_to(np.asarray(fraction,dtype=float),(len(self.faces),)),copy=True)
+        if not np.isfinite(self.fractions).all():
+            raise ValueError('Surface colors require finite intensity fractions.')
+        self.fractions.setflags(write=False)
+        self.canvas=canvas;self.visible=bool(visible)
         self._picture_key=None;self._picture=None
         normals=np.cross(self.faces[:,1]-self.faces[:,0],self.faces[:,2]-self.faces[:,0])
         lengths=np.linalg.norm(normals,axis=1)
         self.normals=normals/np.maximum(lengths[:,None],1e-30)
         light=np.array([-.4,-.55,-.73]);light/=np.linalg.norm(light)
         diffuse=np.clip(self.normals@light,0,1)
-        base=intensity_color(self.fraction)
-        # Directional lighting varies brightness, while the colorbar retains
-        # the complete snapshot normalization and the actual isovalue.
-        self.colors=[QColor.fromRgbF(*[min(1.,max(0.,channel*(.50+.58*d)+.06*d))
-            for channel in (base.redF(),base.greenF(),base.blueF())]) for d in diffuse]
+        # Directional lighting varies brightness; the fixed colorbar still
+        # refers to the saved intensity on each isosurface or domain-cap face.
+        self.colors=[]
+        for fraction,d in zip(self.fractions,diffuse):
+            base=intensity_color(fraction)
+            self.colors.append(QColor.fromRgbF(*[min(1.,max(0.,channel*(.50+.58*d)+.06*d))
+                for channel in (base.redF(),base.greenF(),base.blueF())]))
 
     def set_visible(self, visible):
         if self.visible!=bool(visible):

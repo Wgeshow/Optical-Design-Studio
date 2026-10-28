@@ -72,6 +72,180 @@ class PhotonicBandsUsabilityTests(unittest.TestCase):
         self.assertEqual(current['points_per_segment'], 7)
         self.assertEqual(page.grid_offset.text(), '.17, -.23')
 
+    def test_empty_crystal_status_tracks_add_remove_and_history_without_hiding_runtime(self):
+        page = self.page(); page.start_empty_crystal()
+        empty = page.status.text()
+        page.add_primitive()
+        self.assertEqual(page.status.text(), 'Crystal contains 1 object. Check inputs before running.')
+        page.geometry_history.undo()
+        self.assertEqual(page.status.text(), empty)
+        page.geometry_history.redo()
+        self.assertEqual(page.status.text(), 'Crystal contains 1 object. Check inputs before running.')
+        page.remove_primitive()
+        self.assertEqual(page.status.text(), empty)
+        for message in ('Run failed: runtime unavailable', 'Discovering installed solver…', 'Device run: t = 20'):
+            page.status.setText(message)
+            page.add_primitive()
+            self.assertEqual(page.status.text(), message)
+        page.start_empty_crystal()
+        with patch.object(self.store, 'busy', True):
+            page.add_primitive()
+            self.assertEqual(page.status.text(), empty)
+
+    def test_coordinate_refresh_and_blur_show_sign_without_rounding_or_moving_active_cursor(self):
+        page = self.page(); page.show_stage('build'); APP.processEvents()
+        vector_input = page.primitive_fields['center']
+        exact = '-0.1767766952966369, 0.1767766952966369, -0.1767766952966369'
+        vector_input.setText(exact)
+        APP.processEvents()
+        for edit, text in zip(vector_input.components, exact.split(', ')):
+            self.assertEqual(edit.text(), text)
+            self.assertEqual(edit.toolTip(), text)
+            self.assertEqual(edit.cursorPosition(), 0)
+        edit = vector_input.components[0]
+        edit.setFocus(); APP.processEvents()
+        self.assertTrue(edit.hasFocus())
+        edit.setCursorPosition(8)
+        page._refresh_inspector()
+        self.assertEqual(edit.cursorPosition(), 8)
+        self.assertEqual(edit.text(), exact.split(', ')[0])
+        edit.setCursorPosition(len(edit.text()))
+        page.primitive_fields['name'].setFocus(); APP.processEvents()
+        self.assertFalse(edit.hasFocus())
+        self.assertEqual(edit.cursorPosition(), 0)
+        self.assertEqual(vector_input.text(), exact)
+        self.assertEqual(page.geometry.item(page.geometry.currentRow(), page.geometry_columns.index('center')).text(), exact)
+
+    def test_journey_review_shows_full_legume_request_without_changing_it(self):
+        page = self.page(); settings = crystal()
+        settings.update(solver='legume', polarizations=['te', 'tm'], gmax=5,
+            runtime=dict(mode='local', executable='C:/explicit/legume/python.exe', timeout_s=123.))
+        page.load_settings(settings)
+        page.select_section('Check inputs'); APP.processEvents()
+        before = copy.deepcopy(page.options())
+        draft = copy.deepcopy(page.draft())
+        page.journey_execution.refresh()
+        tree = page.journey_execution.inputs
+        reviewed = {tree.topLevelItem(i).text(0): tree.topLevelItem(i).text(1) for i in range(tree.topLevelItemCount())}
+        self.assertIn('TE', reviewed['Polarizations'])
+        self.assertIn('TM', reviewed['Polarizations'])
+        self.assertEqual(reviewed['Reference length a'], '0.42 µm')
+        self.assertEqual(reviewed['Lattice vector a1 (Cartesian / a)'], '[1.2, 0.3]')
+        self.assertEqual(reviewed['Lattice vector a2 (Cartesian / a)'], '[-0.25, 0.9]')
+        self.assertEqual(reviewed['Background relative permittivity'], '2.3')
+        self.assertIn('radius = 0.17', reviewed['Object 1 · Offset circle'])
+        self.assertIn('εr = 8.0', reviewed['Object 1 · Offset circle'])
+        self.assertIn('axes =', reviewed['Object 2 · Oblique block'])
+        self.assertEqual(reviewed['Path vertex 1 (fractional reciprocal)'], '[0.13, -0.07]')
+        self.assertEqual(reviewed['Solver executable'], 'C:/explicit/legume/python.exe')
+        self.assertEqual(page.options(), before)
+        self.assertEqual(page.draft(), draft)
+        item = next(tree.topLevelItem(i) for i in range(tree.topLevelItemCount())
+            if tree.topLevelItem(i).text(0) == 'Polarizations')
+        page.journey_execution._open(item); APP.processEvents()
+        self.assertEqual(page._crystal_stage, 'calculate')
+        self.assertIs(APP.focusWidget(), page.te)
+
+    def test_journey_review_keeps_invalid_drafts_and_actual_checkbox_states(self):
+        page = self.page(); page.load_settings(crystal())
+        page.te.setChecked(False); page.tm.setChecked(True)
+        self.assertEqual(next(row[2] for row in page.journey_review_fields() if row[1] == 'Polarizations'), page.tm.text())
+        page.tm.setChecked(False)
+        page.lattice.item(0, 0).setText('unfinished lattice')
+        page.geometry.item(0, 3).setText('unfinished radius')
+        page.num_bands.setText('unfinished modes')
+        before = copy.deepcopy(page.draft())
+        with patch.object(page, 'options', side_effect=AssertionError('Review must not normalize a draft')):
+            rows = page.journey_review_fields()
+        reviewed = {row[1]: row[2] for row in rows}
+        self.assertIn('None selected', reviewed['Polarizations'])
+        self.assertIn('unfinished lattice', reviewed['Lattice vector a1 (Cartesian / a)'])
+        self.assertIn('unfinished radius', reviewed['Object 1 · Offset circle'])
+        self.assertEqual(reviewed['Number of bands'], 'unfinished modes')
+        self.assertEqual(page.draft(), before)
+
+    def test_journey_review_handles_3d_vector_grid_and_empty_crystal(self):
+        page = self.page(); page.start_empty_crystal()
+        page.sampling.setCurrentIndex(page.sampling.findData('grid'))
+        page.grid_counts.setText('2, 3, 4'); page.grid_offset.setText('.1, .2, .3')
+        page.te.setChecked(False); page.tm.setChecked(False)
+        reviewed = {row[1]: row[2] for row in page.journey_review_fields()}
+        self.assertEqual(reviewed['Polarizations'], 'Full-vector modes')
+        self.assertEqual(reviewed['Dielectric objects'], 'Uniform background (no objects)')
+        self.assertIn('Lattice vector a3 (Cartesian / a)', reviewed)
+        self.assertEqual(reviewed['Grid counts'], '2, 3, 4')
+        self.assertEqual(reviewed['Grid offset (fractional reciprocal)'], '.1, .2, .3')
+        self.assertNotIn('Path vertex 1 (fractional reciprocal)', reviewed)
+
+    def test_start_empty_crystal_preserves_cell_settings_and_can_undo(self):
+        for dimension in (2, 3):
+            page = self.page()
+            if dimension == 2:
+                page.initialize_2d_document()
+            page.scale_nm.setText('563')
+            page.background.setText('2.25')
+            page.resolution.setText('48')
+            page.lattice.item(0, 0).setText('1.25')
+            before = copy.deepcopy(page.options()['settings'])
+            objects = copy.deepcopy(page._object_draft())
+            page.show_stage('unit'); APP.processEvents()
+            page.preview_geometry()
+            if dimension == 2:
+                self.assertGreater(len(page.preview.figure.axes[0].patches), 1)
+            else:
+                self.assertGreater(page.crystal_3d.scene['primitive_count'], 0)
+            self.assertTrue(page.empty_crystal_button.isVisible())
+            QTest.mouseClick(page.empty_crystal_button, Qt.MouseButton.LeftButton)
+            # The cleared display must not wait for the geometry debounce.
+            if dimension == 2:
+                self.assertEqual(len(page.preview.figure.axes[0].patches), 1)
+                self.assertEqual(len(page.preview.figure.axes[0].texts), 0)
+            else:
+                self.assertEqual(page.crystal_3d.scene['primitive_count'], 0)
+                self.assertEqual(len(page.crystal_3d.scene['meshes']), 0)
+            APP.processEvents()
+            after = page.options()['settings']
+            self.assertEqual(after['geometry'], [])
+            self.assertEqual({key: value for key, value in after.items() if key != 'geometry'},
+                {key: value for key, value in before.items() if key != 'geometry'})
+            self.assertEqual(page._crystal_stage, 'build')
+            self.assertEqual(page.materials.rowCount(), 0)
+            self.assertEqual(page.compact_object_picker.count(), 0)
+            self.assertFalse(page.inspector_group.isEnabled())
+            self.assertTrue(page.geometry_history.undo())
+            self.assertEqual(page._object_draft(), objects)
+            self.assertTrue(page.geometry_history.redo())
+            self.assertEqual(page.options()['settings']['geometry'], [])
+            shape = 'circle' if dimension == 2 else 'sphere'
+            QTest.mouseClick(page.add_shape_buttons[shape], Qt.MouseButton.LeftButton)
+            APP.processEvents()
+            self.assertEqual(len(page.options()['settings']['geometry']), 1)
+            self.assertEqual(page.options()['settings']['geometry'][0]['shape'], shape)
+            self.assertTrue(page.inspector_group.isEnabled())
+
+    def test_2d_polarizations_are_editable_on_modes_page_and_diagnostic_returns_there(self):
+        page = self.page(); page.initialize_2d_document()
+        page.show_stage('calculate'); APP.processEvents()
+        self.assertTrue(page.te.isVisible())
+        self.assertTrue(page.tm.isVisible())
+        QTest.mouseClick(page.te, Qt.MouseButton.LeftButton)
+        self.assertEqual(page.options()['settings']['polarizations'], ['tm'])
+        QTest.mouseClick(page.tm, Qt.MouseButton.LeftButton)
+        page.show_stage('build')
+        self.assertTrue(page.open_diagnostic(dict(workspace='photonic_bands', field='polarizations',
+            message='Select at least one 2D polarization.')))
+        APP.processEvents()
+        self.assertEqual(page._crystal_stage, 'calculate')
+        self.assertTrue(page.te.isVisible())
+        self.assertIs(APP.focusWidget(), page.te)
+        page.dimension.setCurrentIndex(page.dimension.findData(3))
+        page.show_stage('unit'); APP.processEvents()
+        QTest.mouseClick(page.empty_crystal_button, Qt.MouseButton.LeftButton)
+        page.show_stage('calculate'); APP.processEvents()
+        self.assertFalse(page.te.isVisible())
+        self.assertFalse(page.tm.isVisible())
+        self.assertEqual(page.options()['settings']['polarizations'], ['vector'])
+
     def test_legacy_raw_draft_retains_invalid_and_inactive_shape_values(self):
         page = self.page(); page.load_settings(crystal())
         draft = page.draft()

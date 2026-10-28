@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
 )
 
 from electrical_material_library import (
-    PROPERTY_FIELDS, builtin_materials, conductivity_S_m, evaluate_material,
+    CARRIER_PROPERTY_KEYS, PROPERTY_FIELDS, builtin_materials, conductivity_S_m, evaluate_material,
     export_materials, import_materials, lookup_material, merge_materials,
     new_material, reference_properties, validate_materials,
 )
@@ -22,6 +22,10 @@ class ElectricalMaterialDialog(QDialog):
     def __init__(self, material=None, parent=None):
         super().__init__(parent)
         self._material = validate_materials([material])[0] if material is not None else new_material()
+        if material is None:
+            # An uncommitted new draft has no material facts. Explicit edits
+            # and duplicates still receive their detached source values.
+            self._material.update(properties={}, optical_material_name='', color='#7faadd')
         self._accepted_material = None
         self.setWindowTitle('Electrical material properties')
         self.resize(790, 720)
@@ -85,7 +89,11 @@ class ElectricalMaterialDialog(QDialog):
             control.setToolTip(f'{key}: {unit}. Scientific notation such as 8e20 is accepted.')
             self.controls[key] = control
             props_form.addRow(f'{label} [{unit}]', control)
-        prop_note = QLabel('Optional bulk densities set the equilibrium reference for a conductor. Leave fixed conductivity blank to derive σ=q(nμₙ+pμₚ). Constant optical n/k is optional for a custom nondispersive material; use a linked dataset for wavelength-dependent optics.')
+        self.fixed_conductivity_button = QPushButton('Clear carrier fields for fixed conductivity')
+        self.fixed_conductivity_button.setToolTip('Clears band gap, affinity, density of states, masses, mobilities, intrinsic and bulk carrier densities. Keeps permittivity, fixed conductivity, optical values and source records.')
+        self.fixed_conductivity_button.clicked.connect(self._clear_carrier_fields)
+        props_form.addRow(self.fixed_conductivity_button)
+        prop_note = QLabel('A constant conductor in dielectric charge mode needs static permittivity and explicit fixed conductivity; carrier fields may be blank. Semiconductor charge models still require carrier data. Leave fixed conductivity blank to derive σ=q(nμₙ+pμₚ) from carrier properties. Constant optical n/k is optional; use a linked dataset for wavelength-dependent optics.')
         prop_note.setWordWrap(True)
         props_form.addRow(prop_note)
         scroll = QScrollArea()
@@ -104,7 +112,7 @@ class ElectricalMaterialDialog(QDialog):
         sources_layout.addWidget(self.notes, 1)
         self.tabs.addTab(sources_page, 'Sources and assumptions')
 
-        self.status = QLabel('')
+        self.status = QLabel('New custom material: electrical values and optical link are blank. Enter sourced values before saving.' if material is None else '')
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
         self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
@@ -112,12 +120,21 @@ class ElectricalMaterialDialog(QDialog):
         self.buttons.rejected.connect(self.reject)
         layout.addWidget(self.buttons)
         self.model.currentIndexChanged.connect(self._model_changed)
+        self.kind.currentIndexChanged.connect(self._model_changed)
         self._model_changed()
 
     def _model_changed(self):
         model = self.model.currentData()
         self.al_fraction.setEnabled(model == 'algaas_reference')
         self.reference_button.setEnabled(model != 'constant')
+        self.fixed_conductivity_button.setEnabled(model == 'constant' and self.kind.currentData() == 'conductor')
+
+    def _clear_carrier_fields(self):
+        if self.model.currentData() != 'constant' or self.kind.currentData() != 'conductor':
+            return
+        for key in CARRIER_PROPERTY_KEYS:
+            self.controls[key].clear()
+        self.status.setText('Carrier fields cleared: band gap, affinity, density of states, masses, mobilities and carrier densities. Permittivity, fixed conductivity, optical values and source records are unchanged. Enter an explicit fixed conductivity and use dielectric charge mode for field/Ohmic calculations.')
 
     def reset_reference_values(self):
         try:
@@ -157,6 +174,7 @@ class ElectricalMaterialDialog(QDialog):
                 except (ValueError, OverflowError):
                     raise ValueError(f'{key} must be a number, for example 8e20.') from None
         result['properties'] = properties
+        result['property_overrides'] = [key for key in result.get('property_overrides', []) if key in properties]
         if result['model'] == 'algaas_reference' and 'al_fraction' not in result:
             result['al_fraction'] = self.al_fraction.value()
         result = evaluate_material(result, self.temperature.value(), self.al_fraction.value() if result['model'] == 'algaas_reference' else None)
@@ -277,7 +295,7 @@ class ElectricalMaterialManagerDialog(QDialog):
             self.status.setText(f"Saved {value['name']}.")
 
     def add_material(self):
-        self._edit(new_material())
+        self._edit(None)
 
     def edit_material(self):
         ident = self.selected_material_id()

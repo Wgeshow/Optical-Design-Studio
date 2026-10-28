@@ -167,7 +167,9 @@ class TransportThermalUsabilityTests(unittest.TestCase):
         self.assertIn('no longer',page.status.text())
         requests=[]; page.diagnosticRequested.connect(requests.append)
         page.edit_device()
-        self.assertEqual(requests[-1]['workspace'],'structure')
+        self.assertEqual(requests,[])
+        self.assertEqual(page.tabs.currentIndex(),page.sections['device_editor'])
+        self.assertIsNotNone(page.device_editor.editor)
 
     def test_return_from_structure_refreshes_device_and_keeps_layer_draft(self):
         page=self.thermal(); identity=page._layer_ids[0]

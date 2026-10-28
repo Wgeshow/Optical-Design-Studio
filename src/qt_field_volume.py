@@ -3,7 +3,7 @@ import numpy as np
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QLabel, QSlider, QCheckBox
 
-from field_volume import load_volume, vectors, amplitude, field_surface, visible_samples, interaction_surface
+from field_volume import load_volume, vectors, amplitude, field_surface, surface_values, visible_samples, interaction_surface
 from field_tracking_ui import saved_datasets, _safe_directory
 from qt_common import ActionStatusLabel
 from qt_native_field_volume import NativeFieldVolumePlot, NativeSurfaceMesh
@@ -191,10 +191,10 @@ class FieldVolumeWidget(QWidget):
                     faces = field_surface(xyz[layer_mask],values[layer_mask],cutoff)
                     self.surface_faces += len(faces)
                     if len(faces):
-                        surface = NativeSurfaceMesh(faces,cutoff/peak)
+                        surface = NativeSurfaceMesh(faces,surface_values(xyz[layer_mask],values[layer_mask],faces)/peak)
                         reduced = interaction_surface(faces,max(24,900//layer_count))
                         self.interaction_faces += len(reduced)
-                        fast = NativeSurfaceMesh(reduced,cutoff/peak,visible=False)
+                        fast = NativeSurfaceMesh(reduced,surface_values(xyz[layer_mask],values[layer_mask],reduced)/peak,visible=False)
                         self.surfaces.append((surface,fast))
                 except ValueError as exc:
                     surface_error = str(exc)+' Use Sample points for this snapshot.'
@@ -213,7 +213,7 @@ class FieldVolumeWidget(QWidget):
         self.phase.setEnabled(dynamic)
         depths = frame.loc[mask].groupby('layer')['z_um'].nunique()
         quantity = 'Power-flow magnitude' if mode == 'Energy flow' else 'Field intensity'
-        details = f'{quantity} cutoff: {cutoff:.4g} S4 units ({self.threshold.value()}% of the complete snapshot peak). ' + ('Surface interpolated within each layer and capped at sampled boundaries; interpolation adds no simulated detail. ' if self.style.currentIndex()==0 else f'Up to 1,800 original sample points displayed; normalization uses all {len(frame):,} saved samples. ') + ('Energy flow is time averaged.' if not dynamic else 'Shape shows steady-state intensity; enable Field arrows to see phase oscillation.')
+        details = f'{quantity} cutoff: {cutoff:.4g} S4 units ({self.threshold.value()}% of the complete snapshot peak). ' + ('Surface interpolated within each layer and capped at sampled boundaries; colors show local saved intensity, including boundary caps. Interpolation adds no simulated detail. ' if self.style.currentIndex()==0 else f'Up to 1,800 original sample points displayed; normalization uses all {len(frame):,} saved samples. ') + ('Energy flow is time averaged.' if not dynamic else 'Shape shows steady-state intensity; enable Field arrows to see phase oscillation.')
         self.status.setText(f'{int(np.sum(mask & visible)):,} / {int(mask.sum()):,} samples · cutoff {cutoff:.4g} S4 units' +
                             (' · No field above cutoff' if not np.any(mask & visible) else '') +
                             (' · ' + surface_error if surface_error else ''))
@@ -308,7 +308,7 @@ class FieldVolumeWidget(QWidget):
         if self.style.currentText()=='Continuous shape':
             for full,_ in self.surfaces:
                 if len(full.faces):
-                    axis.add_collection3d(Poly3DCollection(full.faces,facecolors=colors.to_rgba(cutoff),linewidths=0,alpha=1.,zsort='average',shade=True,lightsource=LightSource(azdeg=315,altdeg=45),antialiased=False))
+                    axis.add_collection3d(Poly3DCollection(full.faces,facecolors=colors.to_rgba(full.fractions*colors.norm.vmax),linewidths=0,alpha=1.,zsort='average',shade=True,lightsource=LightSource(azdeg=315,altdeg=45),antialiased=False))
         else:axis.scatter(*xyz[self.ids].T,c=values[self.ids],s=12,alpha=.65,cmap='inferno',norm=colors.norm)
         if self.show_arrows.isChecked():
             ids=self.arrow_ids;direction=vectors({name:field[ids] for name,field in fields.items()},mode,self.phase.value())*self.scale

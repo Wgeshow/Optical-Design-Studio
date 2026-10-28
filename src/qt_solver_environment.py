@@ -5,7 +5,7 @@ import os
 import threading
 
 from PyQt6.QtCore import QThread, pyqtSignal
-from PyQt6.QtWidgets import QGridLayout, QLabel, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QFileDialog, QGridLayout, QLabel, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget
 
 
 _tasks = set()  # Keep cancelled installers alive until their child processes exit.
@@ -43,6 +43,7 @@ class _SetupTask(QThread):
 
 class SolverEnvironmentSetup(QWidget):
     runtimeReady = pyqtSignal(object)
+    launcherChanged = pyqtSignal()
 
     def __init__(self, get_runtime, parent=None):
         super().__init__(parent)
@@ -65,6 +66,11 @@ class SolverEnvironmentSetup(QWidget):
         for index, button in enumerate((self.find_button, self.install_button, self.cancel_button, self.windows_button)):
             button.setMinimumHeight(32); row.addWidget(button, index//2, index%2)
         layout.addLayout(row)
+        self.launcher_button = QPushButton('Choose Windows WSL launcher…', self)
+        self.launcher_button.setToolTip('Remember an existing WSL executable for all WSL solvers. This does not change your Linux installations. Check or find the solver afterward.')
+        self.launcher_button.setVisible(os.name == 'nt')
+        self.launcher_button.clicked.connect(self.choose_wsl_launcher)
+        layout.addWidget(self.launcher_button)
         self.status = QLabel(''); self.status.setWordWrap(True); layout.addWidget(self.status)
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setMaximumHeight(130)
         self.log.document().setMaximumBlockCount(160)
@@ -92,6 +98,21 @@ class SolverEnvironmentSetup(QWidget):
             self._task.cancelled.set()
             self.cancel_button.setEnabled(False)
             self.status.setText('Cancelling setup; waiting for the active setup step to stop safely…')
+
+    def choose_wsl_launcher(self):
+        from meep_runtime import saved_wsl_launcher, save_wsl_launcher
+        filename, _ = QFileDialog.getOpenFileName(self, 'Choose installed Windows WSL launcher',
+            saved_wsl_launcher(), 'Windows executable (*.exe)')
+        if not filename:
+            return
+        try:
+            saved = save_wsl_launcher(filename)
+        except (OSError, ValueError) as exc:
+            self.status.setText(str(exc)); return
+        self.invalidate()
+        self.launcherChanged.emit()
+        self.status.setText('Windows WSL launcher saved. Find or check your solver again.')
+        self.status.setToolTip(saved)
 
     def setup_windows(self):
         from meep_managed import setup_windows_support

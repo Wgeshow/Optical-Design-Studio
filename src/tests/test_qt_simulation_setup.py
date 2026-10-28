@@ -10,7 +10,7 @@ os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtTest import QTest, QSignalSpy
-from PyQt6.QtWidgets import QApplication, QLineEdit, QComboBox, QDialog, QDialogButtonBox, QPlainTextEdit, QListWidget, QTableWidget
+from PyQt6.QtWidgets import QApplication, QLineEdit, QComboBox, QDialog, QDialogButtonBox, QPlainTextEdit, QListWidget, QTableWidget, QPushButton
 
 from data_library import DataLibrary
 from qt_core import ProjectStore
@@ -256,6 +256,37 @@ class SimulationSetupWorkspaceTests(unittest.TestCase):
         self.page.perform_action(dict(id='manual',target='electrical.parse_biases'))
         self.assertEqual(self.state.get('search.electrical.biases_V'),[0.,-.2,-.1])
 
+    def test_bias_apply_and_check_are_adjacent_to_draft_before_applied_preview(self):
+        self.page.set_mode('electrical'); self.page.select_section('electrical.study')
+        mode = self.editor('ui.electrical.sweep_mode')
+        mode.setCurrentIndex(mode.findData('manual')); APP.processEvents()
+        manual = self.editor('ui.electrical.bias_list_text')
+        row = manual.parentWidget().parentWidget()
+        card = row.parentWidget(); layout = card.layout()
+        apply = next(button for button in card.findChildren(QPushButton)
+            if button.property('setupActionId') == 'electrical.study.apply_manual')
+        check = next(button for button in card.findChildren(QPushButton)
+            if button.property('setupActionId') == 'electrical.study.validate')
+        # Actions live directly after editable controls, before preview rows.
+        self.assertEqual(layout.indexOf(apply), layout.indexOf(row)+2)
+        self.assertEqual(layout.indexOf(check), layout.indexOf(apply)+1)
+        self.assertIn('draft until Apply', row.caption.text())
+        before = copy.deepcopy(self.state.get('search.electrical.biases_V'))
+        manual.setPlainText('0, -.12, -.24')
+        self.assertEqual(self.state.get('search.electrical.biases_V'), before)
+        apply.click(); APP.processEvents()
+        self.assertEqual(self.state.get('search.electrical.biases_V'), [0., -.12, -.24])
+        manual.setPlainText('0, unfinished')
+        apply.click(); APP.processEvents()
+        self.assertEqual(self.state.get('search.electrical.biases_V'), [0., -.12, -.24])
+        with patch.object(self.page, 'validate_current') as validate:
+            check.click()
+            validate.assert_called_once_with()
+        grid, cards = next((grid, cards) for grid, cards in self.page.page_grids
+            if any(card['id'] == 'electrical.study.range' for _, card in cards))
+        ids = [card['id'] for _, card in cards]
+        self.assertEqual(ids.index('electrical.study.schedule'), ids.index('electrical.study.range')+1)
+
     def test_validation_issue_opens_correct_tab_and_run_has_no_confirmation(self):
         spy=QSignalSpy(self.page.runRequested)
         with patch.object(self.state,'validate',return_value=[dict(key='settings.NumG',message='Invalid basis',tab='optical.accuracy')]):
@@ -381,13 +412,14 @@ class SimulationSetupWorkspaceTests(unittest.TestCase):
         physical=copy.deepcopy(self.store.device)
         self.page.refresh()
         summary=self.page.summary.accessibleDescription()
-        self.assertIn('Finite array: 16 air holes',summary)
+        self.assertIn('16 enabled regions',summary)
+        self.assertIn('PC-array regions: 16 · Other regions: 0',summary)
         self.assertIn('Optical PC cell: 1 air hole',summary)
         self.assertIn('Full array shown in preview; S4 solves the optical cell.',summary)
         self.assertEqual(self.store.device,physical)
         self.assertEqual(len(self.store.device['shapes']),16)
         self.page.set_mode('electrical')
-        self.assertIn('Finite array: 16 air holes',self.page.summary.accessibleDescription())
+        self.assertIn('PC-array regions: 16 · Other regions: 0',self.page.summary.accessibleDescription())
         self.assertNotIn('Optical PC cell',self.page.summary.accessibleDescription())
         self.page.set_mode('optical')
         cell=dict(self.state.get('settings.optical_unit_cell'),width_um=.6)
@@ -395,6 +427,24 @@ class SimulationSetupWorkspaceTests(unittest.TestCase):
         self.assertIn('Optical PC cell: configure a one-hole pitch cell',self.page.summary.accessibleDescription())
         self.assertNotIn('Optical PC cell: 1 air hole',self.page.summary.accessibleDescription())
         self.assertEqual(self.store.device,physical)
+
+    def test_domain_summary_counts_explicit_optical_regions_without_inferring_holes(self):
+        from device_model import default_device
+        device=default_device(self.store.electrical_materials)
+        device['shapes']=[dict(id='custom-circle',name='Optical air circle',layer_id=device['layers'][0]['id'],
+            shape='circle',cx_um=0.,cy_um=0.,size_x_um=.4,size_y_um=.4,angle_deg=0.,vertices=[],
+            enabled=True,material_id='gaas',operation='material',optical_material_name='Air')]
+        self.store.set_device(device)
+        physical=copy.deepcopy(self.store.device)
+        self.page.refresh()
+        summary=self.page.summary.accessibleDescription()
+        self.assertIn('1 enabled region',summary)
+        self.assertNotIn('air holes',summary)
+        self.assertNotIn('PC-array regions',summary)
+        self.assertEqual(self.store.device,physical)
+        device=copy.deepcopy(physical);device['shapes'][0]['enabled']=False
+        self.store.set_device(device)
+        self.assertIn('0 enabled regions',self.page.summary.accessibleDescription())
 
 
 if __name__=='__main__':

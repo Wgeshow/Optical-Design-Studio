@@ -19,7 +19,7 @@ _OPTIONAL = {'sesame_transport': ('sesame', 'Sesame'),
              'sesame': ('sesame', 'Sesame'), 'legume': ('legume', 'Legume'), 'gmsh': ('gmsh', 'Gmsh')}
 _NATIVE = {'thermal': 'Heat flow', 'high_field_optics': 'High-field optics',
            'advanced_transport': 'DEVSIM transport', 'pcsel_unitcell_transport': 'DEVSIM transport',
-           'lumped_laser': 'Lumped laser'}
+           'lumped_laser': 'Steady-state laser estimate'}
 _PCSEL_MODELS = {'vertical', 'cwt', 'finite', 'beam', 'aperture', 'rcwa_poles', 'gme'}
 
 

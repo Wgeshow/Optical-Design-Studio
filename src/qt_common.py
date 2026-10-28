@@ -8,11 +8,11 @@ from pathlib import Path
 
 import pandas as pd
 from PyQt6 import sip
-from PyQt6.QtCore import QObject, QSettings, Qt, pyqtSignal, QSignalBlocker, QPoint, QEvent
-from PyQt6.QtGui import QColor, QPalette, QFontDatabase, QFont, QImage, QPainter, QPolygon, QPen
+from PyQt6.QtCore import QObject, QSettings, Qt, pyqtSignal, QSignalBlocker, QPoint, QPointF, QEvent
+from PyQt6.QtGui import QColor, QPalette, QFontDatabase, QFont, QImage, QPainter, QPolygon, QPen, QWheelEvent
 from PyQt6.QtWidgets import (QApplication, QComboBox, QDoubleSpinBox, QSpinBox, QTableWidget,
     QTableWidgetItem, QAbstractItemView, QHeaderView, QWidget, QVBoxLayout, QGroupBox,
-    QLabel, QPushButton, QScrollArea, QFileDialog, QMessageBox, QSizePolicy, QLayout)
+    QLabel, QPushButton, QAbstractScrollArea, QScrollArea, QFileDialog, QMessageBox, QSizePolicy, QLayout)
 from matplotlib.figure import Figure
 
 COLORS = {
@@ -634,6 +634,39 @@ class PlotWidget(QWidget):
             except Exception as exc:QMessageBox.warning(self,'Figure export failed',str(exc))
 
 
+class _UnfocusedWheelGuard(QObject):
+    """Leave page scrolling to ancestors until a parameter is deliberately focused."""
+    def eventFilter(self, widget, event):
+        if event.type() == QEvent.Type.Wheel and not widget.hasFocus():
+            # Filtered wheel events do not reliably propagate through nested
+            # controls. Preserve the motion and hand it to the scroll viewport.
+            parent = widget.parentWidget()
+            while parent is not None:
+                if isinstance(parent, QAbstractScrollArea):
+                    viewport = parent.viewport()
+                    forwarded = QWheelEvent(QPointF(viewport.mapFromGlobal(event.globalPosition().toPoint())),
+                        event.globalPosition(), event.pixelDelta(), event.angleDelta(), event.buttons(),
+                        event.modifiers(), event.phase(), event.inverted(), Qt.MouseEventSource.MouseEventSynthesizedByApplication, event.pointingDevice())
+                    QApplication.sendEvent(viewport, forwarded)
+                    event.setAccepted(forwarded.isAccepted())
+                    return True
+                parent = parent.parentWidget()
+            event.ignore()
+            return True
+        return super().eventFilter(widget, event)
+
+
+def guard_unfocused_wheel(widget):
+    """Opt-in protection for numeric/combo parameters inside scrolling pages."""
+    if not isinstance(widget, (QDoubleSpinBox, QSpinBox, QComboBox)):
+        raise TypeError('Wheel protection requires a spin box or combo box.')
+    widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+    if not hasattr(widget, '_unfocused_wheel_guard'):
+        widget._unfocused_wheel_guard = _UnfocusedWheelGuard(widget)
+        widget.installEventFilter(widget._unfocused_wheel_guard)
+    return widget
+
+
 class CompactDoubleSpinBox(QDoubleSpinBox):
     def textFromValue(self,value):
         text=super().textFromValue(value)
@@ -740,7 +773,7 @@ def completion_notice(text):
     action=match.group(1).lower()
     title='Completed' if action in ('complete','completed','finished') else action.capitalize()
     summary=text.split('. ',1)[0].split('\n',1)[0]
-    if len(summary)>145:summary=summary[:142].rstrip()+'â€¦'
+    if len(summary)>145:summary=summary[:142].rstrip()+'\u2026'
     return title,summary
 
 

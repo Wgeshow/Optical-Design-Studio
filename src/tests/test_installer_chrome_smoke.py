@@ -47,11 +47,11 @@ class InstalledChromeSmokeTests(unittest.TestCase):
                     settle_window_layout(self.app, self.window)
                     detail = inspect_window_chrome(self.window)
                     self.assertEqual(detail['width'], width)
-                    # Below the responsive breakpoint, the workflow tabs move
-                    # to their own row while the caption/menu remain visible.
-                    self.assertEqual(detail['visible_controls'], 6 if width < 1150 else 7)
-                    self.assertIs(self.window.optical_workflow.parentWidget(),
-                                  self.window.navigation_bar if width < 1150 else self.window.chrome)
+                    # App commands stay in title chrome; study stages always
+                    # use the dedicated workflow row with a compact selector.
+                    self.assertEqual(detail['visible_controls'], 6)
+                    self.assertIs(self.window.optical_workflow.parentWidget(),self.window.workflow_navigation)
+                    self.assertTrue(self.window.workflow_navigation.isVisible())
                     self.assertTrue(detail['frameless'])
                     self.assertEqual(detail['maximize_hit_test'], 9)
                     self.assertEqual(detail['native_snap_adapter_enabled'],

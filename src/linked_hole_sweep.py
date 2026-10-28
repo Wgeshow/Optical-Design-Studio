@@ -28,7 +28,7 @@ def shared_radius_bounds(model,bounds,options):
     minimum=number(options.get('min_um'),'Shared minimum radius',minimum=0)
     maximum=number(options.get('max_um'),'Shared maximum radius',minimum=0)
     step=number(options.get('step_um'),'Shared radius step',minimum=0)
-    if minimum<=0 or maximum<minimum or step<=0:raise ValueError('Shared radius requires 0 < minimum ≤ maximum and positive step.')
+    if minimum<=0 or maximum<minimum or step<=0:raise ValueError('Shared radius requires 0 < minimum â‰¤ maximum and positive step.')
     chosen={str(i+1) for i in indices}
     result=[]
     for row in bounds:
@@ -53,7 +53,7 @@ def make_widget(store):
             self.enabled=QCheckBox('Link radii across layers');layout.addWidget(self.enabled)
             self.enabled.setToolTip('Use one shared radius variable for all checked circular air holes.')
             self.holes=QListWidget();self.holes.setMaximumHeight(145);layout.addWidget(self.holes)
-            self.unit=QComboBox();self.unit.addItems(['nm','µm']);self.factor=1000.
+            self.unit=QComboBox();self.unit.addItems(['nm','Âµm']);self.factor=1000.
             self.minimum=spin(50,1e-9,1e9,6);self.maximum=spin(150,1e-9,1e9,6);self.step=spin(25,1e-9,1e9,6)
             form=QFormLayout();form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
             for label,widget in [('Radius units',self.unit),('Minimum radius',self.minimum),('Maximum radius',self.maximum),('Radius step',self.step)]:form.addRow(label,widget)
@@ -81,19 +81,23 @@ def make_widget(store):
             air={m['Name'] for m in mats if m['Model'] in ('constant_nk','constant_eps') and m['A']==1 and m['B']==0}
             for i,p in enumerate(store.patterns.to_dict('records'),1):
                 if p['Shape']=='circle' and p['Material'] in air:
-                    item=QListWidgetItem(f"#{i} · {p['Layer']} · x={p['CenterX_um']:g}, y={p['CenterY_um']:g} µm")
+                    item=QListWidgetItem(f"#{i} Â· {p['Layer']} Â· x={p['CenterX_um']:g}, y={p['CenterY_um']:g} Âµm")
                     item.setData(Qt.ItemDataRole.UserRole,i);item.setFlags(item.flags()|Qt.ItemFlag.ItemIsUserCheckable)
                     item.setCheckState(Qt.CheckState.Checked if first or i in selected else Qt.CheckState.Unchecked);self.holes.addItem(item)
             self.restoring=False
         def options(self):
             return dict(enabled=self.enabled.isChecked(),targets=[self.holes.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.holes.count()) if self.holes.item(i).checkState()==Qt.CheckState.Checked],min_um=self.minimum.value()/self.factor,max_um=self.maximum.value()/self.factor,step_um=self.step.value()/self.factor)
         def restore(self,options):
+            # A new document has no saved options; restore every default rather
+            # than inheriting the previous document's bounds or selection.
+            values=dict(enabled=False,min_um=.05,max_um=.15,step_um=.025,
+                targets=[self.holes.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.holes.count())])
+            values.update(options)
             self.restoring=True
-            self.enabled.setChecked(options.get('enabled',False))
+            self.enabled.setChecked(values['enabled'])
             for key,widget in [('min_um',self.minimum),('max_um',self.maximum),('step_um',self.step)]:
-                if key in options:widget.setValue(options[key]*self.factor)
-            if 'targets' in options:
-                for i in range(self.holes.count()):
-                    item=self.holes.item(i);item.setCheckState(Qt.CheckState.Checked if item.data(Qt.ItemDataRole.UserRole) in options['targets'] else Qt.CheckState.Unchecked)
+                widget.setValue(values[key]*self.factor)
+            for i in range(self.holes.count()):
+                item=self.holes.item(i);item.setCheckState(Qt.CheckState.Checked if item.data(Qt.ItemDataRole.UserRole) in values['targets'] else Qt.CheckState.Unchecked)
             self.restoring=False;self.update_enabled()
     return SharedHoleWidget()

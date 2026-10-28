@@ -200,8 +200,12 @@ def inspect_simulation_choices(window, store, application, output, capture=True)
                 assert window.navigation.currentRow()==(3 if target=='tools.sweep' else 8)
                 if target=='tools.sweep':
                     assert page._grid_workspace and page.peak_options()['search_options']['search_mode']=='Exhaustive grid'
-                    assert not page.select_tool_tab('explore.constraints')
-                    assert not page.select_tool_tab('explore.learning')
+                    for legacy_target in ('explore.constraints','explore.learning'):
+                        selected=page.select_tool_tab(legacy_target)
+                        if hasattr(page,'optical_journey'):
+                            assert selected and page.optical_journey.stack.currentIndex()==page.optical_journey.keys['sampling']
+                        else:
+                            assert not selected
                     record['dedicated_grid']=True
             elif target=='papers':
                 page=window.research_studies_page.library_page
@@ -216,7 +220,9 @@ def inspect_simulation_choices(window, store, application, output, capture=True)
                 engine='pcsel' if target.startswith('pcsel.') else 'sesame_transport' if target.startswith('sesame_transport') else target
                 assert chooser.selector.currentData()==engine
                 if engine in ('pcsel','pcsel_transport'):
-                    preview=page.geometry_editor.preview.canvas
+                    geometry=page.geometry_editor.preview
+                    preview=geometry.canvas if geometry.last_geometry else geometry.cell_fallback
+                    record['preview_scope']='Authored device geometry' if geometry.last_geometry else 'Known lateral cell only; incomplete layer geometry is not inferred'
                     if engine=='pcsel':
                         assert page.fields['model'].currentData()==target.split('.')[1]
                         record['model']=page.fields['model'].currentData()
@@ -243,6 +249,26 @@ def inspect_simulation_choices(window, store, application, output, capture=True)
                     preview=page.model_views.currentWidget()
                     assert page.last_result is None
                     record['preview_scope']='Lumped model flow; independent 3D structure remains available'
+            # The campaign replaces legacy side previews with a full editor
+            # in the normal structure stage. Exercise that owning stage rather
+            # than showing the retired preview or changing model inputs.
+            if hasattr(page,'setup_flow'):
+                page.setup_flow.show_stage(0)
+                settle_window_layout(application,window)
+                editor=page.setup_flow.device_editor
+                assert editor is not None and editor.isVisible(),target+' full device editor is hidden'
+                preview=editor.editor.view_3d
+                record['preview_navigation']='Structure stage; full device editor 3D view'
+            elif hasattr(page,'optical_journey'):
+                host=page.optical_journey
+                host.select_stage('structure')
+                settle_window_layout(application,window)
+                from PyQt6.QtWidgets import QWidget
+                candidates=[widget for widget in host.stack.currentWidget().findChildren(QWidget)
+                    if type(widget).__name__ in ('DeviceCanvas','GeometryViewport','OpticalDomainCanvas') and widget.isVisible()]
+                assert candidates,target+' current structure stage has no visible geometry canvas'
+                preview=max(candidates,key=lambda widget:widget.width()*widget.height())
+                record['preview_navigation']='Structure journey stage; current visible geometry canvas'
             assert page.isVisible(),target+' model page is hidden'
             controls=[]
             for widget in page.findChildren((QLineEdit,QAbstractSpinBox,QComboBox,QTableWidget)):

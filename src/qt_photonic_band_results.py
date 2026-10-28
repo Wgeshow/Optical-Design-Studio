@@ -3,12 +3,67 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+import numpy as np
 
 from PyQt6.QtCore import Qt, QSignalBlocker
 from PyQt6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QHeaderView, QSizePolicy, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
 from qt_research_common import label
 from qt_research_results import ResearchResultsPanel
+
+
+def _path_vertex_ticks(summary, data):
+    """Recognize conventional cell coordinates, registered to saved samples.
+
+    Unknown lattices or vertices retain numeric distance ticks. These names
+    describe the reciprocal cell and do not assert symmetry of the motif.
+    """
+    try:
+        cfg = summary.get('options', {})
+        if not summary.get('path_connectivity', True) or cfg.get('sampling') != 'k_vertices':
+            return None
+        dim = cfg['dimension']
+        if dim not in (2, 3):
+            return None
+        lattice = np.asarray(cfg['lattice_vectors'], dtype=float)[:dim]
+        gram = lattice @ lattice.T
+        if not np.isfinite(gram).all() or gram[0, 0] <= 0:
+            return None
+        metric = gram / gram[0, 0]
+        if np.allclose(metric, np.eye(dim), rtol=1e-8, atol=1e-10):
+            coordinates = ([(0, 0), (.5, 0), (.5, .5)] if dim == 2 else
+                [(0, 0, 0), (.5, 0, 0), (.5, .5, 0), (.5, .5, .5)])
+            names = ['Γ', 'X', 'M'] if dim == 2 else ['Γ', 'X', 'M', 'R']
+        elif np.allclose(metric, .5 * (np.eye(dim) + np.ones((dim, dim))), rtol=1e-8, atol=1e-10):
+            coordinates = ([(0, 0), (.5, 0), (2/3, 1/3)] if dim == 2 else
+                [(0, 0, 0), (.5, 0, .5), (.5, .25, .75), (.375, .375, .75),
+                 (.5, .5, .5), (.625, .25, .625)])
+            names = ['Γ', 'M', 'K'] if dim == 2 else ['Γ', 'X', 'W', 'K', 'L', 'U']
+        else:
+            return None
+        vertices = np.asarray(cfg['k_vertices'], dtype=float)
+        if vertices.ndim != 2 or len(vertices) < 2 or vertices.shape[1] < dim or not np.isfinite(vertices).all():
+            return None
+        labels = []
+        for vertex in vertices:
+            matches = [name for point, name in zip(coordinates, names)
+                       if np.allclose(vertex[:dim], point, rtol=0, atol=1e-9)]
+            if len(matches) != 1:
+                return None
+            labels.append(matches[0])
+        intervals = cfg['points_per_segment']
+        if isinstance(intervals, bool) or not isinstance(intervals, int) or intervals < 1:
+            return None
+        distance = np.asarray(data['path_distance_reciprocal_a'], dtype=float)
+        indices = np.arange(len(vertices)) * intervals
+        if len(distance) != indices[-1] + 1 or not np.isfinite(distance).all() or np.any(np.diff(distance) <= 0):
+            return None
+        sampled = np.column_stack([data['k'+str(i+1)] for i in range(dim)])
+        if sampled.shape[0] != len(distance) or not np.allclose(sampled[indices], vertices[:, :dim], rtol=0, atol=1e-9):
+            return None
+        return distance[indices], labels
+    except (KeyError, TypeError, ValueError, IndexError):
+        return None
 
 
 class PhotonicBandResultsPanel(ResearchResultsPanel):
@@ -166,6 +221,15 @@ class PhotonicBandResultsPanel(ResearchResultsPanel):
             else self._column_label(x_key))
         axis.set_ylabel('Normalized frequency a/λ' if y_key == '__bands__' or str(y_key).startswith('band_')
             else self._column_label(y_key))
+        if x_key == 'path_distance_reciprocal_a' and (y_key == '__bands__' or str(y_key).startswith('band_')):
+            ticks = _path_vertex_ticks(self._data_summary or self.summary, self.data)
+            if ticks is not None:
+                positions, names = ticks
+                axis.set_xticks(positions, names)
+                axis.set_xlim(positions[0], positions[-1])
+                axis.set_xlabel('Wavevector path (distance in reciprocal a)')
+                for position in positions[1:-1]:
+                    axis.axvline(position, color='0.5', linewidth=.7, alpha=.35)
         for line in axis.lines:
             if line.get_label().startswith('band_'):
                 line.set_label(self._column_label(line.get_label()))

@@ -99,13 +99,13 @@ class PCSELResearchTests(unittest.TestCase):
 
     def test_fill_and_offset_sweep_preserves_pattern_family(self):
         for shape in ('CC','RIT'):
-            sample=pc.paper_example('hole',shape)
+            sample=pc.paper_example('hole',shape);sample['model']='cwt'
             sample['parameter_sweep']=dict(parameters=[dict(path='fill_fraction',values=[.08,.12]),dict(path='center_scale',values=[.8,1.])])
             cases=pc.prepare({},sample)['parameter_sweep']['cases']
             for case in cases:
                 self.assertAlmostEqual(case['prepared']['fill_fraction'],case['parameters']['fill_fraction'],12)
                 self.assertEqual(len(case['prepared']['shapes']),len(sample['shapes']))
-        sample=pc.paper_example();sample['parameter_sweep']=dict(parameters=[dict(path='shapes',object_id='circle-0',field='center_x',values=[-.2,-.15])])
+        sample=pc.paper_example();sample['model']='cwt';sample['parameter_sweep']=dict(parameters=[dict(path='shapes',object_id='circle-0',field='center_x',values=[-.2,-.15])])
         cases=pc.prepare({},sample)['parameter_sweep']['cases']
         self.assertEqual([case['prepared']['shapes'][0]['center'][0] for case in cases],[-.2,-.15])
 

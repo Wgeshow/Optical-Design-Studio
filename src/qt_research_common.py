@@ -3,12 +3,29 @@ from __future__ import annotations
 
 from copy import deepcopy
 import math
+import re
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (QApplication, QComboBox, QFormLayout, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QScrollArea, QTabWidget, QTableWidget, QTreeWidget, QVBoxLayout, QWidget)
+    QDialog, QDialogButtonBox, QLineEdit, QPlainTextEdit, QPushButton, QScrollArea, QTabWidget, QTableWidget, QTreeWidget, QVBoxLayout, QWidget)
 
 from qt_input_diagnostics import DiagnosticPanel, reveal_and_focus
+
+
+def run_failure_summary(message, limit=300):
+    """Keep the final cause visible while retaining the full report separately."""
+    lines = [line.strip() for line in str(message).splitlines() if line.strip()]
+    if not lines:
+        return 'The solver failed without an error message.'
+    exceptions = [i for i, line in enumerate(lines)
+                  if re.match(r'^[\w.]+(?:Error|Exception|Interrupt):', line)]
+    if exceptions:
+        text = ' '.join(lines[exceptions[-1]:])
+    elif any(line.startswith('Traceback (') for line in lines):
+        text = lines[-1]
+    else:
+        text = ' '.join(lines)
+    return text if len(text) <= limit else text[:limit-1].rstrip()+'…'
 
 
 class FieldError(ValueError):
@@ -87,7 +104,12 @@ class ResearchWorkspaceBase(QWidget):
         self.body_layout.addWidget(self.diagnostics)
         footer = QHBoxLayout()
         self.status = label('Edit the inputs, then review and run.')
+        self.status.setTextFormat(Qt.TextFormat.PlainText)
         footer.addWidget(self.status, 1)
+        self._last_run_error = ''
+        self.error_details_button = button('View error details', self.show_error_details)
+        self.error_details_button.hide()
+        footer.addWidget(self.error_details_button)
         self.validate_button = button('Check inputs', self.validate_inputs)
         self.run_button = button('Run simulation', self.run)
         self.run_button.setObjectName('setupPrimary')
@@ -347,6 +369,9 @@ class ResearchWorkspaceBase(QWidget):
         if not self._is_active_document() or self.store.busy or not self.validate_inputs():
             return
         try:
+            self._last_run_error = ''
+            self.status.setToolTip('')
+            self.error_details_button.hide()
             self._owns_run = True
             if self._benchmark_request is not None:
                 snapshot = deepcopy(self.store.project())
@@ -355,9 +380,7 @@ class ResearchWorkspaceBase(QWidget):
             else:
                 self.store.start_run('research_simulation', self.options())
         except Exception as exc:
-            self._owns_run = False
-            self.diagnostics.set_diagnostics([self._issue(exc)], workspace=self.workspace_id)
-            self.status.setText(str(exc))
+            self._failed(str(exc))
 
     def attach_benchmark(self, case):
         """Keep reference identity with this editable draft, not the shared device."""
@@ -393,11 +416,36 @@ class ResearchWorkspaceBase(QWidget):
         if self._owns_run:
             self._owns_run = False
             self.cancel_button.setEnabled(False)
-            self.status.setText(str(message))
-            issue = self._issue(ValueError(message))
-            issue.update(code='run_failed', section='Solver & accuracy' if 'runtime.executable' in self.fields else '',
+            self._last_run_error = str(message)
+            summary = run_failure_summary(message)
+            self.status.setText('Run failed: '+summary)
+            self.status.setToolTip(self._last_run_error)
+            self.error_details_button.show()
+            issue = self._issue(ValueError(summary))
+            issue.update(code='run_failed', details=self._last_run_error,
+                         section='Solver & accuracy' if 'runtime.executable' in self.fields else '',
                          field='runtime.executable' if 'runtime.executable' in self.fields else '')
             self.diagnostics.set_diagnostics([issue], workspace=self.workspace_id)
+            if self.diagnostics.list.count():
+                self.diagnostics.list.item(0).setToolTip(self._last_run_error)
+
+    def show_error_details(self):
+        if not self._last_run_error:
+            return
+        dialog = QDialog(self)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.setWindowTitle('Simulation error details')
+        dialog.resize(800, 480)
+        layout = QVBoxLayout(dialog)
+        report = QPlainTextEdit(dialog)
+        report.setReadOnly(True)
+        report.setPlainText(self._last_run_error)
+        report.setAccessibleName('Full solver error report; select and copy text')
+        layout.addWidget(report)
+        close = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, parent=dialog)
+        close.rejected.connect(dialog.close)
+        layout.addWidget(close)
+        dialog.show()
 
     def open_diagnostic(self, target):
         if target.get('workspace') and target['workspace'] != self.workspace_id:

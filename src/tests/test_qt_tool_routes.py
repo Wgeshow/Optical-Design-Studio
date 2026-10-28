@@ -53,7 +53,7 @@ class NamedToolRoutesTests(unittest.TestCase):
         page=IndexShiftPage(self.store);self.widgets.append(page)
         spy=QSignalSpy(page.routeRequested)
         from PyQt6.QtWidgets import QPushButton
-        button=next(button for button in page.findChildren(QPushButton) if button.text()=='Edit shared optical sampling')
+        button=next(button for button in page.findChildren(QPushButton) if button.text()=='Edit optical sampling')
         button.click()
         self.assertEqual(list(spy),[['optical.sweep']])
 

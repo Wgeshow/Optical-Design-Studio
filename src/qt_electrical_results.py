@@ -289,9 +289,16 @@ def _axis_edges(axis):
 
 
 class _FieldColors:
-    def __init__(self, values, logarithmic=False):
+    def __init__(self, values, logarithmic=False, resolve_tiny=False):
         self.logarithmic = logarithmic
         values = np.asarray(values, dtype=float)
+        self.data_low, self.data_high = float(values.min()), float(values.max())
+        self.data_span = self.data_high-self.data_low
+        magnitude = max(abs(self.data_low), abs(self.data_high))
+        # Relative-only display criterion: no absolute floor that would hide
+        # a genuinely small signal around zero. Saved samples stay untouched.
+        self.near_constant = bool(magnitude > 0 and self.data_span <= 1e-12*magnitude)
+        self.padded = self.near_constant and not resolve_tiny
         if logarithmic:
             positive = values[values > 0]
             self.low = float(np.log10(positive.min())) if positive.size else 0.
@@ -306,6 +313,10 @@ class _FieldColors:
                 self.cmap = colormaps['coolwarm']
             else:
                 self.cmap = colormaps['viridis']
+        if self.padded:
+            center = self.data_low+self.data_span/2
+            low, high = center-magnitude*.01, center+magnitude*.01
+            self.low, self.high = (math.log10(low), math.log10(high)) if logarithmic else (low, high)
         self.span = max(self.high-self.low, abs(self.high)*1e-15, 1e-300)
         palette = self.cmap(np.linspace(0,1,256))
         self.palette = [QColor(round(r*255),round(g*255),round(b*255)) for r,g,b,_ in palette]
@@ -321,7 +332,13 @@ class _FieldColors:
 
     def range_text(self):
         low, high = (10**self.low, 10**self.high) if self.logarithmic else (self.low,self.high)
-        return f'{low:.4g} … {high:.4g}'+(' (log color)' if self.logarithmic else '')
+        result = f'{low:.4g} … {high:.4g}'+(' (log color)' if self.logarithmic else '')
+        if self.near_constant:
+            result += f'; saved Δ={self.data_span:.4g}' + ('; near-constant auto range ±1%' if self.padded else '; tiny range resolved')
+        return result
+
+    def tick_text(self, value):
+        return format(value, '.4g' if self.padded else '.17g' if self.near_constant else '.2g')
 
 
 class ElectricalSliceCanvas(QWidget):
@@ -574,9 +591,16 @@ class ElectricalResultsPanel(QWidget):
         controls.addWidget(self.quantity,1)
         self.log_colors = QCheckBox('Log color scale')
         controls.addWidget(self.log_colors)
+        self.resolve_tiny_range = QCheckBox('Resolve tiny range')
+        self.resolve_tiny_range.setToolTip('Use the saved min/max even when their relative spread is at most 1e-12 of their magnitude (no absolute floor). Automatic mode pads that near-constant range by ±1%; data, probes and exports are unchanged.')
+        controls.addWidget(self.resolve_tiny_range)
+        self.color_range_note = QLabel('')
+        self.color_range_note.setWordWrap(True)
+        self.color_range_note.hide()
         self.range_label = QLabel('')
         controls.addWidget(self.range_label)
         layout.addLayout(controls)
+        layout.addWidget(self.color_range_note)
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs,1)
 
@@ -644,6 +668,7 @@ class ElectricalResultsPanel(QWidget):
         self.result_bias.currentIndexChanged.connect(self._bias_changed)
         self.quantity.currentIndexChanged.connect(self.redraw)
         self.log_colors.toggled.connect(self.redraw)
+        self.resolve_tiny_range.toggled.connect(self.redraw)
         self.top_view.positionPicked.connect(self._pick_xy)
         self.cross_view.positionPicked.connect(self._pick_xz)
         self.volume_view.positionPicked.connect(self.set_probe)
@@ -852,9 +877,11 @@ class ElectricalResultsPanel(QWidget):
         can_log = bool(np.all(values >= 0) and np.any(values > 0))
         self.log_colors.setEnabled(can_log)
         logarithmic = self.log_colors.isChecked() and can_log
-        self._colors = _FieldColors(values,logarithmic)
+        self._colors = _FieldColors(values,logarithmic,self.resolve_tiny_range.isChecked())
         label,unit = _QUANTITY_INFO[key]
         self.range_label.setText(self._colors.range_text()+' '+unit)
+        self.color_range_note.setText(self._colors.range_text()+' '+unit)
+        self.color_range_note.setVisible(self._colors.near_constant)
         ix,iy,iz = self.cursor_indices
         x,y,z = [self.volume[axis] for axis in ('x','y','z')]
         self.top_view.set_field(x,y,values[:,:,iz],self._colors,(x[ix],y[iy]),f'Top XY · z={z[iz]*1e6:.5g} µm · {label}')
@@ -913,7 +940,14 @@ class ElectricalResultsPanel(QWidget):
         names = {'npz':('volume.npz','NumPy volume (*.npz)'), 'csv':('electrical-grid.csv','Grid samples (*.csv)'),
                  'vtk':('electrical-volume.vtk','VTK rectilinear grid (*.vtk)'), 'figure':('electrical-fields.png','PNG image (*.png);;PDF figure (*.pdf);;SVG figure (*.svg)')}
         name,filters = names[kind]
-        path,_ = QFileDialog.getSaveFileName(self,'Export electrical result',name,filters)
+        title = 'Export electrical result'
+        if kind in ('npz', 'csv', 'vtk') and self.selected_bias() is not None:
+            bias = f'{self.selected_bias():.12g}'
+            run = self.directory.name if self.directory is not None else 'saved-run'
+            stem = Path(name)
+            name = f'{stem.stem}-bias-{bias}V-{run[:12]}{stem.suffix}'
+            title = f'Export selected electrical state · {bias} V · run {run[:12]}'
+        path,_ = QFileDialog.getSaveFileName(self,title,name,filters)
         if path:
             try:
                 self.export_file(path,kind)

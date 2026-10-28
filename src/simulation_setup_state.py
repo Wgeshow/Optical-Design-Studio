@@ -21,7 +21,18 @@ from input_diagnostics import diagnostic
 
 @lru_cache(maxsize=1)
 def _plan():
-    return json.loads(Path(__file__).with_name('simulation_setup_plan.json').read_text(encoding='utf-8'))
+    plan = json.loads(Path(__file__).with_name('simulation_setup_plan.json').read_text(encoding='utf-8'))
+    # Keep the historical presentation catalog intact while exposing the real
+    # outer-layer assignment in the current native setup and binding metadata.
+    for mode in plan['modes'].values():
+        for tab in mode['tabs']:
+            for card in tab.get('cards', []):
+                for field in card.get('fields', []):
+                    if field.get('key') in ('ui.optical.incident_material', 'ui.optical.exit_material'):
+                        field.update(widget='select', default='',
+                            validation='Choose an existing project optical material for this semi-infinite outer medium. Finite device geometry is preserved.',
+                            error_message='Choose an existing project optical material.')
+    return plan
 
 
 def load_plan():
@@ -91,7 +102,10 @@ class SimulationSetupState(QObject):
         self._mesh = None
         self._runtime = {}
         store.changed.connect(self._source_changed)
-        store.busy_changed.connect(lambda busy: self.changed.emit('busy'))
+        store.busy_changed.connect(self._busy_changed)
+
+    def _busy_changed(self, _busy):
+        self.changed.emit('busy')
 
     def _source_changed(self, reason='project'):
         presentation = str(reason).startswith('ui.') and not str(reason).startswith(('ui.optical.outputs.', 'ui.optical.engine', 'ui.coupled.unsupported_output_policy'))
@@ -635,7 +649,8 @@ class SimulationSetupState(QObject):
             return [dict(label=row['name'],value=row['id']) for row in rows]
         if key=='ui.electrical.selected_material_id':
             return [dict(label=row['name'],value=row['id']) for row in self.store.electrical_materials]
-        if key in ('ui.optical.selected_material_name','device.optical_material_name'):
+        if key in ('ui.optical.selected_material_name','device.optical_material_name',
+                   'ui.optical.incident_material','ui.optical.exit_material'):
             return [dict(label=row['Name'],value=row['Name']) for row in self.store.materials.to_dict('records')]
         return copy.deepcopy(field.get('options',[]) if isinstance(field,dict) else self._fields.get(key,{}).get('options',[]))
 
@@ -701,6 +716,8 @@ class SimulationSetupState(QObject):
                     if not isinstance(base[flag],bool): raise ValueError(flag+' must be true or false.')
             self.store.save_search(namespace,values)
             self._source_changed(key)
+        elif key in ('ui.optical.incident_material','ui.optical.exit_material'):
+            self.store.set_optical_exterior_material('incident' if key=='ui.optical.incident_material' else 'exit', value)
         elif key=='ui.optical.study_type':
             self._set_study(value)
         elif key=='ui.optical.single.wavelength_nm':

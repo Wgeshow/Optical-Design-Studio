@@ -238,7 +238,7 @@ def _colorbar(painter,colors,rect,label):
         physical=10**value if colors.logarithmic else value
         y=rect.top()+position*rect.height()
         painter.drawLine(QPointF(rect.right(),y),QPointF(rect.right()+4,y))
-        painter.drawText(QPointF(rect.right()+7,y+3),f'{physical:.2g}')
+        painter.drawText(QPointF(rect.right()+7,y+3),colors.tick_text(physical))
     painter.restore()
 
 
@@ -289,7 +289,8 @@ class ResultsMapCanvas(ElectricalSliceCanvas):
                         if points:
                             path.addPolygon(QPolygonF([project(x*1e-6,y*1e-6) for x,y in points]));path.closeSubpath()
                     painter.setPen(QPen(QColor('#233949' if obj.get('operation')=='void' else '#d7ebff'),.7))
-                    painter.setBrush(QColor('#0a1c2b') if obj.get('operation')=='void' else Qt.BrushStyle.NoBrush)
+                    # A geometric void is still a solved dielectric region. Keep its saved field visible.
+                    painter.setBrush(Qt.BrushStyle.NoBrush)
                     painter.drawPath(path)
                 if total>len(objects):
                     _pc_area_outline(painter,self.device,layer['id'],lambda x,y:project(x*1e-6,y*1e-6))
@@ -674,7 +675,7 @@ class ResultsWorkspace(ElectricalResultsPanel):
         self._workspace_ready=False
         self.store=store
         self.saved_project={};self.optical_data=pd.DataFrame();self.profile_data=pd.DataFrame();self.feature_data=pd.DataFrame()
-        self._saved_optical_cell={}
+        self._saved_optical_cell={};self._saved_solver_time=None
         self._reference_volume=None;self._saved_runs=[];self._active_category='Overview'
         self.optical_source_directory=None;self.has_optical_fields=False;self.has_specular_phase=False
         super().__init__(parent)
@@ -746,22 +747,27 @@ class ResultsWorkspace(ElectricalResultsPanel):
         self.saved_run_list.setFixedHeight(78);self.saved_run_list.currentItemChanged.connect(self._saved_run_selected)
         self.saved_run_list.setToolTip('Scroll to select another saved run; the active run remains highlighted.')
         layout.addWidget(self.saved_run_list)
+        self.electrical_controls=QWidget()
+        controls=QVBoxLayout(self.electrical_controls);controls.setContentsMargins(0,0,0,0);controls.setSpacing(8)
+        layout.addWidget(self.electrical_controls)
         def field(label,widget):
-            row=QHBoxLayout();row.addWidget(QLabel(label),1);row.addWidget(widget,2);layout.addLayout(row);widget.show()
+            row=QHBoxLayout();row.addWidget(QLabel(label),1);row.addWidget(widget,2);controls.addLayout(row);widget.show()
         field('Bias (V)',self.result_bias)
         self.compare_zero=QCheckBox('Compare with 0 V');self.compare_zero.setToolTip('Overlay the saved zero-offset reference in depth and optical charts.')
-        self.compare_zero.toggled.connect(self._draw_charts);layout.addWidget(self.compare_zero)
+        self.compare_zero.toggled.connect(self._draw_charts);controls.addWidget(self.compare_zero)
         field('Visualize',self.quantity)
         self.scale_choice=QComboBox();self.scale_choice.addItems(['Linear','Log']);self.scale_choice.currentTextChanged.connect(lambda text:self.log_colors.setChecked(text=='Log'))
         field('Scale',self.scale_choice)
-        label=QLabel('Slice position (µm)');label.setContentsMargins(0,7,0,0);layout.addWidget(label)
+        controls.addWidget(self.resolve_tiny_range);self.resolve_tiny_range.show()
+        controls.addWidget(self.color_range_note)
+        label=QLabel('Slice position (µm)');label.setContentsMargins(0,7,0,0);controls.addWidget(label)
         self.cursor_sliders={}
         for key in ('x','y','z'):
             row=QHBoxLayout();name=QLabel(key.upper());name.setFixedWidth(12);row.addWidget(name)
             slider=QSlider(Qt.Orientation.Horizontal);slider.setRange(0,0);slider.valueChanged.connect(lambda value,k=key:self._slide_cursor(k,value));row.addWidget(slider,1)
             self.cursor_sliders[key]=slider
             control=self.cursor_controls[key];control.setDecimals(4);control.setSuffix('');control.setFixedWidth(70);control.setMinimumWidth(0);control.show();row.addWidget(control)
-            layout.addLayout(row)
+            controls.addLayout(row)
         layout.addSpacing(8)
         self.nav_buttons={}
         categories=[('Overview','Structure'),('Potential & fields','Fields'),('Carriers & charge','Materials'),
@@ -783,7 +789,8 @@ class ResultsWorkspace(ElectricalResultsPanel):
 
     def _build_center(self):
         self.center=QWidget();layout=QVBoxLayout(self.center);layout.setContentsMargins(0,0,0,0);layout.setSpacing(6)
-        metric_row=QHBoxLayout();metric_row.setSpacing(6)
+        self.electrical_metric_bar=QWidget()
+        metric_row=QHBoxLayout(self.electrical_metric_bar);metric_row.setContentsMargins(0,0,0,0);metric_row.setSpacing(6)
         self.metric_values={};self.metric_cards=[]
         for key,title,symbol in [('bias','Applied bias','ϟ'),('field','Peak field','▥'),('electrons','Peak electrons','−'),('holes','Peak holes','+'),('shift','Optical peak shift','∿')]:
             frame=QFrame();frame.setObjectName('resultsMetric');frame.setFixedHeight(65)
@@ -793,7 +800,16 @@ class ResultsWorkspace(ElectricalResultsPanel):
             text.addWidget(label);text.addWidget(value);row.addLayout(text,1);metric_row.addWidget(frame,1)
             self.metric_values[key]=value
             self.metric_cards.append(frame)
-        layout.addLayout(metric_row)
+        layout.addWidget(self.electrical_metric_bar)
+        self.optical_metric_bar=QWidget()
+        optical_metrics=QHBoxLayout(self.optical_metric_bar);optical_metrics.setContentsMargins(0,0,0,0);optical_metrics.setSpacing(6)
+        self.optical_metric_values={}
+        for key,title in [('samples','Saved samples'),('range','Wavelength (nm)'),('R','Peak R'),('T','Peak T'),('A','Saved A range')]:
+            frame=QFrame();frame.setObjectName('resultsMetric');frame.setFixedHeight(65)
+            box=QVBoxLayout(frame);box.setContentsMargins(10,6,8,6);box.setSpacing(3)
+            label=QLabel(title);label.setObjectName('metricTitle');value=QLabel('—');value.setObjectName('metricValue')
+            box.addWidget(label);box.addWidget(value);optical_metrics.addWidget(frame,1);self.optical_metric_values[key]=value
+        self.optical_metric_bar.hide();layout.addWidget(self.optical_metric_bar)
         self.info_label=QLabel('ⓘ  Open a saved run to display its computed fields and optical spectra.');self.info_label.setObjectName('resultsInfo');self.info_label.setFixedHeight(24)
         layout.addWidget(self.info_label)
         self.center_stack=QStackedWidget();layout.addWidget(self.center_stack,1)
@@ -816,14 +832,14 @@ class ResultsWorkspace(ElectricalResultsPanel):
         self.hero_depth=_small_plot();self.hero_optical=_small_plot();self.hero_stack.addWidget(self.hero_depth);self.hero_stack.addWidget(self.hero_optical)
         main_layout.addWidget(self.hero_stack,1)
         overview_layout.addWidget(main,37)
-        maps=QWidget();map_row=QHBoxLayout(maps);map_row.setContentsMargins(0,0,0,0);map_row.setSpacing(6)
+        maps=QWidget();self.electrical_maps=maps;map_row=QHBoxLayout(maps);map_row.setContentsMargins(0,0,0,0);map_row.setSpacing(6)
         self.top_view=ResultsMapCanvas('xy');self.cross_view=ResultsMapCanvas('xz')
         self.top_view.positionPicked.connect(self._pick_xy);self.cross_view.positionPicked.connect(self._pick_xz)
         self.top_card=_card('Potential · XY',self.top_view);self.cross_card=_card('|E| · XZ',self.cross_view)
         self.top_card.more_button.clicked.connect(lambda:self.export_dialog('figure'));self.cross_card.more_button.clicked.connect(lambda:self.export_dialog('figure'))
         self.top_card.more_button.show();self.cross_card.more_button.show()
         map_row.addWidget(self.top_card,1);map_row.addWidget(self.cross_card,1);overview_layout.addWidget(maps,22)
-        charts=QWidget();chart_row=QHBoxLayout(charts);chart_row.setContentsMargins(0,0,0,0);chart_row.setSpacing(6)
+        charts=QWidget();self.overview_charts=charts;chart_row=QHBoxLayout(charts);chart_row.setContentsMargins(0,0,0,0);chart_row.setSpacing(6)
         self.depth_plot=_small_plot();self.rta_plot=_small_plot()
         depth_content,self.depth_legend=_legend_column(self.depth_plot)
         optical_content,self.rta_legend=_legend_column(self.rta_plot)
@@ -861,17 +877,20 @@ class ResultsWorkspace(ElectricalResultsPanel):
         scroll=QScrollArea();scroll.setWidgetResizable(True)
         content=QWidget();layout=QVBoxLayout(content);layout.setContentsMargins(12,10,12,10);layout.setSpacing(8)
         title=QLabel('Run summary');title.setObjectName('resultsCardTitle');layout.addWidget(title)
-        self.run_value_labels={}
+        self.run_value_labels={};self.run_value_captions={}
         for key,label in [('model','Model'),('biases','Bias states'),('mesh','Mesh cells'),('elapsed','Elapsed time')]:
-            row=QHBoxLayout();caption=QLabel(label);caption.setFixedWidth(85);row.addWidget(caption)
+            row=QHBoxLayout();caption=QLabel(label);caption.setFixedWidth(85);caption.setWordWrap(True);row.addWidget(caption)
             value=QLabel('—');value.setWordWrap(True);value.setStyleSheet('font-size:11px;');row.addWidget(value,1);layout.addLayout(row);self.run_value_labels[key]=value
+            self.run_value_captions[key]=caption
         badge_row=QHBoxLayout();self.convergence_badge=QLabel('Convergence unavailable');self.balance_badge=QLabel('Charge balance unavailable')
         for badge in (self.convergence_badge,self.balance_badge):badge.setStyleSheet('background:#12283a;border:1px solid #31546b;border-radius:4px;padding:6px;font-size:10px;');badge_row.addWidget(badge)
         layout.addLayout(badge_row)
-        heading=QLabel('Numerical checks');heading.setContentsMargins(0,7,0,0);heading.setObjectName('resultsCardTitle');layout.addWidget(heading)
-        self.check_labels={}
+        heading=QLabel('Numerical checks');self.check_heading=heading;heading.setContentsMargins(0,7,0,0);heading.setObjectName('resultsCardTitle');layout.addWidget(heading)
+        self.check_labels={};self.check_captions={}
         for key,label in [('residual','Poisson residual'),('gauss','Gauss balance'),('refinement','Mesh refinement')]:
-            row=QHBoxLayout();row.addWidget(QLabel(label),1);value=QLabel('Unavailable');value.setStyleSheet('font-size:11px;');row.addWidget(value,1);layout.addLayout(row);self.check_labels[key]=value
+            row=QHBoxLayout();caption=QLabel(label);row.addWidget(caption,1);value=QLabel('Unavailable');value.setStyleSheet('font-size:11px;');row.addWidget(value,1);layout.addLayout(row);self.check_labels[key]=value;self.check_captions[key]=caption
+        self.optical_check_note=QLabel('S4 defines A = 1 − R − T. These saved values do not establish convergence; refine the basis and spectral sampling independently.')
+        self.optical_check_note.setWordWrap(True);self.optical_check_note.hide();layout.addWidget(self.optical_check_note)
         self.detail_expanders={}
         for key,title in [('boundary','Boundary conditions'),('sources','Material models & sources'),('assumptions','Assumptions')]:
             button=QPushButton('›  '+title.replace('&','&&'));button.setObjectName('resultsExpander');button.setCheckable(True)
@@ -880,12 +899,13 @@ class ResultsWorkspace(ElectricalResultsPanel):
             layout.addWidget(button);layout.addWidget(text);self.detail_expanders[key]=text
         self.current_scope=QLabel('Current / I–V: no saved study');self.current_scope.setWordWrap(True);self.current_scope.setStyleSheet('font-size:11px;');layout.addWidget(self.current_scope)
         self.optical_scope=QLabel('Optical model: unavailable');self.optical_scope.setWordWrap(True);self.optical_scope.setStyleSheet('font-size:11px;');layout.addWidget(self.optical_scope)
-        probe_title=QLabel('Probe at cursor position');probe_title.setObjectName('resultsCardTitle');probe_title.setContentsMargins(0,8,0,0);layout.addWidget(probe_title)
+        self.electrical_probe=QWidget();probe_layout=QVBoxLayout(self.electrical_probe);probe_layout.setContentsMargins(0,0,0,0);layout.addWidget(self.electrical_probe)
+        probe_title=QLabel('Probe at cursor position');probe_title.setObjectName('resultsCardTitle');probe_title.setContentsMargins(0,8,0,0);probe_layout.addWidget(probe_title)
         self.probe_values={};probe_grid=QGridLayout();probe_grid.setHorizontalSpacing(10);probe_grid.setVerticalSpacing(7)
         for row,(key,label) in enumerate([('x','X (µm)'),('y','Y (µm)'),('z','Z (µm)'),('potential','Potential (V)'),('Ex_V_m','Ex (V/m)'),('Ey_V_m','Ey (V/m)'),('Ez_V_m','Ez (V/m)'),('electrons_cm3','Electrons (cm⁻³)'),('holes_cm3','Holes (cm⁻³)'),('charge_density_C_m3','Charge (C/m³)')]):
             probe_grid.addWidget(QLabel(label),row,0);value=QLabel('—');value.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignVCenter);value.setStyleSheet('font-size:11px;');probe_grid.addWidget(value,row,1);self.probe_values[key]=value
-        layout.addLayout(probe_grid)
-        self.probe_identity=QLabel('Nearest saved grid sample');self.probe_identity.setWordWrap(True);self.probe_identity.setStyleSheet('font-size:10px;color:#86adc9;');layout.addWidget(self.probe_identity)
+        probe_layout.addLayout(probe_grid)
+        self.probe_identity=QLabel('Nearest saved grid sample');self.probe_identity.setWordWrap(True);self.probe_identity.setStyleSheet('font-size:10px;color:#86adc9;');probe_layout.addWidget(self.probe_identity)
         layout.addStretch(1);scroll.setWidget(content);right_layout.addWidget(scroll)
         self._body.addWidget(self.right_rail)
 
@@ -963,6 +983,19 @@ class ResultsWorkspace(ElectricalResultsPanel):
     def set_result(self,directory,summary):
         self.saved_project={};path=Path(directory)/'project.json'
         self._saved_optical_cell=_saved_optical_cell(directory) if summary.get('model')=='optical_only' else {}
+        self._saved_solver_time=None
+        if summary.get('model')=='optical_only':
+            optical=summary.get('optical',{})
+            elapsed=optical.get('elapsed_seconds') if isinstance(optical,dict) else None
+            def valid_time(value):
+                return isinstance(value,(int,float)) and not isinstance(value,bool) and math.isfinite(value) and value>=0
+            if not valid_time(elapsed):
+                diagnostics=Path(directory)/'diagnostics.json'
+                try:
+                    saved=json.loads(diagnostics.read_text(encoding='utf-8')) if diagnostics.is_file() and diagnostics.stat().st_size<=5*1024*1024 else {}
+                    elapsed=saved.get('elapsed_seconds') if isinstance(saved,dict) else None
+                except (OSError,ValueError):elapsed=None
+            if valid_time(elapsed):self._saved_solver_time=float(elapsed)
         if path.is_file():
             try:self.saved_project=json.loads(path.read_text(encoding='utf-8'))
             except (OSError,ValueError):self.saved_project={}
@@ -1093,7 +1126,7 @@ class ResultsWorkspace(ElectricalResultsPanel):
         self.field_scene.set_field(device,self.volume,values,self._colors,(x[ix],y[iy],z[iz]),label,unit)
         top_key='potential' if self._active_category in ('Overview','Potential & fields') and 'potential' in self.volume else key
         top_values=self.volume[top_key];top_label,top_unit=_QUANTITY_INFO[top_key]
-        top_colors=_FieldColors(top_values,False);self.top_view.device=device;self.top_view.plane_coordinate=z[iz];self.top_view.unit=top_unit
+        top_colors=_FieldColors(top_values,False,self.resolve_tiny_range.isChecked());self.top_view.device=device;self.top_view.plane_coordinate=z[iz];self.top_view.unit=top_unit
         self.top_view.set_field(x,y,top_values[:,:,iz],top_colors,(x[ix],y[iy]),top_label)
         self.hero_top.device=device;self.hero_top.plane_coordinate=z[iz];self.hero_top.unit=top_unit
         self.hero_top.set_field(x,y,top_values[:,:,iz],top_colors,(x[ix],y[iy]),top_label)
@@ -1121,6 +1154,69 @@ class ResultsWorkspace(ElectricalResultsPanel):
         for key,label in self.probe_values.items():
             if key not in ('x','y','z'):label.setText(_text(probe.get('values',{}).get(key),'—'))
         self.probe_identity.setText('Nearest grid sample '+str(probe.get('indices',''))+'\n'+' · '.join(str(probe[key]) for key in ('layer_id','material_id','contact_id') if key in probe))
+
+    def _optical_only_result(self):
+        return (self.summary.get('model')=='optical_only' and not self._result_rows
+                and self.iv_data.empty and self.cv_data.empty)
+
+    def _apply_result_mode(self):
+        """Present only quantities actually saved by this run; preserve controllers."""
+        optical=self._optical_only_result()
+        self.electrical_controls.setVisible(not optical)
+        self.electrical_probe.setVisible(not optical)
+        self.electrical_metric_bar.setVisible(not optical)
+        self.optical_metric_bar.setVisible(optical and self._active_category not in ('Optical E/H','Specular phase'))
+        self.electrical_maps.setVisible(not optical)
+        self.depth_card.setVisible(not optical)
+        self.overview_charts.setVisible(not optical or not self.optical_data.empty)
+        self.current_scope.setVisible(not optical)
+        for badge in (self.convergence_badge,self.balance_badge):badge.setVisible(not optical)
+        for name in ('Potential & fields','Carriers & charge','Energy bands','I–V / C–V','Mesh & convergence'):
+            self.nav_buttons[name].setVisible(not optical)
+        for name,available in [('Optical E/H',self.has_optical_fields),('Specular phase',self.has_specular_phase),('Optical response',not self.optical_data.empty)]:
+            self.nav_buttons[name].setVisible(not optical or available)
+        for name in ('Top view · XY','Cross section · XZ','Depth profiles'):
+            self.mode_buttons[name].setVisible(not optical)
+        self.mode_buttons['3D fields'].setText('Saved geometry' if optical else '3D fields')
+        self.mode_buttons['Optical spectra'].setVisible(not optical or not self.optical_data.empty)
+        self.workspace_export_buttons['Export VTK'].setVisible(not optical)
+        self.rerun_button.setText('Rerun / refine optics' if optical else 'Rerun / refine mesh')
+        self.run_value_captions['biases'].setText('Samples' if optical else 'Bias states')
+        self.run_value_captions['mesh'].setText('Wavelength' if optical else 'Mesh cells')
+        self.run_value_captions['elapsed'].setText('Saved solver time' if optical else 'Elapsed time')
+        self.run_value_labels['elapsed'].setToolTip('Saved elapsed_seconds from the run summary or diagnostics; not a reconstructed wall-clock total.' if optical else 'Elapsed time recorded in the saved electrical result summary.')
+        self.check_heading.setText('Saved spectrum' if optical else 'Numerical checks')
+        for key,title in [('residual','Saved rows' if optical else 'Poisson residual'),
+                          ('gauss','Finite R/T/A rows' if optical else 'Gauss balance'),
+                          ('refinement','Convergence' if optical else 'Mesh refinement')]:
+            self.check_captions[key].setText(title)
+        self.optical_check_note.setVisible(optical and not self.optical_data.empty)
+        if not optical:return
+        frame=self.optical_data
+        def finite_column(key):
+            values=pd.to_numeric(frame[key],errors='coerce').to_numpy(dtype=float) if key in frame else np.array([])
+            return values[np.isfinite(values)]
+        wave=finite_column('wavelength_nm' if 'wavelength_nm' in frame else 'wavelength')
+        wavelength=f'{np.min(wave):.5g}–{np.max(wave):.5g}' if len(wave) else '—'
+        samples=f'{len(frame):,}' if not frame.empty else '—'
+        self.optical_metric_values['samples'].setText(samples)
+        self.optical_metric_values['range'].setText(wavelength)
+        self.optical_metric_values['range'].setToolTip('Range of finite wavelengths in the saved spectrum; nm.')
+        for key in ('R','T','A'):
+            values=finite_column(key)
+            text=(f'{np.min(values):.4g}–{np.max(values):.4g}' if key=='A' else f'{np.max(values):.4g}') if len(values) else '—'
+            self.optical_metric_values[key].setText(text)
+            self.optical_metric_values[key].setToolTip('Actual saved samples; no fitted peak or convergence claim.' if key!='A' else 'Actual saved A values. S4 defines A = 1 − R − T; this is not an independent energy-conservation test.')
+        valid=None
+        if {'R','T','A'}<=set(frame):
+            values=frame[['R','T','A']].apply(pd.to_numeric,errors='coerce').to_numpy(dtype=float)
+            valid=int(np.all(np.isfinite(values),axis=1).sum())
+        self.run_value_labels['biases'].setText(samples)
+        self.run_value_labels['mesh'].setText(wavelength+' nm' if len(wave) else 'Unavailable')
+        self.run_value_labels['elapsed'].setText(f'{self._saved_solver_time:.5g} s' if self._saved_solver_time is not None else 'Unavailable')
+        self.check_labels['residual'].setText(samples if not frame.empty else 'Unavailable')
+        self.check_labels['gauss'].setText(f'{valid:,} / {len(frame):,}' if valid is not None else 'Unavailable')
+        self.check_labels['refinement'].setText('Not established')
 
     def _refresh_workspace(self):
         if not self._workspace_ready:return
@@ -1172,7 +1268,7 @@ class ResultsWorkspace(ElectricalResultsPanel):
         self.detail_expanders['sources'].setPlainText(self.sources.toPlainText());self.detail_expanders['assumptions'].setPlainText('\n'.join(self.summary.get('limitations',[])))
         self.current_scope.setText('Current / I–V: '+labels['iv_scope'])
         selection=self._saved_optical_cell or self.summary.get('optical_unit_cell',{}).get('selection') or self.saved_project.get('settings',{}).get('optical_unit_cell',{})
-        if self.optical_data.empty:optical_scope='Electrical fields only'
+        if self.optical_data.empty:optical_scope='Saved optical E/H phasors' if self.has_optical_fields else 'Saved specular phase' if self.has_specular_phase else 'No saved optical response'
         elif selection.get('enabled'):
             optical_scope=f"S4 · selected periodic cell {selection['width_um']:g} × {selection['depth_um']:g} µm"
         elif selection:optical_scope='S4 · device-footprint periodic supercell'
@@ -1180,14 +1276,17 @@ class ResultsWorkspace(ElectricalResultsPanel):
         self.optical_scope.setText('Optical model: '+optical_scope)
         device=self.summary.get('device',{});name=device.get('name') or self.summary.get('title') or (self.directory.name[:16] if self.directory else 'No saved run')
         self.footer_label.setText('ⓘ  '+name+' · saved result\nGeometry, materials and inputs are retained with this run.')
-        self.info_label.setText('ⓘ  '+('Saved optical spectra · electrical field quantities unavailable.' if model=='optical_only' else 'Computed saved fields · nearest-grid probe · meshes and optical sampling require convergence checks.'))
+        self.info_label.setText('ⓘ  '+('Saved optical spectra · basis and spectral sampling need separate convergence checks.' if model=='optical_only' else 'Computed saved fields · nearest-grid probe · meshes and optical sampling require convergence checks.'))
         if self.has_optical_fields and model=='optical_only':self.info_label.setText('ⓘ  Saved optical E/H phasors · source-normalized amplitudes; static electrical fields unavailable.')
         shape_count=sum(bool(obj.get('enabled',True)) for obj in geometry.get('shapes',[]))
         if shape_count>256:
             self.info_label.setText(self.info_label.text()+f'  Geometry display LOD · all {shape_count:,} actual shapes retained.')
         for title,button in self.workspace_export_buttons.items():button.setEnabled(self.directory is not None and (self.volume is not None or title=='Export CSV / NPZ' and (self.has_optical_fields or self.has_specular_phase or not self.optical_data.empty or not self.iv_data.empty or not self.cv_data.empty) or title not in ('Export CSV / NPZ','Export VTK')))
+        self._apply_result_mode()
 
     def select_category(self,name):
+        if self._optical_only_result() and name in ('Potential & fields','Carriers & charge','Energy bands','I–V / C–V','Mesh & convergence'):
+            name='Optical response' if not self.optical_data.empty else 'Overview'
         self._active_category=name
         for key,button in self.nav_buttons.items():button.setChecked(key==name)
         for card in self.metric_cards:card.setVisible(name not in ('Optical E/H','Specular phase'))
@@ -1195,6 +1294,8 @@ class ResultsWorkspace(ElectricalResultsPanel):
         pages={'Overview':0,'Potential & fields':0,'Carriers & charge':0,'Energy bands':1,'Optical response':2,'I–V / C–V':3,'Mesh & convergence':4,'Inputs & materials':5,'Raw data & exports':6,
             'Optical E/H':7,'Specular phase':8}
         self.center_stack.setCurrentIndex(pages.get(name,0))
+        self._apply_result_mode()
+        if name=='Overview' and self._optical_only_result() and self.hero_stack.currentIndex() in (1,2,3):self.focus_view('3D fields')
         if name in ('Potential & fields','Carriers & charge'):
             key='potential' if name=='Potential & fields' else 'electrons_cm3'
             index=self.quantity.findData(key)
@@ -1202,6 +1303,7 @@ class ResultsWorkspace(ElectricalResultsPanel):
         self.redraw()
 
     def focus_view(self,title):
+        if self._optical_only_result() and title in ('Top view · XY','Cross section · XZ','Depth profiles'):title='3D fields'
         for key,button in self.mode_buttons.items():button.setChecked(key==title)
         modes={'3D fields':0,'Top view · XY':1,'Cross section · XZ':2,'Depth profiles':3,'Optical spectra':4}
         self.hero_stack.setCurrentIndex(modes.get(title,0));self.center_stack.setCurrentIndex(0)
@@ -1308,8 +1410,9 @@ class ResultsWorkspace(ElectricalResultsPanel):
             actions[menu.addAction('Original selected optical E/H arrays NPZ')]=self.optical_fields_panel.export_npz
         else:
             if self.volume is not None:
-                actions[menu.addAction('Complete saved electrical grid CSV')]=lambda:self.export_dialog('csv')
-                actions[menu.addAction('Original saved electrical volume NPZ')]=lambda:self.export_dialog('npz')
+                context = f' · selected {self.selected_bias():.12g} V' if self.selected_bias() is not None else ''
+                actions[menu.addAction('Complete saved electrical grid CSV'+context)]=lambda:self.export_dialog('csv')
+                actions[menu.addAction('Original saved electrical volume NPZ'+context)]=lambda:self.export_dialog('npz')
             for label,name,frame in [('Optical spectra CSV','optical-spectra',self.optical_data),
                     ('I–V CSV','electrical-iv',self.iv_data),('C–V CSV','electrical-cv',self.cv_data)]:
                 if not frame.empty:

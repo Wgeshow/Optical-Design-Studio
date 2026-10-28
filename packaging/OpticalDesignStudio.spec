@@ -140,6 +140,8 @@ for package in ('sklearn', 'scipy', 'shapely', 'pyqtgraph'):
     hidden += collect_submodules(package, filter=lambda name: not any(
         part in name.split('.') for part in ('tests', 'testing', 'examples', 'opengl', 'jupyter', 'MatplotlibWidget')))
 
+hidden += ['ai_campaign_storage', 'optical_ui_scope', 'pcsel_paper_studies', 'qt_geometry_history', 'qt_journey', 'qt_optical_domain_canvas', 'qt_optical_journey', 'qt_pcsel_paper', 'qt_research_journey', 'qt_study_device_editor', 'qt_study_navigation']
+
 a = Analysis([str(root/'desktop_entry.py'), str(root/'backend_entry.py')],
              pathex=[str(source), *map(str, dependency_paths)],
              binaries=binaries, datas=data, hiddenimports=hidden,

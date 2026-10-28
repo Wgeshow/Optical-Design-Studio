@@ -1,61 +1,16 @@
-# Optical Design Studio 1.4.0-alpha.2
+# Optical Design Studio 1.4.0-alpha.3
 
-**Highly Experimental prerelease.** This version adds editable research and paper-comparison workspaces. Keep a separate copy of existing projects and review each model's assumptions, solver requirements and convergence status before relying on its results. A completed calculation does not establish agreement with a paper or physical convergence.
+Experimental portable application for Windows x64.
 
-## Start the Windows portable application
+1. Download OpticalDesignStudio-Portable-1.4.0-alpha.3-Windows-x64.7z.
+2. Use 7-Zip to extract the complete archive to a new writable folder.
+3. Open the extracted Optical Design Studio folder and run Optical Design Studio.exe. Keep the backend executable and _internal folder together with it.
+4. Choose a workspace and create your structure through its editor. Optional solver setup is available in the relevant study.
 
-1. Download **OpticalDesignStudio-Portable-1.4.0-alpha.2-Windows-x64.7z** and **SHA256SUMS.txt** from the same release.
-2. Verify the archive's SHA-256 checksum if you want to check download integrity:
+The bundled desktop and S4 runtime do not require a separate Python installation. MPB and Meep use their supported Linux/WSL environments; other optional solvers have separate setup requirements. This prerelease is downloaded manually and does not change the current stable update channel.
 
-   ```powershell
-   Get-FileHash -Algorithm SHA256 -LiteralPath .\OpticalDesignStudio-Portable-1.4.0-alpha.2-Windows-x64.7z
-   ```
+Preserve your current application folder and project/data library. To use an existing data location, select it in Settings → Data storage. Do not remove the only copy of an unfinished project or result.
 
-   Compare the result with the entry in **SHA256SUMS.txt**.
-3. Extract the entire 7z archive with 7-Zip or another compatible extractor to a folder where you can write files. Open the extracted **Optical Design Studio** folder and run **Optical Design Studio.exe**.
+Read RELEASE_NOTES.md for changes and known limitations, and VALIDATION.json for this build's actual checks. The 28-route UI-only scientific campaign remains incomplete; model availability is not a claim of physical validation.
 
-Keep **OpticalDesignBackend.exe**, **_internal**, and the supplied documents and notices together. Launch from the extracted folder, not the archive preview. The portable application contains its Python and native S4 calculation runtime; a separate Python installation or installer is not required for the bundled solvers. Optional solvers have separate setup controls.
-
-This release is unsigned. Windows may display a publisher or reputation warning. The checksum verifies archive integrity, not publisher identity; follow your organization's software policy. Do not disable antivirus or Windows security to install it.
-
-## Keep existing work
-
-Save open projects, finish calculations, and close the old application before upgrading. Back up your saved project JSON files and the data directory shown in **Settings → Data storage**.
-
-For a default portable installation, data lives in **User Data** beside the executables. When using a new application folder, preserve that folder. If you configured another data location, preserve it and the adjacent **portable_settings.json** setting; confirm the selected location after launch. Extraction does not move an existing library for you. **Help → Quick actions → Open library folder** opens the active library.
-
-Download this prerelease explicitly from its GitHub release page. Stable update checks may not offer prereleases. **Help → About** shows the running version.
-
-## First session
-
-Choose from 29 destinations in **Choose a simulation**: 28 simulation/tool workspaces and **Paper comparisons**. Each simulation retains its own editable structure, materials, parameters, unfinished inputs and results. **Choose simulation** changes workspaces; **Transfer inputs** explicitly copies compatible structure inputs into the selected destination while retaining its calculation settings. Switching alone does not copy the device. The paper library offers 24 source-linked studies; open an editable copy before changing a reference setup. A missing-input action opens the relevant control so it can be completed before running.
-
-**Simulation Sweep** runs the selected parameter combinations and retains their raw data. Afterward, use saved-data analysis for Q-factor estimates or high/low reflection, transmission and absorption. **AI Search** has a separate workspace.
-
-For optional solvers, use **Find installed solver** or **Set up automatically** in that study's environment panel. Automatic setup provides progress, error logs and cancellation. MPB and Meep on Windows require a working WSL installation; enabling Windows components may require administrator access and a restart. Merely opening an editor does not install dependencies.
-
-Open **Help** to load the bundled Silicon example or inspect its actual saved simulation results. The tutorial uses constant-index approximations for a 220 nm Silicon layer on SiO₂, 100 nm radius Air holes, and a 540 nm square period. The saved spectrum covers 1515–1555 nm; the illustrated fields are at 1550 nm. Loading the example restores inputs; changing the structure requires a new calculation for corresponding results.
-
-In a layered study's **Structure** editor, choose a layer by name using the **Layer** dropdown or the layer stack. Edit its material or thickness and use **Apply layer**. Use **Apply lattice** and **Apply pattern** for those edits. Changes belong to the active study; use **Transfer inputs** when another study should receive compatible structure inputs. Crystal, finite-device and other dedicated editors expose their model's own geometry controls.
-
-In **Materials**, inspect the original n/k samples and source, or use **Import CSV**, **Find online**, or **Enter values**. Select the wavelength unit explicitly when importing. Interpolation is a physical calculation setting: **Linear (in log k)** requires every k sample to be positive. **Display color**, layer colors, and **Preview opacity** affect only geometry display. Source attribution and editable Notes are stored separately.
-
-In **Settings → Appearance**, choose **B Light**, **B Dark**, **Glass Light**, or **Glass Dark**. Each look keeps its own colors. **Reset colors** restores that look's defaults, and the live preview displays your actual applied structure.
-
-Glass Desktop Acrylic requires Windows 11 build 22621 or later. Windows may use a solid backdrop because of transparency, accessibility, power, or remote-session settings. A solid fallback is also used on unsupported desktops. Choose a B look whenever you prefer an opaque window.
-
-## Plots and files
-
-Hover over plot icons for **Fit**, **Pan**, **Zoom**, **Copy**, **Export**, and **Figure settings**. Live charts fill their panels; publication dimensions are set through the export controls. Plot percentages do not rewrite the saved numeric values. Table values are original samples and complete CSV exports retain the raw datasets, while interpolated curves are evaluated from the chosen material model.
-
-Use **Ctrl+O** to open a project, **Ctrl+S** to save, **Ctrl+Shift+S** to save as, and **Ctrl+N** for a new project. Run and Stop remain in the bottom bar. Consult **Help → User guide** for units, convergence checks, MEEP setup, comparisons, and saved-field conventions.
-
-## Source package
-
-**OpticalDesignStudio-Source-1.4.0-alpha.2.zip** is the corresponding source package, not the ready-to-run Windows application. It requires Python 3.12, the listed dependencies, and an S4 native extension built for your platform. Read its **README.md** and **src/DESKTOP_GUIDE.md** before running or rebuilding. Optional MEEP, GPU, CAD, and machine-learning components have their own runtime requirements.
-
-## Troubleshooting
-
-If the application or backend is missing, extract the complete archive again and check whether your security software quarantined a file. If a calculation fails, retain the displayed error and the log information from **Help → Quick actions**. Loading inputs is not the same as calculating results; run the solver after applying changes. Older saved electric-only field snapshots remain supported.
-
-All supplied third-party components retain their own licenses. See **THIRD_PARTY_NOTICES.md** and **THIRD_PARTY_LICENSES**.
+The Source ZIP is for rebuilding and inspection. Normal use requires the Portable .7z archive. Corresponding readable source and third-party notices are included; see THIRD_PARTY_NOTICES.md and THIRD_PARTY_LICENSES.

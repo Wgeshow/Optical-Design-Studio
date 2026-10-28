@@ -6,19 +6,19 @@ from qt_common import COLORS, theme_manager
 
 # Stable destinations; selecting one opens an editor and never starts a job.
 SIMULATIONS = (
-    ('optical', 'Optical spectrum', 'Optical', 'Reflection, transmission and absorption · S4'),
-    ('fdtd', 'Time-domain optics', 'Optical', 'Sources, boundaries and time-domain fields · MEEP'),
-    ('tools.index_shift', 'Refractive-index sweep', 'Optical', 'Optical response across editable index changes'),
-    ('tools.fields', 'Optical fields & phase', 'Optical', 'Electric and magnetic fields and spectral phase'),
-    ('tools.sweep', 'Simulation parameter sweep', 'Optical', 'Every selected parameter combination, raw spectra and Q / R / T / A analysis'),
-    ('tools.ai', 'AI optical search', 'Optical', 'Independent editable optical design and model-assisted search'),
+    ('optical', 'S4 · optical spectrum', 'Optical', 'Periodic RCWA · wavelength or angle sweeps, R / T / A, phase and fields'),
+    ('fdtd', 'Meep · time-domain optics', 'Optical', 'FDTD · broadband pulse, reference normalization, grid, PML and stopping'),
+    ('tools.index_shift', 'Refractive-index sweep', 'Optical', 'S4 · optical response across editable index changes'),
+    ('tools.fields', 'Optical fields & phase', 'Optical', 'S4 · electric and magnetic fields and spectral phase'),
+    ('tools.sweep', 'Simulation parameter sweep', 'Optical', 'S4 · every selected parameter combination, raw spectra and Q / R / T / A analysis'),
+    ('tools.ai', 'AI optical search', 'Optical', 'S4 · independent editable optical design and model-assisted search'),
     ('photonic_bands', '3D Photonic Bands', 'Photonic crystals', 'Fully 3D editable periodic crystals · MPB'),
     ('photonic_bands.2d', '2D Photonic Bands', 'Photonic crystals', 'Editable two-dimensional periodic crystals · MPB'),
     ('photonic_bands.legume', '2D bands · Legume', 'Photonic crystals', 'Plane-wave bands for an infinite cross-section'),
     ('electrical', 'Electrical device · DC', 'Electrical & heat', 'Device potential, carriers and terminal current'),
     ('electrical.iv', 'Current–voltage sweep', 'Electrical & heat', 'Editable device and terminal bias schedule'),
     ('electrical.cv', 'Capacitance–voltage sweep', 'Electrical & heat', 'Editable device, voltage points and charge derivative'),
-    ('coupled', 'Coupled electrical & optical', 'Electrical & heat', 'Bias-dependent carriers and optical response'),
+    ('coupled', 'Coupled electrical & optical', 'Electrical & heat', 'Electrical carriers → S4 periodic optical response; independent coupled device'),
     ('sesame_transport', '1D Semiconductor transport', 'Electrical & heat', 'Editable junction, material regions and contacts'),
     ('sesame_transport.2d', '2D Semiconductor transport', 'Electrical & heat', 'Editable 2D junctions and grain boundaries'),
     ('thermal', 'Temperature & heat flow', 'Electrical & heat', 'Device power, thermal materials and cooling'),
@@ -33,9 +33,42 @@ SIMULATIONS = (
     ('pcsel.rcwa_poles', 'PCSEL RCWA resonances', 'PCSEL', 'Optical resonances of an editable unit cell · S4'),
     ('pcsel_transport', 'PCSEL periodic transport', 'PCSEL', 'Conformal periodic cell, carriers and current'),
     ('pcsel_unitcell_transport', 'PCSEL representative cell', 'PCSEL', 'Drawn device cell with insulating side faces'),
-    ('lumped_laser', 'Laser rate equations', 'PCSEL', 'Threshold, light–current response and modulation'),
+    ('lumped_laser', 'Steady-state laser estimate', 'PCSEL', 'Threshold, light–current response and heuristic modulation'),
     ('papers', 'Paper comparisons', 'Paper library', 'Open any of the 24 references as an editable setup'),
 )
+
+
+CREATION_PATHS = {
+    'optical':'Structure → illumination → spectrum sampling',
+    'fdtd':'Domain → pulse → mesh and stopping',
+    'tools.index_shift':'Materials and layers → index states → tracking',
+    'tools.fields':'Excitation → sampling planes → field display',
+    'tools.sweep':'Base design → parameter recipe → all combinations',
+    'tools.ai':'Design space → collection → model and verification',
+    'photonic_bands':'3D cell → dielectric objects → wavevectors',
+    'photonic_bands.2d':'2D cell → inclusions → TE/TM bands',
+    'photonic_bands.legume':'2D cell → permittivities → plane-wave modes',
+    'electrical':'Device → contacts and charge → DC operating point',
+    'electrical.iv':'Device → terminals → voltage schedule',
+    'electrical.cv':'Device → electrodes → charge sampling',
+    'coupled':'Finite device → S4 optical setup → carrier mapping → bias response',
+    'sesame_transport':'1D junction → materials and end contacts → bias',
+    'sesame_transport.2d':'2D domain → regions and defects → bias',
+    'thermal':'Device → heat sources → cooling faces',
+    'advanced_transport':'Finite contacts → interfaces → physical models',
+    'high_field_optics':'Material → carrier and field states → spectrum',
+    'pcsel.vertical':'Layer stack → waveguide → mode accuracy',
+    'pcsel.cwt':'Crystal → coupling → band-edge modes',
+    'pcsel.finite':'Crystal source → cavity → outgoing modes',
+    'pcsel.beam':'Finite-mode source → angular sampling → beam',
+    'pcsel.aperture':'Calibration → aperture and contacts → reduced physics',
+    'pcsel.gme':'Slab crystal → guided modes → radiation',
+    'pcsel.rcwa_poles':'Unit cell → complex seeds → resonance search',
+    'pcsel_transport':'Periodic cell → materials and bias → conformal mesh',
+    'pcsel_unitcell_transport':'Drawn cell → contact laws → insulating sides',
+    'lumped_laser':'Supplied mode → gain and recombination → operating point',
+    'papers':'Find reference → inspect scope → editable simulation',
+}
 
 
 class SimulationPicker(QWidget):
@@ -58,6 +91,9 @@ class SimulationPicker(QWidget):
         filters.addWidget(self.search, 3)
         filters.addWidget(self.family, 1)
         root.addLayout(filters)
+        self.match_count=QLabel(self)
+        self.match_count.setObjectName('simulationDescription')
+        root.addWidget(self.match_count)
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -86,6 +122,11 @@ class SimulationPicker(QWidget):
             caption.setWordWrap(True)
             content.addWidget(action)
             content.addWidget(caption)
+            path=QLabel(CREATION_PATHS[target],card)
+            path.setWordWrap(True)
+            path.setObjectName('simulationDescription')
+            path.setAccessibleName(title+' setup path: '+CREATION_PATHS[target])
+            content.addWidget(path)
             content.addStretch()
             self.cards[target] = card
             self.buttons[target] = action
@@ -125,6 +166,7 @@ class SimulationPicker(QWidget):
         family = self.family.currentData()
         visible = [row[0] for row in SIMULATIONS if (not family or family == row[2])
                    and (not needle or needle in ' '.join(row).casefold())]
+        self.match_count.setText(f'{len(visible)} of {len(SIMULATIONS)} simulation workspaces · choose one to create or edit its setup')
         columns = 3 if self.width() >= 1250 else 2 if self.width() >= 880 else 1
         while self.grid.count():
             self.grid.takeAt(0)

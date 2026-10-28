@@ -115,6 +115,7 @@ class RuntimeTests(unittest.TestCase):
 
     def test_path_wsl_resolution_is_absolute_for_windows_process_creation(self):
         with patch.dict(os.environ, ODS_WSL_EXECUTABLE=''), \
+             patch.object(meep_runtime, 'saved_wsl_launcher', return_value=''), \
              patch.object(meep_runtime.shutil, 'which', return_value=str(Path.cwd()/'wsl.exe')):
             self.assertEqual(meep_runtime.wsl_executable(), str((Path.cwd()/'wsl.exe').resolve()))
 

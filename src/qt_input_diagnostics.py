@@ -4,7 +4,7 @@ from __future__ import annotations
 import weakref
 
 from PyQt6.QtCore import Qt, QEvent, QTimer, pyqtSignal
-from PyQt6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QListWidget,
+from PyQt6.QtWidgets import (QComboBox, QFrame, QHBoxLayout, QLabel, QListWidget,
     QListWidgetItem, QPushButton, QScrollArea, QStackedWidget, QTabWidget,
     QToolBox, QVBoxLayout, QWidget)
 
@@ -24,6 +24,11 @@ class DiagnosticPanel(QFrame):
         self.heading = QLabel('Missing inputs')
         self.heading.setAccessibleName('Missing inputs and invalid settings')
         layout.addWidget(self.heading)
+        self.group_filter = QComboBox(self)
+        self.group_filter.setAccessibleName('Filter input issues by section or object')
+        self.group_filter.addItem('All input issues', '')
+        self.group_filter.currentIndexChanged.connect(self._filter_issues)
+        layout.addWidget(self.group_filter)
         self.list = QListWidget()
         self.list.setObjectName('setupValidation')
         self.list.setAccessibleName('Missing inputs; choose an issue to go to its field')
@@ -60,9 +65,35 @@ class DiagnosticPanel(QFrame):
             if row['id'] == selected:
                 self.list.setCurrentItem(item)
         self.list.verticalScrollBar().setValue(scroll)
+        selected_group = self.group_filter.currentData()
+        self.group_filter.blockSignals(True)
+        self.group_filter.clear()
+        self.group_filter.addItem('All input issues', '')
+        groups = dict.fromkeys(self._group(self.list.item(i).data(Qt.ItemDataRole.UserRole)) for i in range(self.list.count()))
+        for group in groups:
+            if group:self.group_filter.addItem(group,group)
+        self.group_filter.setCurrentIndex(max(0,self.group_filter.findData(selected_group)))
+        self.group_filter.blockSignals(False)
+        self.group_filter.setVisible(len(groups)>1)
         self.heading.setText(f'Missing inputs · {self.list.count()} issue(s)')
         self.first_button.setEnabled(bool(self.list.count()))
         self.setVisible(bool(self.list.count()))
+        self._filter_issues()
+
+    @staticmethod
+    def _group(row):
+        return ' / '.join(str(row.get(k,'')) for k in ('section','object_id') if row.get(k)) or str(row.get('workspace',''))
+
+    def _filter_issues(self, *_):
+        if not hasattr(self,'list'):return
+        selected = self.group_filter.currentData()
+        for index in range(self.list.count()):
+            item=self.list.item(index)
+            item.setHidden(bool(selected and self._group(item.data(Qt.ItemDataRole.UserRole))!=selected))
+        first=next((self.list.item(i) for i in range(self.list.count()) if not self.list.item(i).isHidden()),None)
+        self.first_button.setEnabled(first is not None)
+        if self.list.currentItem() is not None and self.list.currentItem().isHidden():
+            self.list.setCurrentItem(first)
 
     def _activate(self, item):
         if item is not None:
@@ -70,12 +101,14 @@ class DiagnosticPanel(QFrame):
             self.activated.emit(dict(item.data(Qt.ItemDataRole.UserRole)))
 
     def go_to_first(self):
-        self._activate(self.list.item(0))
+        self._activate(next((self.list.item(i) for i in range(self.list.count()) if not self.list.item(i).isHidden()),None))
 
     def eventFilter(self, watched, event):
         if watched is self.list and event.type() == QEvent.Type.KeyPress and event.key() in (
                 Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
-            self._activate(self.list.currentItem() or self.list.item(0))
+            if self.list.currentItem() is not None and not self.list.currentItem().isHidden():
+                self._activate(self.list.currentItem())
+            else:self.go_to_first()
             return True
         return super().eventFilter(watched, event)
 

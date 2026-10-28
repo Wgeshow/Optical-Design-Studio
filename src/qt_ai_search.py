@@ -4,15 +4,16 @@ from pathlib import Path
 from matplotlib.figure import Figure
 import pandas as pd
 from PyQt6.QtCore import QSignalBlocker, pyqtSignal
-from PyQt6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QTabWidget,QFileDialog,QLineEdit,QCheckBox,QComboBox,QLabel,QPushButton
+from PyQt6.QtWidgets import QAbstractSpinBox,QWidget,QVBoxLayout,QHBoxLayout,QTabWidget,QFileDialog,QLineEdit,QCheckBox,QComboBox,QLabel,QPushButton
 from qt_compute import _RunPage,_group,_combo,_check,_button,_value,_set_value,_on_edit,_scroll,_ResponsiveSplitter
-from qt_common import number,integer,table,fill_table,PlotWidget
+from qt_common import number,integer,table,fill_table,PlotWidget,guard_unfocused_wheel
 from qt_surfaces import WorkspacePanel
 from qt_ranges import BoundsEditor
 from qt_core import prepare_job
 from data_library import read_json
 from qt_field_volume import FieldVolumeWidget
 from ai_campaign import DEFAULTS
+from ai_campaign_storage import resolve_campaign_paths, load_campaign_checkpoint, export_campaign_archive
 from ai_campaign_plots import field_figure,line_figure,rta_figure,validation_figure
 
 class AISearchPage(_RunPage):
@@ -50,7 +51,7 @@ class AISearchPage(_RunPage):
         self.edit_bounds.toggled.connect(self.bounds_editor.setVisible)
         bound_layout.insertWidget(1,self.edit_bounds);bound_layout.insertWidget(2,self.bounds_editor)
         self.bounds.add.hide();self.edit_bounds.toggled.connect(self.bounds.add.setVisible)
-        layout.addWidget(self.controls['link_holes']);layout.addWidget(_button('Create ranges around current design',self.default_ranges));layout.addWidget(_button('Copy ranges from Optimize',self.copy_ranges));layout.addStretch()
+        layout.addWidget(self.controls['link_holes']);layout.addWidget(_button('Create ranges around current design',self.default_ranges));layout.addWidget(_button('Copy ranges from parameter sweep',self.copy_ranges));layout.addStretch()
         layout.removeWidget(self.bounds);layout.insertWidget(1,self.bounds)
         self.setup_tabs.addTab(_scroll(setup),'Set up')
         training=QWidget();layout=QVBoxLayout(training)
@@ -81,7 +82,6 @@ class AISearchPage(_RunPage):
         self.result_tabs.setMinimumHeight(320);output.addWidget(self.result_tabs,1)
         self.moving=_check('Moving ceiling',False);self.threshold=number(0,0,10000,3);self.threshold.setSingleStep(.1);bar=QHBoxLayout();bar.addWidget(self.moving);bar.addWidget(QLabel('Contour amplitude'));bar.addWidget(self.threshold);output.addLayout(bar)
         self.apply=_button('Use selected design in Structure',self.apply_selected);self.apply.setEnabled(False);self.inspect_note=QLabel('All field components use incident amplitude. Test designs are for validation; predictions are not measured results.');self.inspect_note.setWordWrap(True);output.addWidget(self.inspect_note)
-        from qt_result_export import export_run
         inspector=WorkspacePanel();inspector_layout=QVBoxLayout(inspector)
         title=QLabel('Search progress & candidates');title.setObjectName('sectionTitle');inspector_layout.addWidget(title)
         inspector_layout.addWidget(self.summary)
@@ -89,11 +89,11 @@ class AISearchPage(_RunPage):
         self.device_preview=DeviceCanvas('3d');self.device_preview.compact_preview=True
         self.device_preview.setMinimumHeight(220);self.device_preview.setMaximumHeight(300)
         inspector_layout.addWidget(self.device_preview)
-        preview_label=QLabel('Shared input device · measured fields are shown in the result tabs');preview_label.setWordWrap(True);inspector_layout.addWidget(preview_label)
-        inspector_layout.addWidget(_button('Edit shared optical setup',lambda:self.routeRequested.emit('optical.overview')))
+        preview_label=QLabel('Current study input device · measured fields are shown in the result tabs');preview_label.setWordWrap(True);inspector_layout.addWidget(preview_label)
+        inspector_layout.addWidget(_button('Edit this study\'s optical setup',lambda:self.routeRequested.emit('optical.overview')))
         inspector_layout.addStretch()
         inspector_layout.addWidget(self.apply)
-        inspector_layout.addWidget(_button('Export campaign…',lambda:export_run(self,self.directory,self.status)))
+        inspector_layout.addWidget(_button('Export campaign…',self.export_campaign))
         self.campaign_actions=self.actions('Start search',lambda:self.run('search'));controls.addWidget(self.campaign_actions)
         controls.addWidget(_button('Preview plan',self.preview))
         self.progress_bar.setParent(inspector);inspector_layout.insertWidget(2,self.progress_bar)
@@ -114,6 +114,8 @@ class AISearchPage(_RunPage):
         self._refresh_device_preview()
         from qt_tool_workspace import polish_tool_workspace
         polish_tool_workspace(self)
+        for control in self.findChildren(QAbstractSpinBox) + self.findChildren(QComboBox):
+            guard_unfocused_wheel(control)
         for explanation in (note,hint,self.inspect_note):
             explanation.hide();explanation.parentWidget().setToolTip(explanation.text())
         self.plan_label.setText('')
@@ -163,6 +165,7 @@ class AISearchPage(_RunPage):
             self.bounds.set_records(saved.get('bounds',[]))
         except Exception as exc:self.status.setText('Saved AI setup needs review: '+str(exc))
         finally:self._loading=False
+        self.enabling()
 
     def default_ranges(self):
         try:
@@ -177,17 +180,39 @@ class AISearchPage(_RunPage):
         except Exception as exc:self.status.setText(str(exc))
 
     def copy_ranges(self):
+        if self.store.busy:return
+        if getattr(self.store,'study_navigation_enabled',False) and self.store.active_study!='tools.ai':return
         try:
-            opts=self.store.search_state.get('peaks') or self.store.search_state.get('target') or {}
-            rows=list(opts.get('bounds',[]))
+            # This explicit transfer reads the independent source document;
+            # visiting the AI workspace never shares or mutates that draft.
+            source=(self.store.study_project('tools.sweep')
+                    if getattr(self.store,'study_navigation_enabled',False) else self.store.project())
+            search=source.get('desktop_search',self.store.search_state)
+            opts=search.get('peaks') or search.get('target') or {}
+            if opts.get('shared_hole',{}).get('enabled'):
+                raise ValueError('Shared-radius sweep groups require explicit AI bounds. Current AI ranges were retained.')
+            rows=copy.deepcopy(opts.get('bounds',[]))
+            source_patterns=source.get('patterns',[])
             for hole in opts.get('holes',[]):
                 if hole.get('Shape')!='circle':continue
-                indices=[i+1 for i,p in self.store.patterns.iterrows() if p.Layer==hole['Layer'] and p.Shape=='circle']
+                indices=[i+1 for i,p in enumerate(source_patterns) if p['Layer']==hole['Layer'] and p['Shape']=='circle']
                 if not indices:continue
                 index=indices[0];lo=float(hole['MinX_um']);hi=float(hole['MaxX_um'])
                 if not any(r['Parameter'] in ('radius','r_over_a') and str(r['Target'])==str(index) for r in rows):
                     rows.append(dict(Parameter='radius',Target=str(index),Min=lo,Max=hi,Step=max((hi-lo)/max(1,int(opts.get('grid_steps',21))-1),1e-9),Choices=''))
+            if not rows:
+                self.status.setText('No saved parameter-sweep ranges to copy. Current AI ranges were retained.')
+                return
+            from bounds_editor import PATTERN_PARAMETERS
+            current_patterns=self.store.patterns.to_dict('records')
+            for row in rows:
+                if row['Parameter'] not in PATTERN_PARAMETERS:continue
+                index=int(row['Target'])-1
+                if (index<0 or index>=len(source_patterns) or index>=len(current_patterns)
+                        or source_patterns[index]!=current_patterns[index]):
+                    raise ValueError('Pattern targets differ between the sweep and AI structures. Transfer the matching structure first, then copy ranges. Current AI ranges were retained.')
             self.bounds.set_records(rows);self.save()
+            self.status.setText('Copied parameter-sweep ranges into this AI setup. Review the limits before running.')
         except Exception as exc:self.status.setText(str(exc))
 
     def preview(self):
@@ -213,11 +238,22 @@ class AISearchPage(_RunPage):
             if path not in paths:paths.append(path)
             self.reference.setText(';'.join(paths));self.save()
 
+    def export_campaign(self):
+        if self.directory is None or not (Path(self.directory)/'campaign.json').is_file():
+            self.status.setText('Run or open a saved campaign before exporting.');return
+        path,_=QFileDialog.getSaveFileName(self,'Export saved campaign','campaign.zip','ZIP archive (*.zip)')
+        if not path:return
+        try:
+            target=export_campaign_archive(self.directory,path)
+            self.status.setText(f'Exported campaign and its saved fields to {target}. Extract the ZIP and open campaign.json to reopen it.')
+        except (OSError,ValueError,KeyError) as exc:
+            self.status.setText('Could not export campaign: '+str(exc))
+
     def open_campaign(self):
         path,_=QFileDialog.getOpenFileName(self,'Open AI campaign checkpoint',str(self.store.library.runs),'Campaign (campaign.json)')
         if path:
             try:
-                saved=read_json(path);settings=dict(saved['settings']);base=saved.get('base',{})
+                saved=resolve_campaign_paths(read_json(path),path);settings=dict(saved['settings']);base=saved.get('base',{})
                 for key,value in dict(basis=base.get('basis',32),polarization=base.get('polarization','p'),phi_deg=base.get('phi',0.),theta_deg=base.get('points',[[0,1550,0.]])[0][2]).items():settings.setdefault(key,value)
                 self._loading=True
                 for k,w in self.controls.items():
@@ -225,7 +261,7 @@ class AISearchPage(_RunPage):
                     if isinstance(w,QLineEdit):w.setText(str(value))
                     else:_set_value(w,value)
                 self.bounds.set_records([{k:r.get(k,'') for k in ('Parameter','Target','Min','Max','Step','Choices')} for r in settings.get('input_bounds',settings.get('bounds',[]))])
-                self.reference.setText(settings.get('reference_directory',''));self.resume.setText(path);self._loading=False;self.save();self.directory=Path(path).parent;self.load_campaign(saved)
+                self.reference.setText(settings.get('reference_directory',''));self.resume.setText(path);self._loading=False;self.enabling();self.save();self.directory=Path(path).parent;self.load_campaign(saved)
             except Exception as exc:self._loading=False;self.status.setText(str(exc))
 
     def _progress(self,event):
@@ -234,7 +270,7 @@ class AISearchPage(_RunPage):
             self.records.append(event['record']);self.refresh_designs();self.summary.setText(f"{len(self.records)} observations displayed · new work {event.get('completed')} / {event.get('total')}")
 
     def show_result(self,event):
-        path=self.directory/'campaign.json';self.resume.setText(str(path));self.load_campaign(read_json(path));self.save();self.status.setText(f"{event['summary']['status']}. Saved to {self.directory}")
+        path=self.directory/'campaign.json';self.resume.setText(str(path));self.load_campaign(load_campaign_checkpoint(path));self.save();self.status.setText(f"{event['summary']['status']}. Saved to {self.directory}")
 
     def load_campaign(self,saved):
         self.campaign=saved;self.records=saved['records'];s=saved['summary'];self.summary.setText(f"{s['completed']} completed · {s['training']} training · {s['tests']} tests · {s['new_simulations']} new S4 designs · {s['reused']} reused · {s['failures']} failed")

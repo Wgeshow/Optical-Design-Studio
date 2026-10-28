@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
 import numpy as np
@@ -162,6 +163,100 @@ class ResultsWorkspaceTests(unittest.TestCase):
         self.assertIn('RECTILINEAR_GRID',(self.directory/'exported.vtk').read_text())
         workspace.select_category('Optical response');workspace.export_file(self.directory/'optical.png','figure')
         self.assertGreater((self.directory/'optical.png').stat().st_size,1000)
+
+    def test_export_menu_dialog_and_actual_csv_follow_selected_bias_and_new_run(self):
+        workspace=self.show_workspace()
+        new_run=self.directory/'next-run';new_run.mkdir()
+        (new_run/'electrical_summary.json').write_text(json.dumps(self.summary),encoding='utf-8')
+        for index,(directory,bias) in enumerate(((self.directory,0.),(self.directory,-1.),(new_run,0.))):
+            if directory != workspace.directory:workspace.load_run(directory)
+            workspace.set_bias(bias);APP.processEvents()
+            chosen=self.directory/f'user-chosen-{index}.csv'
+            menu_labels=[]
+            def choose_csv(menu,*_):
+                menu_labels.extend(action.text() for action in menu.actions())
+                return next(action for action in menu.actions() if action.text().startswith('Complete saved electrical grid CSV'))
+            before=workspace.selected_bias()
+            with patch('qt_results_workspace.QMenu.exec',choose_csv), patch('qt_electrical_results.QFileDialog.getSaveFileName',return_value=(str(chosen),'')) as save:
+                workspace._export_data_menu()
+            self.assertIn(f'selected {bias:g} V',menu_labels[0])
+            self.assertIn(f'selected {bias:g} V',menu_labels[1])
+            self.assertIn(f'{bias:g} V',save.call_args.args[1])
+            self.assertIn(f'bias-{bias:g}V',save.call_args.args[2])
+            self.assertIn(directory.name[:12],save.call_args.args[2])
+            self.assertEqual(workspace.selected_bias(),before)
+            exported=pd.read_csv(chosen)
+            np.testing.assert_allclose(exported['potential'],_volume(bias)['potential'].ravel())
+
+    def test_optical_mode_hides_electrical_ui_and_restores_coupled_and_electrical_runs(self):
+        workspace=self.show_workspace()
+        optical=self.directory/'standalone';optical.mkdir()
+        frame=pd.DataFrame(dict(wavelength_nm=[1500.,1510.,1520.],R=[.1,.25,.2],T=[.7,.5,.6],A=[.2,.25,.2]))
+        frame.to_csv(optical/'results.csv',index=False)
+        (optical/'project.json').write_text(json.dumps(dict(device=_device())),encoding='utf-8')
+        electrical=self.directory/'electrical-only';electrical.mkdir()
+        (electrical/'electrical_summary.json').write_text(json.dumps(self.summary),encoding='utf-8')
+        for next_run in (self.directory,electrical):
+            workspace.focus_view('Depth profiles')
+            workspace.load_run(optical);APP.processEvents()
+            for widget in (workspace.electrical_controls,workspace.electrical_probe,workspace.electrical_metric_bar,
+                           workspace.electrical_maps,workspace.depth_card,workspace.convergence_badge,workspace.balance_badge):
+                self.assertTrue(widget.isHidden())
+            self.assertFalse(workspace.resolve_tiny_range.isVisible())
+            self.assertFalse(workspace.color_range_note.isVisible())
+            for name in ('Potential & fields','Carriers & charge','Energy bands','I–V / C–V','Mesh & convergence'):
+                self.assertTrue(workspace.nav_buttons[name].isHidden())
+            self.assertTrue(workspace.optical_metric_bar.isVisible())
+            self.assertEqual({key:label.text() for key,label in workspace.optical_metric_values.items()},
+                             dict(samples='3',range='1500–1520',R='0.25',T='0.7',A='0.2–0.25'))
+            self.assertEqual(workspace.check_labels['gauss'].text(),'3 / 3')
+            self.assertEqual(workspace.check_labels['refinement'].text(),'Not established')
+            self.assertIn('A = 1 − R − T',workspace.optical_check_note.text())
+            workspace.select_category('Overview')
+            self.assertEqual(workspace.hero_stack.currentIndex(),0)
+            self.assertEqual(workspace.mode_buttons['3D fields'].text(),'Saved geometry')
+            workspace.select_category('Potential & fields')
+            self.assertEqual(workspace._active_category,'Optical response')
+            np.testing.assert_array_equal(workspace.optical_data['R'],frame['R'])
+            workspace.load_run(next_run);APP.processEvents()
+            for widget in (workspace.electrical_controls,workspace.electrical_probe,workspace.electrical_metric_bar,
+                           workspace.electrical_maps,workspace.depth_card,workspace.convergence_badge,workspace.balance_badge):
+                self.assertFalse(widget.isHidden())
+            self.assertTrue(workspace.resolve_tiny_range.isVisible())
+            self.assertTrue(workspace.color_range_note.isVisible())
+            self.assertIn('near-constant auto range',workspace.color_range_note.text())
+            self.assertTrue(workspace.optical_metric_bar.isHidden())
+            self.assertFalse(workspace.nav_buttons['Potential & fields'].isHidden())
+            self.assertEqual(workspace.mode_buttons['3D fields'].text(),'3D fields')
+            self.assertEqual(workspace.check_captions['gauss'].text(),'Gauss balance')
+            self.assertEqual(workspace.run_value_captions['mesh'].text(),'Mesh cells')
+            self.assertEqual(workspace.metric_values['field'].text(),'3 MV/m')
+            np.testing.assert_array_equal(workspace.volume['potential'],_volume(0.)['potential'])
+        # Missing/nonfinite saved channels are unavailable, never synthesized as zero.
+        pd.DataFrame(dict(wavelength_nm=[1500.,1510.],R=[np.nan,np.inf],T=[.3,.4])).to_csv(optical/'results.csv',index=False)
+        workspace.load_run(optical);APP.processEvents()
+        self.assertEqual(workspace.optical_metric_values['R'].text(),'—')
+        self.assertEqual(workspace.optical_metric_values['A'].text(),'—')
+        self.assertEqual(workspace.check_labels['gauss'].text(),'Unavailable')
+
+    def test_optical_solver_time_uses_saved_metadata_and_clears_when_absent(self):
+        workspace=self.show_workspace()
+        optical=self.directory/'timed-optical';optical.mkdir()
+        pd.DataFrame(dict(wavelength_nm=[1500.],R=[.2],T=[.8],A=[0.])).to_csv(optical/'results.csv',index=False)
+        record=optical/'library_record.json';diagnostics=optical/'diagnostics.json'
+        record.write_text(json.dumps(dict(summary=dict(elapsed_seconds=1.015))),encoding='utf-8')
+        workspace.load_run(optical)
+        self.assertEqual(workspace.run_value_captions['elapsed'].text(),'Saved solver time')
+        self.assertEqual(workspace.run_value_labels['elapsed'].text(),'1.015 s')
+        record.unlink();diagnostics.write_text(json.dumps(dict(elapsed_seconds=4.265)),encoding='utf-8')
+        workspace.load_run(optical)
+        self.assertEqual(workspace.run_value_labels['elapsed'].text(),'4.265 s')
+        diagnostics.write_text(json.dumps(dict(elapsed_seconds=-1)),encoding='utf-8')
+        workspace.load_run(optical)
+        self.assertEqual(workspace.run_value_labels['elapsed'].text(),'Unavailable')
+        workspace.load_run(self.directory)
+        self.assertEqual(workspace.run_value_captions['elapsed'].text(),'Elapsed time')
+        self.assertEqual(workspace.run_value_labels['elapsed'].text(),'1.25 s')
 
     def test_root_can_reparent_footer_without_crushing_840_pixel_body(self):
         workspace=self.show_workspace()

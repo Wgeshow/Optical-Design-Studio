@@ -41,17 +41,18 @@ class LaserParameters:
     def validate(self):
         positive = ("wavelength_nm", "group_index", "confinement", "quality_factor",
                     "transparency_density_cm3", "differential_gain_cm2", "active_volume_um3",
-                    "recombination_a_s", "recombination_b_cm3_s", "recombination_c_cm6_s",
+                    "recombination_a_s",
                     "injection_efficiency", "differential_efficiency",
                     "ambient_temperature_k", "drive_voltage_v")
-        nonnegative = ("internal_loss_cm", "spontaneous_emission_factor",
+        nonnegative = ("recombination_b_cm3_s", "recombination_c_cm6_s",
+                       "internal_loss_cm", "spontaneous_emission_factor",
                        "gain_compression_cm3", "thermal_resistance_k_w",
                        "wavelength_shift_nm_k", "transparency_temperature_coefficient_k",
                        "differential_gain_temperature_coefficient_k")
         if any(not math.isfinite(float(getattr(self, n))) or getattr(self, n) <= 0 for n in positive):
             raise ValueError("Positive laser parameters must be finite and greater than zero.")
         if any(not math.isfinite(float(getattr(self, n))) or getattr(self, n) < 0 for n in nonnegative):
-            raise ValueError("Loss, thermal, and correction parameters must be finite and non-negative.")
+            raise ValueError("B/C recombination, loss, thermal, and correction parameters must be finite and non-negative.")
         for name in ("confinement", "injection_efficiency", "differential_efficiency"):
             if not 0 < getattr(self, name) <= 1:
                 raise ValueError(f"{name.replace('_', ' ').title()} must be between zero and one.")

@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 import numpy as np
 from data_library import read_json, write_json
+from ai_campaign_storage import load_campaign_checkpoint
 from field_storage import field_data_exists, copy_field_data
 from ml_optimizer import model_for, encode, value_key, fit_predict, dependencies, expected_improvement
 from peak_optimizer import parse_search, geometry_error, write_csv
@@ -187,7 +188,7 @@ def execute_campaign(base,perf,cfg,directory,executor,emit=lambda e:None,cancell
         (directory/'design_models.jsonl').write_text(''.join(json.dumps(dict(design_id=i+1,model=r['model']),separators=(',',':'))+'\n' for i,r in enumerate(records)),encoding='utf-8')
         return summary
     if cfg.get('resume_file'):
-        old=read_json(cfg['resume_file'])
+        old=load_campaign_checkpoint(cfg['resume_file'])
         same_measurements=old.get('fingerprint')==campaign_key(base,cfg)
         old_settings=old.get('settings',{})
         same_plan=all(old_settings.get(k,DEFAULTS[k])==cfg[k] for k in ('mode','initial','test_count','seed'))
@@ -207,7 +208,7 @@ def execute_campaign(base,perf,cfg,directory,executor,emit=lambda e:None,cancell
         for path in Path(cfg['runs']).glob('*/campaign.json'):
             if path.parent==directory:continue
             try:
-                saved=read_json(path)
+                saved=load_campaign_checkpoint(path)
                 for r in saved.get('records',[]):
                     if r.get('status')=='complete' and (Path(r['field_directory'])/'field_features.json').is_file() and r.get('rta'):
                         cache[r['measurement_key']]=r

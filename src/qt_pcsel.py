@@ -1,9 +1,16 @@
 """Laser and PCSEL simulation workspace."""
 from pathlib import Path
+from dataclasses import asdict
+from copy import deepcopy
+from datetime import datetime, timezone
+import csv
+import io
+import json
+import uuid
 import numpy as np
 from PyQt6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,QDoubleSpinBox,
  QSpinBox,QPushButton,QGroupBox,QTabWidget,QComboBox,QPlainTextEdit,QScrollArea,QFileDialog,
- QTableWidget,QTableWidgetItem,QHeaderView,QFrame,QGridLayout,QSizePolicy)
+ QTableWidget,QTableWidgetItem,QHeaderView,QFrame,QGridLayout,QSizePolicy,QToolButton,QMenu)
 from PyQt6.QtCore import Qt, QSignalBlocker
 from PyQt6.QtGui import QColor, QPainter, QPen, QFont
 from qt_common import theme_manager, PlotWidget
@@ -17,7 +24,7 @@ class LaserModelDiagram(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMinimumSize(120, 240)
-        self.setAccessibleName('Lumped laser model: drive, carriers, photons, output light and temperature feedback')
+        self.setAccessibleName('Steady-state laser estimate: drive, carriers, photons, output light and temperature feedback')
         theme_manager().changed.connect(self.update)
 
     def paintEvent(self, event):
@@ -93,7 +100,7 @@ class WorkflowTabs(QTabWidget):
 
 class PCSELPage(QWidget):
     def __init__(self,store):
-        super().__init__(); self.store=store; self.last_result=None
+        super().__init__(); self.store=store; self.last_result=None; self._results_stale=False
         self.setObjectName('laserWorkspace')
         root=QVBoxLayout(self); root.setContentsMargins(0,0,0,0); root.setSpacing(0)
         # The application chrome already identifies this as the Laser / PCSEL
@@ -141,17 +148,18 @@ class PCSELPage(QWidget):
         self.workflow_footer.hide()
         theme_manager().changed.connect(self.retheme)
         self.sync_device_geometry()
-        self.solver_status.setText('Optical parameters: supplied by user\n\nS4 / Meep: not run\n\nCOMSOL: no results imported\n\nRate equations: ready')
+        self.solver_status.setText('Optical parameters: supplied by user\n\nS4 / Meep: not run\n\nCOMSOL: no results imported\n\nSteady-state estimate: ready')
         self.status.setText('Configure inputs, then run the analytical laser model in Results.')
         self.report.setPlainText('No laser simulation has been run. Results and provenance will appear here.')
         self.retheme()
         self._install_clean_workbench(root, optical, electrical, modulation, thermal, device)
+        self._install_laser_journey()
         self._draft_loading=False
         self._draft_controls={name:value for name,value in vars(self).items()
             if isinstance(value,(QDoubleSpinBox,QSpinBox,QComboBox)) and name not in ('result_selector','parameter_selector')}
         self._default_draft=self.draft()
         self._restore_project_draft()
-        store.changed.connect(self._project_draft_changed)
+        if store is not None: store.changed.connect(self._project_draft_changed)
         self.device_store.changed.connect(self.flush_draft)
         for control in self._draft_controls.values():
             (control.currentIndexChanged if isinstance(control,QComboBox) else control.valueChanged).connect(self.flush_draft)
@@ -162,7 +170,13 @@ class PCSELPage(QWidget):
             for name,control in self._draft_controls.items()})
 
     def flush_draft(self,*_):
-        if self._draft_loading:return
+        if not self._draft_loading and self.last_result is not None and hasattr(self,'laser_run_note'):
+            self.laser_run_note.setText('Inputs changed · previous analytical results are stale. Run again to update them.')
+            self.laser_result_note.setText('Inputs changed · displayed analytical results belong to the previous inputs. Run again to update them.')
+            if not self._results_stale:
+                self.report.setPlainText('INPUTS CHANGED: this report retains the previous calculation inputs. Run again to update it.\n\n'+self.report.toPlainText())
+            self._results_stale=True
+        if self._draft_loading or self.store is None:return
         if getattr(self.store,'study_navigation_enabled',False) and self.store.active_study!='lumped_laser':return
         from copy import deepcopy
         namespace=deepcopy(self.store.search_state.get('research_workspaces',{}))
@@ -172,6 +186,7 @@ class PCSELPage(QWidget):
 
     def _restore_project_draft(self):
         from copy import deepcopy
+        if self.store is None:return
         value=deepcopy(self.store.search_state.get('research_workspaces',{}).get('lumped_laser',self._default_draft))
         self._draft_loading=True
         try:
@@ -183,7 +198,31 @@ class PCSELPage(QWidget):
         finally:self._draft_loading=False
 
     def _project_draft_changed(self,reason):
-        if reason in ('project','study'):self._restore_project_draft()
+        if reason not in ('project','study'):return
+        if reason=='project':self._clear_results()
+        if (getattr(self.store,'study_navigation_enabled',False)
+                and self.store.active_study!='lumped_laser'):return
+        self._restore_project_draft()
+
+    def _clear_results(self):
+        # Project replacement must not retain another project's calculation or
+        # external overlay. A normal study switch keeps this document's results.
+        self.last_result=None;self._comsol_imported=None;self._results_stale=False
+        self.result_export_button.setEnabled(False)
+        self.report.setPlainText('No laser simulation has been run for this project.')
+        self.status.setProperty('error',False);self.status.setText('Configure inputs, then run the analytical laser model.')
+        self.run_state.setText('●  READY');self.run_state.setStyleSheet('')
+        self.laser_run_note.setText('Not run · no analytical result is available for this project.')
+        self.laser_result_note.setText('No analytical calculation has been run for this project. External power imports have been cleared.')
+        self.laser_check_note.setText('Inputs have not been checked.')
+        self._laser_diagnostic=None;self.laser_issue_button.hide()
+        self.quick.clear();self.modulation_summary.clear();self.thermal_summary.clear()
+        self.mode_table.setRowCount(0)
+        for card in self.dashboard_kpis:
+            card.setText(card.text().split('\n',1)[0]+'\n—')
+        self.overview_status.setText('RESULT\nAwaiting simulation')
+        self.solver_status.setText('Optical parameters: supplied by user\n\nS4 / Meep: not run\n\nCOMSOL: no results imported\n\nSteady-state estimate: ready')
+        for plot in self.findChildren(_PCSELPlot):plot.clear()
 
     def _install_clean_workbench(self, root, optical, electrical, modulation, thermal, device):
         from qt_legacy_study_workbench import StudyWorkbench
@@ -201,14 +240,28 @@ class PCSELPage(QWidget):
         for name,index in [('Overview',6),('Optical mode',1),('Mode comparison',3),('Temperature',4),('Modulation',5),('Report and import',7)]:
             self.result_selector.addItem(name,index)
         self.result_selector.currentIndexChanged.connect(lambda _:self.tabs.setCurrentIndex(self.result_selector.currentData()))
-        result_layout.addWidget(self.result_selector);result_layout.addWidget(self.tabs,1)
+        export_row=QHBoxLayout();export_row.addWidget(self.result_selector,1)
+        self.result_export_button=QToolButton();self.result_export_button.setText('Export data')
+        self.result_export_button.setObjectName('exportLaserNumericalData')
+        self.result_export_button.setAccessibleName('Export numerical laser results')
+        self.result_export_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.result_export_button.setIcon(reference_icon('export',COLORS[theme_manager().mode]['accent']))
+        self.result_export_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        menu=QMenu(self.result_export_button)
+        menu.addAction('Raw numerical result JSON…',self.export_result_json)
+        menu.addAction('Current sweep CSV + result JSON…',self.export_sweep_csv)
+        menu.addAction('Modulation CSV + result JSON…',self.export_modulation_csv)
+        self.result_export_button.setMenu(menu);self.result_export_button.setEnabled(False)
+        self.result_export_button.setToolTip('Export the completed numerical arrays and captured inputs. CSV exports include a full result JSON beside the table.')
+        export_row.addWidget(self.result_export_button);result_layout.addLayout(export_row)
+        result_layout.addWidget(self.tabs,1)
         self.tabs.tabBar().hide();self.tabs.setCurrentIndex(self.results_index)
         self.workflow_footer.hide()
         self.tabs.currentChanged.connect(lambda _:self.workflow_footer.hide())
-        self.workbench=StudyWorkbench(self.device_store,'Laser rate equations',
+        self.workbench=StudyWorkbench(self.device_store,'Steady-state laser estimate',
             ['Device & mode','Gain & injection','Drive & calculate'],rail,result_host,
             edit_geometry=self._edit_laser_structure,
-            preview_note='Independent editable laser geometry. Optical mode inputs are supplied; the calculation is a lumped rate-equation estimate.')
+            preview_note='Independent editable laser geometry. Optical mode inputs are supplied; the calculation is a lumped steady-state estimate.')
         root.insertWidget(0,self.workbench,1)
         self.workbench.input_tabs.setTabText(0,'Drive && geometry')
         parameter_tabs={}
@@ -243,6 +296,194 @@ class PCSELPage(QWidget):
         self.workbench.select_step(0)
         for index in range(self.tabs.count()):
             self.tabs.setTabIcon(index,reference_icon('results',COLORS[theme_manager().mode]['muted']))
+
+    def _install_laser_journey(self):
+        """Scalar setup screens reuse the original numerical control objects."""
+        from qt_journey import JourneyBar
+        self.laser_stage = 0
+        for action in self.workbench.step_buttons:
+            action.hide()
+        self.laser_journey = JourneyBar([
+            dict(title='Supplied mode', description='Enter optical parameters from an identified source. Selecting a source label does not import an optical solution.'),
+            dict(title='Gain & heat', description='Explicit carrier, recombination, efficiency and lumped thermal laws. Geometry remains optional volume context.'),
+            dict(title='Drive & modulation', description='Set the drive sweep and optional small-signal bias. Values retain the backend units shown.'),
+            dict(title='Check inputs', description='Check the scalar inputs before running. This does not run S4, Meep or a spatial thermal solver.'),
+            dict(title='Run', description='Run the steady-state estimate with carrier clamping above threshold. The calculation is synchronous and has no worker cancellation.'),
+            dict(title='Results', description='Inspect the actual analytical result, external power import and report provenance.')], self)
+        self.workbench.layout().insertWidget(1, self.laser_journey)
+        self.laser_journey.stageRequested.connect(self._show_laser_stage)
+        self.laser_result_note=QLabel('No steady-state estimate has been run. Optical source labels alone do not import results.')
+        self.laser_result_note.setWordWrap(True)
+        self.result_selector.parentWidget().layout().insertWidget(1,self.laser_result_note)
+        self.workbench.show_results=self.show_results
+        context=QPushButton('Geometry and advanced inputs…')
+        context.clicked.connect(self._show_laser_context)
+        self.workbench.properties.layout().insertWidget(0,context)
+        self._laser_parameter_pages = {}
+        specifications = [
+            ('Mode inputs', [('Wavelength (nm)', 'wavelength'), ('Optical parameter source', 'optical_source'), ('Quality factor Q', 'quality_factor'), ('Group index', 'group_index'), ('Confinement Γ', 'confinement'), ('Internal loss (cm⁻¹)', 'internal_loss'), ('Mode volume (reference)', 'mode_volume')]),
+            ('Gain and injection', [('Gain model', 'gain_model'), ('Transparency density', 'transparency_density'), ('Differential gain', 'differential_gain'), ('Active volume (µm³)', 'active_volume'), ('SRH A', 'recombination_a'), ('Radiative B', 'recombination_b'), ('Auger C', 'recombination_c'), ('Injection efficiency', 'injection_efficiency'), ('Differential efficiency', 'differential_efficiency'), ('Spontaneous factor β', 'spontaneous_beta')]),
+            ('Lumped thermal inputs', [('Ambient temperature', 'ambient_temperature'), ('Thermal resistance', 'thermal_resistance'), ('Operating voltage', 'series_voltage'), ('Wavelength coefficient', 'thermal_shift'), ('Transparency temperature coefficient', 'transparency_temperature'), ('Differential-gain temperature coefficient', 'gain_temperature')]),
+            ('Drive sweep', [('Starting current', 'current_start'), ('Stopping current', 'current_max'), ('Current samples', 'current_points')]),
+            ('Small-signal modulation', [('Bias current', 'bias_current'), ('Frequency span', 'modulation_max'), ('Gain compression', 'gain_compression')]),
+        ]
+        self._laser_control_sections={key:name for name,fields in specifications for _,key in fields}
+        self._laser_field_titles={key:title for _,fields in specifications for title,key in fields}
+        for name, fields in specifications:
+            host=QWidget(); layout=QVBoxLayout(host); form=QFormLayout(); layout.addLayout(form)
+            for title, key in fields:
+                control=getattr(self,key)
+                for old in self.findChildren(QFormLayout):
+                    if old.indexOf(control)>=0:
+                        row=old.takeRow(control)
+                        if row.labelItem and row.labelItem.widget():row.labelItem.widget().deleteLater()
+                        break
+                if key=='gain_model':
+                    self.supported_gain_model=QLabel('Linear differential gain')
+                    self.supported_gain_model.setToolTip('This solver uses linear differential gain. Logarithmic and spectral gain inputs are not supported.')
+                    form.addRow(title,self.supported_gain_model)
+                    control.hide()
+                else:form.addRow(title,control)
+            if name in ('Mode inputs', 'Small-signal modulation'):
+                note=QLabel('Steady-state estimate with carrier clamping above threshold; no transient rate-equation solve.' if name=='Mode inputs' else 'Estimated modulation: carrier lifetime uses 1 / max(A, 1 s⁻¹); damping is max(0.1, 0.7 × resonance frequency) GHz. This is a heuristic response, not a linearized coupled rate-equation solve.')
+                note.setWordWrap(True);layout.addWidget(note)
+            layout.addStretch()
+            self._laser_parameter_pages[name]=self.workbench.add_parameter_tab(host,name)
+        self.gain_model.setEnabled(False)
+        self.gain_model.setToolTip('This solver uses linear differential gain. Logarithmic and spectral gain inputs are not supported.')
+        self.mode_volume.setToolTip('Retained optical context; this value is not passed into the current LaserParameters calculation.')
+        self.optical_source.setToolTip('Source label only. Enter and verify the numerical Q, group index and confinement independently.')
+        checks=QWidget(); check_layout=QVBoxLayout(checks)
+        self.laser_check_note=QLabel('Inputs have not been checked.'); self.laser_check_note.setWordWrap(True)
+        check_layout.addWidget(self.laser_check_note)
+        check=QPushButton('Check analytical inputs');check.clicked.connect(self._check_laser_inputs);check_layout.addWidget(check)
+        self._laser_diagnostic=None
+        self.laser_issue_button=QPushButton('Go to input')
+        self.laser_issue_button.setObjectName('laserGoToInvalidInput')
+        self.laser_issue_button.clicked.connect(lambda:self.open_diagnostic())
+        self.laser_issue_button.hide();check_layout.addWidget(self.laser_issue_button);check_layout.addStretch()
+        self._laser_check_page=self.workbench.add_parameter_tab(checks,'Check analytical inputs')
+        run=QWidget(); run_layout=QVBoxLayout(run)
+        self.laser_run_note=QLabel('Not run · no analytical result is available.');self.laser_run_note.setWordWrap(True)
+        run_layout.addWidget(self.laser_run_note)
+        scope=QLabel('Lumped steady-state estimate: carrier density is clamped above threshold. Modulation uses an estimated carrier lifetime and heuristic damping; no time-dependent rate equations are solved. Synchronous calculation; no worker Stop is available.')
+        scope.setWordWrap(True);run_layout.addWidget(scope)
+        action=QPushButton('Run analytical laser model');action.setProperty('primary',True);action.clicked.connect(self.run_simulation);run_layout.addWidget(action);run_layout.addStretch()
+        self._laser_run_page=self.workbench.add_parameter_tab(run,'Run analytical model')
+        self.parameter_selector.blockSignals(True);self.parameter_selector.clear()
+        for index in range(self.workbench.input_tabs.count()):self.parameter_selector.addItem(self.workbench.input_tabs.tabText(index).replace('&&','&'),index)
+        self.parameter_selector.blockSignals(False)
+        self._show_laser_stage(0)
+
+    def _show_laser_stage(self, index):
+        self.laser_stage=index;self.laser_journey.set_current(index)
+        if index!=5:self._laser_setup_stage=index
+        names=[['Mode inputs'],['Gain and injection','Lumped thermal inputs'],['Drive sweep','Small-signal modulation']]
+        if index<3:
+            pages=[self._laser_parameter_pages[name] for name in names[index]]
+        elif index==3:pages=[self._laser_check_page]
+        elif index==4:pages=[self._laser_run_page]
+        else:pages=[]
+        # Stage changes only presentation. Every original editor remains alive
+        # and reachable through the parameter selector's optional-context menu.
+        allowed=set(pages)
+        if index==0:
+            allowed.update(i for i in range(self.workbench.input_tabs.count())
+                           if self.workbench.input_tabs.tabText(i).replace('&&','&')=='Device assignments')
+        for i in range(self.parameter_selector.count()):
+            self.parameter_selector.model().item(i).setEnabled(i in allowed)
+        self.workbench.objects_panel.setVisible(False)
+        self.workbench.properties.setVisible(index!=5)
+        self.parameter_selector.setVisible(len(allowed)>1)
+        self.result_selector.setVisible(index==5)
+        if pages:self.workbench.input_tabs.setCurrentIndex(pages[0])
+        self.model_views.setCurrentIndex(0)
+        self.workbench.views.setCurrentIndex(1 if index==5 else 0)
+
+    def show_results(self):
+        self.tabs.setCurrentIndex(self.results_index)
+        self._show_laser_stage(5)
+
+    def show_setup(self):
+        self._show_laser_stage(getattr(self,'_laser_setup_stage',0))
+
+    def validate_setup(self):
+        """Public check contract used by the global simulation footer."""
+        valid=self._check_laser_inputs()
+        self._show_laser_stage(3)
+        return valid
+
+    def _check_laser_inputs(self):
+        field=''
+        try:
+            for key,title in self._laser_field_titles.items():
+                control=getattr(self,key)
+                if key!='mode_volume' and isinstance(control,(QDoubleSpinBox,QSpinBox)) and not control.hasAcceptableInput():
+                    field=key
+                    raise ValueError('Enter a valid value for '+title+'.')
+            if self.current_start.value()>=self.current_max.value():
+                field='current_max'
+                raise ValueError('Stopping current must exceed starting current.')
+            parameters=self.laser_parameters()
+            try:parameters.validate()
+            except (ValueError,OverflowError):
+                # Use the existing parameter validator to identify the control;
+                # do not infer destinations by parsing human-readable errors.
+                controls=dict(wavelength_nm='wavelength',group_index='group_index',
+                    confinement='confinement',quality_factor='quality_factor',
+                    transparency_density_cm3='transparency_density',differential_gain_cm2='differential_gain',
+                    active_volume_um3='active_volume',recombination_a_s='recombination_a',
+                    recombination_b_cm3_s='recombination_b',recombination_c_cm6_s='recombination_c',
+                    injection_efficiency='injection_efficiency',differential_efficiency='differential_efficiency',
+                    internal_loss_cm='internal_loss',spontaneous_emission_factor='spontaneous_beta',
+                    gain_compression_cm3='gain_compression',ambient_temperature_k='ambient_temperature',
+                    thermal_resistance_k_w='thermal_resistance',drive_voltage_v='series_voltage',
+                    wavelength_shift_nm_k='thermal_shift',transparency_temperature_coefficient_k='transparency_temperature',
+                    differential_gain_temperature_coefficient_k='gain_temperature')
+                for parameter,control in controls.items():
+                    try:LaserParameters(**{parameter:getattr(parameters,parameter)}).validate()
+                    except (ValueError,OverflowError):
+                        field=control
+                        break
+                raise
+        except (ValueError,OverflowError) as exc:
+            from input_diagnostics import diagnostic
+            self._laser_diagnostic=diagnostic(str(exc),workspace='lumped_laser',
+                section=self._laser_control_sections.get(field,''),field=field)
+            self.laser_check_note.setText('Inputs need attention: '+str(exc))
+            self.laser_issue_button.setText('Go to '+self._laser_field_titles.get(field,'input').lower())
+            self.laser_issue_button.setVisible(bool(field))
+            return False
+        self._laser_diagnostic=None;self.laser_issue_button.hide()
+        self.laser_check_note.setText('Analytical inputs are valid. Optical Q and confinement are supplied parameters; S4 and Meep have not run.')
+        return True
+
+    def open_diagnostic(self,target=None):
+        """Select the owning laser stage, then reveal its unchanged input."""
+        from qt_input_diagnostics import reveal_and_focus
+        target=target or self._laser_diagnostic
+        if not isinstance(target,dict):return False
+        field=target.get('field','');section=self._laser_control_sections.get(field)
+        if section is None:return False
+        stage={'Mode inputs':0,'Gain and injection':1,'Lumped thermal inputs':1,
+               'Drive sweep':2,'Small-signal modulation':2}[section]
+        self._show_laser_stage(stage)
+        self.workbench.input_tabs.setCurrentIndex(self._laser_parameter_pages[section])
+        return reveal_and_focus(getattr(self,field),message=target.get('message',''))
+
+    def return_to_issues(self):
+        self._show_laser_stage(3)
+        if self._laser_diagnostic:self.laser_issue_button.setFocus()
+
+    def _show_laser_context(self):
+        """Optional authored geometry is context, not a spatial laser solve."""
+        for i in range(self.parameter_selector.count()):self.parameter_selector.model().item(i).setEnabled(True)
+        self.parameter_selector.setVisible(True)
+        self.workbench.properties.setVisible(True)
+        self.workbench.objects_panel.setVisible(True)
+        self.workbench.input_tabs.setCurrentIndex(0)
+        self.workbench.views.setCurrentIndex(0)
+        self.model_views.setCurrentIndex(1)
 
     def _edit_laser_structure(self):
         from PyQt6.QtWidgets import QDialog, QDialogButtonBox
@@ -398,13 +639,10 @@ class PCSELPage(QWidget):
 
         side=QVBoxLayout(); side.setSpacing(7); upper.addLayout(side,3)
         status_panel=self.panel('Solver & Simulation Status'); status_layout=status_panel.layout()
-        self.solver_status=QLabel('✓   Meep / S4       Photonic band structure      Completed    12 s\n\n'
-                                  '✓   Mode solver      Cavity modes                         Completed    28 s\n\n'
-                                  '✓   COMSOL           Electro-thermal analysis         Completed    2 m 14 s\n\n'
-                                  '✓   Rate Equations   Laser dynamics                    Ready')
+        self.solver_status=QLabel('Optical parameters: supplied by user\n\nS4 / Meep: not run\n\nCOMSOL: no results imported\n\nSteady-state estimate: ready')
         self.solver_status.setObjectName('solverStatus'); status_layout.addWidget(self.solver_status); side.addWidget(status_panel)
-        flow=self.panel('Coupled Simulation Flow'); flow_label=QLabel('▧  Meep / S4     ➜     ◈  COMSOL     ➜     ↗  Rate Equations\n'
-                                                        '    Photonic modes              Electrical / thermal          Laser dynamics')
+        flow=self.panel('Laser input sources'); flow_label=QLabel('Supplied optical mode → Steady-state laser estimate\n'
+                                                        'Gain, recombination and thermal inputs · Optional external power data')
         flow_label.setAlignment(Qt.AlignmentFlag.AlignCenter); flow_label.setWordWrap(True); flow.layout().addWidget(flow_label); side.addWidget(flow)
         dashboard_run=QPushButton('▶   Run Laser Simulation'); dashboard_run.setObjectName('runLaserSimulationDashboard'); dashboard_run.setProperty('primary',True); dashboard_run.clicked.connect(self.run_simulation); side.addWidget(dashboard_run)
 
@@ -460,7 +698,7 @@ class PCSELPage(QWidget):
         self.transparency_density=self.spin(1,.001,1000,.1,' ×10¹⁸ cm⁻³'); self.differential_gain=self.spin(2.5,.001,1000,.1,' ×10⁻¹⁶ cm²'); self.active_volume=self.spin(120,.001,1e7,1,' µm³')
         for label,w in [('Gain model',self.gain_model),('Transparency density',self.transparency_density),('Differential gain',self.differential_gain),('Active volume',self.active_volume)]: form.addRow(label,w)
         box=QGroupBox('Injection and recombination'); form=QFormLayout(box); row.addWidget(box)
-        self.recombination_a=self.spin(1,.001,1e6,.1,' ×10⁸ s⁻¹'); self.recombination_b=self.spin(1,.001,1e6,.1,' ×10⁻¹⁰ cm³/s'); self.recombination_c=self.spin(3,.001,1e6,.1,' ×10⁻²⁹ cm⁶/s')
+        self.recombination_a=self.spin(1,.001,1e6,.1,' ×10⁸ s⁻¹'); self.recombination_b=self.spin(1,0,1e6,.1,' ×10⁻¹⁰ cm³/s'); self.recombination_c=self.spin(3,0,1e6,.1,' ×10⁻²⁹ cm⁶/s')
         self.injection_efficiency=self.spin(.85,.001,1,.01); self.differential_efficiency=self.spin(.7,.001,1,.01); self.spontaneous_beta=self.spin(1,0,10000,.1,' ×10⁻⁴')
         for label,w in [('A · SRH',self.recombination_a),('B · radiative',self.recombination_b),('C · Auger',self.recombination_c),('Injection efficiency',self.injection_efficiency),('Differential efficiency',self.differential_efficiency),('Spontaneous emission β',self.spontaneous_beta)]: form.addRow(label,w)
         note=QLabel('Use extracted COMSOL carrier/current results to set active volume, injection efficiency, and recombination inputs.'); note.setObjectName('muted'); note.setWordWrap(True); layout.addWidget(note); layout.addStretch(1); return self.scroll(layout)
@@ -503,29 +741,68 @@ class PCSELPage(QWidget):
         return PCSELDesign(self.period.value(),self.radius.value(),self.etch.value(),
                            self.gain_thickness.value(),self.wavelength.value(),
                            patterned_layer_thickness_um=float(selected.iloc[0].Thickness_um)).validate()
+    def _optional_design_context(self):
+        """Geometry is report context, never a prerequisite for supplied modes."""
+        try:
+            return self.design()
+        except (ValueError, OverflowError):
+            return None
+
     def laser_parameters(self):
         return LaserParameters(wavelength_nm=self.wavelength.value(),group_index=self.group_index.value(),confinement=self.confinement.value(),quality_factor=self.quality_factor.value(),transparency_density_cm3=self.transparency_density.value()*1e18,differential_gain_cm2=self.differential_gain.value()*1e-16,active_volume_um3=self.active_volume.value(),recombination_a_s=self.recombination_a.value()*1e8,recombination_b_cm3_s=self.recombination_b.value()*1e-10,recombination_c_cm6_s=self.recombination_c.value()*1e-29,injection_efficiency=self.injection_efficiency.value(),differential_efficiency=self.differential_efficiency.value(),internal_loss_cm=self.internal_loss.value(),spontaneous_emission_factor=self.spontaneous_beta.value()*1e-4,gain_compression_cm3=self.gain_compression.value()*1e-17,ambient_temperature_k=self.ambient_temperature.value(),thermal_resistance_k_w=self.thermal_resistance.value(),drive_voltage_v=self.series_voltage.value(),wavelength_shift_nm_k=self.thermal_shift.value(),transparency_temperature_coefficient_k=self.transparency_temperature.value(),differential_gain_temperature_coefficient_k=self.gain_temperature.value())
 
     def run_simulation(self):
+        # Reject unfinished numeric drafts before value() can reuse an old value.
+        if not self._check_laser_inputs():
+            self.laser_run_note.setText('Input error: '+self._laser_diagnostic['message'])
+            self._show_laser_stage(3)
+            return None
         try:
             if self.current_start.value()>=self.current_max.value():raise ValueError('Stop current must be greater than start current.')
-            d=self.design(); parameters=self.laser_parameters(); currents=np.linspace(self.current_start.value(),self.current_max.value(),self.current_points.value()); frequencies=np.linspace(0,self.modulation_max.value(),501); r=solve_laser(parameters,currents); r['modulation']=solve_laser(parameters,[self.bias_current.value()],frequencies)['modulation']
+            parameters=self.laser_parameters().validate(); currents=np.linspace(self.current_start.value(),self.current_max.value(),self.current_points.value()); frequencies=np.linspace(0,self.modulation_max.value(),501); r=solve_laser(parameters,currents); r['modulation']=solve_laser(parameters,[self.bias_current.value()],frequencies)['modulation']
         except (ValueError,OverflowError) as exc:
-            self.last_result=None; self.status.setText(str(exc)); self.status.setProperty('error',True); self.run_state.setText('●  INPUT ERROR'); self.run_state.setStyleSheet('color:#ff8297;'); self.overview_status.setText(f'RESULT\n{exc}'); return None
-        self.last_result=r; self.status.setProperty('error',False); self.status.setText(f'Complete · {len(currents)} samples · fill factor {d.fill_factor:.1%}')
+            if hasattr(self,'laser_run_note'):
+                self.laser_run_note.setText('Input error: '+str(exc))
+                self.laser_result_note.setText('Calculation not completed. Previous displays, if present, are stale: '+str(exc))
+            self.last_result=None; self.result_export_button.setEnabled(False); self.status.setText(str(exc)); self.status.setProperty('error',True); self.run_state.setText('●  INPUT ERROR'); self.run_state.setStyleSheet('color:#ff8297;'); self.overview_status.setText(f'RESULT\n{exc}'); return None
+        d=self._optional_design_context()
+        # A later input edit or external overlay must not rewrite the provenance
+        # of an already calculated result with values from live controls.
+        r.setdefault('inputs',asdict(parameters))
+        r['report_context']=dict(geometry=self._report_geometry(d),fidelity=self.fidelity.currentText(),
+            mode_volume=self.mode_volume.value(),optical_source=self.optical_source.currentText())
+        from app_version import APP_VERSION
+        r['calculation_context']=dict(result_id=uuid.uuid4().hex,completed_at_utc=datetime.now(timezone.utc).isoformat(),
+            app_version=APP_VERSION,study_id='lumped_laser',
+            current_sweep=dict(start_mA=float(currents[0]),stop_mA=float(currents[-1]),samples=len(currents)),
+            modulation=dict(bias_current_mA=self.bias_current.value(),frequency_stop_GHz=float(frequencies[-1]),samples=len(frequencies)),
+            method='Lumped steady-state ABC threshold/output estimate with supplied optical mode, carrier clamping above threshold, lumped thermal feedback and heuristic modulation.',
+            limitations=['Optical Q and confinement are supplied; S4 and Meep were not run.',
+                         'Optional geometry is context only unless explicitly applied to scalar volume inputs.',
+                         'No time-dependent coupled rate equations are solved; carrier density is clamped above threshold.',
+                         'Modulation uses carrier lifetime 1 / max(A, 1 s^-1) and damping max(0.1, 0.7 * resonance frequency) GHz.',
+                         'External COMSOL power remains a separately identified overlay.'])
+        self._results_stale=False
+        self.result_export_button.setEnabled(True)
+        self.last_result=r; self.status.setProperty('error',False); self.status.setText(f'Complete · {len(currents)} samples · supplied optical mode')
+        if hasattr(self,'laser_run_note'):
+            self.laser_run_note.setText(f'Steady-state estimate complete · {len(currents)} current samples. Carrier clamping above threshold; heuristic modulation. Supplied optical parameters; no spatial optical solve.')
+            self.laser_result_note.setText(f'Steady-state estimate · {len(currents)} current samples. Carrier density is clamped above threshold; modulation uses estimated lifetime and heuristic damping. No transient rate-equation solve. Optical Q and confinement supplied by user; S4 / Meep not run. External power imports retain their own report provenance.')
         self.run_state.setText('●  SOLVED'); self.run_state.setStyleSheet('')
-        self.overview_geometry.setText(f'GEOMETRY\n{self.lattice.currentText()} · r/a {d.hole_radius_um/d.period_um:.3f}')
-        self.overview_sweep.setText(f'CURRENT SWEEP\n0 — {self.current_max.value():g} mA · {len(currents)} pts')
+        self.overview_geometry.setText(f'OPTIONAL GEOMETRY\n{self.lattice.currentText()} · r/a {d.hole_radius_um/d.period_um:.3f}' if d is not None else 'OPTIONAL GEOMETRY\nNo valid geometry context; supplied-mode calculation')
+        self.overview_sweep.setText(f'CURRENT SWEEP\n{self.current_start.value():g} — {self.current_max.value():g} mA · {len(currents)} pts')
         self.overview_solver.setText(f'MODEL\n{self.fidelity.currentText()}')
         self.overview_status.setText(f"RESULT\nIth {r['threshold_current_ma']:.2f} mA · {r['output_power_mw'][-1]:.2f} mW")
-        self.quick.setText(f"Resonance  {d.wavelength_nm:.1f} nm     Q  {self.quality_factor.value():.3g}     Photon lifetime  {r['photon_lifetime_ps']:.3g} ps\nThreshold gain  {r['threshold_gain_cm-1']:.3g} cm⁻¹     Threshold current  {r['threshold_current_ma']:.3g} mA     Slope  {r['slope_efficiency_w_per_a']:.3g} W/A")
+        self.quick.setText(f"Resonance  {parameters.wavelength_nm:.1f} nm     Q  {self.quality_factor.value():.3g}     Photon lifetime  {r['photon_lifetime_ps']:.3g} ps\nThreshold gain  {r['threshold_gain_cm-1']:.3g} cm⁻¹     Threshold current  {r['threshold_current_ma']:.3g} mA     Slope  {r['slope_efficiency_w_per_a']:.3g} W/A")
         self.plot_dashboard(d,r); self.plot_mode(d); self.plot_laser(r); self.plot_modulation(r); self.plot_thermal(r); self.populate_modes(d,r); self.plot_sensitivity(d); self.write_report(d,r)
-        self.solver_status.setText('Optical parameters: supplied by user\n\nS4 / Meep: not run\n\nCOMSOL: external import\n\nRate equations: analytical calculation complete')
+        comsol_state='external power imported' if getattr(self,'_comsol_imported',None) is not None else 'not imported'
+        self.solver_status.setText('Optical parameters: supplied by user\n\nS4 / Meep: not run\n\nCOMSOL: '+comsol_state+'\n\nSteady-state estimate: calculation complete')
         if getattr(self,'_comsol_imported',None) is not None:
             self.last_result=merge_comsol_power(r,self._comsol_imported);self._render_comsol()
         self.retheme()
         if hasattr(self,'workbench'):
             self.workbench.show_results();self.tabs.setCurrentIndex(self.results_index)
+            if hasattr(self,'laser_journey'):self._show_laser_stage(5)
         return self.last_result
 
     @staticmethod
@@ -552,27 +829,124 @@ class PCSELPage(QWidget):
         if logx: ax.set_xscale('log')
         ax.set_xlabel(xlabel,fontsize=7); ax.set_ylabel(ylabel,fontsize=7); ax.tick_params(labelsize=6); fig.set_layout_engine('constrained'); canvas.draw_idle()
     def plot_mode(self,d):
-        fig=self.mode_canvas.figure;fig.clear();ax=fig.add_subplot(111);ax.set_axis_off();ax.text(.5,.5,'Enter independently calculated mode parameters above.\nA finite-device PCSEL eigenmode solve is not performed by the rate-equation model.',ha='center',va='center',wrap=True);self.mode_canvas.draw_idle()
+        fig=self.mode_canvas.figure;fig.clear();ax=fig.add_subplot(111);ax.set_axis_off();ax.text(.5,.5,'Enter independently calculated mode parameters above.\nA finite-device PCSEL eigenmode solve is not performed by this steady-state laser estimate.',ha='center',va='center',wrap=True);self.mode_canvas.draw_idle()
     def plot_laser(self,r):
         fig=self.laser_canvas.figure; fig.clear(); ax=fig.add_subplot(111); self.style(fig,ax); ax.plot(r['currents_ma'],r['output_power_mw'],color='#00cbb8',label='Analytical model');
         if r.get('comsol'): ax.plot(r['comsol']['current_ma'],r['comsol']['output_power_mw'],color='#4aa3ff',marker='o',ms=3,label='COMSOL imported')
         ax.axvline(r['threshold_current_ma'],color='#e36d91',ls='--',label='Threshold'); ax.set(title='Steady-state L–I curve',xlabel='Current (mA)',ylabel='Power (mW)'); self.finish(fig,self.laser_canvas)
     def plot_modulation(self,r):
-        fig=self.modulation_canvas.figure; fig.clear(); ax=fig.add_subplot(111); self.style(fig,ax); m=r['modulation']; f=np.asarray(m['frequencies_ghz']); db=np.asarray(m['magnitude_db']); bw=m['bandwidth_3db_ghz']; fr=m['relaxation_frequency_ghz']; self.modulation_summary.setText(f"Relaxation resonance {fr:.2f} GHz · 3 dB bandwidth {bw:.2f} GHz" if bw is not None else f"Relaxation resonance {fr:.2f} GHz · bandwidth exceeds selected span"); ax.plot(f,db,label='Small-signal response'); ax.axhline(-3,color='#e36d91',ls='--',label='−3 dB'); ax.set(title='Modulation response',xlabel='Frequency (GHz)',ylabel='Response (dB)',ylim=(-30,5)); self.finish(fig,self.modulation_canvas)
+        fig=self.modulation_canvas.figure; fig.clear(); ax=fig.add_subplot(111); self.style(fig,ax); m=r['modulation']; f=np.asarray(m['frequencies_ghz']); db=np.asarray(m['magnitude_db']); bw=m['bandwidth_3db_ghz']; fr=m['relaxation_frequency_ghz']; self.modulation_summary.setText(f"Estimated resonance {fr:.2f} GHz · estimated 3 dB bandwidth {bw:.2f} GHz · heuristic damping" if bw is not None else f"Estimated resonance {fr:.2f} GHz · bandwidth exceeds selected span · heuristic damping"); ax.plot(f,db,label='Heuristic response estimate'); ax.axhline(-3,color='#e36d91',ls='--',label='−3 dB'); ax.set(title='Estimated modulation response',xlabel='Frequency (GHz)',ylabel='Response (dB)',ylim=(-30,5)); self.finish(fig,self.modulation_canvas)
     def plot_thermal(self,r):
         fig=self.thermal_canvas.figure; fig.clear(); ax=fig.add_subplot(111); self.style(fig,ax); current=np.asarray(r['currents_ma']); temp=np.asarray([x['temperature_k'] for x in r['sweep']]); wl=np.asarray([x['wavelength_nm'] for x in r['sweep']]); ax.plot(current,temp,color='#e36d91',label='Junction temperature'); ax.set(title='Self-consistent lumped thermal model',xlabel='Current (mA)',ylabel='Temperature (K)'); self.thermal_summary.setText(f'At {current[-1]:.1f} mA: {temp[-1]:.1f} K · {wl[-1]:.2f} nm'); self.finish(fig,self.thermal_canvas)
     def populate_modes(self,d,r):
         self.mode_table.setRowCount(1)
-        values=['User-supplied mode',f'{d.wavelength_nm:.2f}',f'{self.quality_factor.value():.4g}',f'{self.confinement.value():.3f}',f"{r['threshold_gain_cm-1']:.3g}",'Not calculated']
+        values=['User-supplied mode',f'{self.wavelength.value():.2f}',f'{self.quality_factor.value():.4g}',f'{self.confinement.value():.3f}',f"{r['threshold_gain_cm-1']:.3g}",'Not calculated']
         for col,value in enumerate(values):self.mode_table.setItem(0,col,QTableWidgetItem(value))
     def plot_sensitivity(self,d):
         fig=self.optimization_canvas.figure;fig.clear();ax=fig.add_subplot(111);ax.set_axis_off();ax.text(.5,.5,'No mode competition or geometry sensitivity solve has been run.',ha='center',va='center',wrap=True);self.optimization_canvas.draw_idle()
+    def _report_geometry(self,d):
+        return (f'Optional geometry context (not used by this scalar calculation):\n'
+                    f'Device: {self.device_type.currentText()}\nLattice: {self.lattice.currentText()}\n'
+                    f'Period: {d.period_um:.4g} µm\nHole radius: {d.hole_radius_um:.4g} µm\n'
+                    f'Fill factor: {d.fill_factor:.4%}\n') if d is not None else (
+                    'Optional geometry context: unavailable or incomplete; not used by this scalar calculation.\n')
     def write_report(self,d,r):
-        self.report.setPlainText(f"PCSEL LASER SIMULATION / PERFORMANCE REPORT\n\nDevice: {self.device_type.currentText()}\nLattice: {self.lattice.currentText()}\nPeriod: {d.period_um:.4g} µm\nHole radius: {d.hole_radius_um:.4g} µm\nFill factor: {d.fill_factor:.4%}\nTarget wavelength: {d.wavelength_nm:.4g} nm\n\nOPTICAL\nQ: {self.quality_factor.value():.6g}\nConfinement: {self.confinement.value():.6g}\nMode volume: {self.mode_volume.value():.6g} (lambda/n)^3\nPhoton lifetime: {r['photon_lifetime_ps']:.6g} ps\n\nTHRESHOLD AND OUTPUT\nThreshold gain: {r['threshold_gain_cm-1']:.6g} cm^-1\nThreshold carrier density: {r['threshold_density_cm-3']:.6g} cm^-3\nThreshold current: {r['threshold_current_ma']:.6g} mA\nSlope efficiency: {r['slope_efficiency_w_per_a']:.6g} W/A\nOutput at {r['currents_ma'][-1]:.6g} mA: {r['output_power_mw'][-1]:.6g} mW\n\nMETHOD\nSteady-state ABC recombination, linear material gain, Q-derived photon lifetime from user-supplied mode parameters, optional intrinsic small-signal modulation estimate, and lumped thermal estimate.\nFidelity: {self.fidelity.currentText()}.")
+        inputs=r.get('inputs',{})
+        context=r.get('report_context',{})
+        geometry=context.get('geometry',self._report_geometry(d))
+        wavelength=inputs.get('wavelength_nm',self.wavelength.value())
+        quality_factor=inputs.get('quality_factor',self.quality_factor.value())
+        confinement=inputs.get('confinement',self.confinement.value())
+        mode_volume=context.get('mode_volume',self.mode_volume.value())
+        fidelity=context.get('fidelity',self.fidelity.currentText())
+        warning='INPUTS CHANGED: this report retains the previous calculation inputs. Run again to update it.\n\n' if self._results_stale else ''
+        self.report.setPlainText(warning+f"PCSEL LASER SIMULATION / PERFORMANCE REPORT\n\n{geometry}Target wavelength: {wavelength:.4g} nm\n\nOPTICAL\nQ: {quality_factor:.6g}\nConfinement: {confinement:.6g}\nMode volume: {mode_volume:.6g} (lambda/n)^3\nPhoton lifetime: {r['photon_lifetime_ps']:.6g} ps\n\nTHRESHOLD AND OUTPUT\nThreshold gain: {r['threshold_gain_cm-1']:.6g} cm^-1\nThreshold carrier density: {r['threshold_density_cm-3']:.6g} cm^-3\nThreshold current: {r['threshold_current_ma']:.6g} mA\nSlope efficiency: {r['slope_efficiency_w_per_a']:.6g} W/A\nOutput at {r['currents_ma'][-1]:.6g} mA: {r['output_power_mw'][-1]:.6g} mW\n\nMETHOD\nSteady-state ABC recombination, linear material gain, Q-derived photon lifetime from user-supplied mode parameters, carrier clamping above threshold, heuristic modulation, and lumped thermal estimate. No time-dependent rate equations are solved. Modulation carrier lifetime is 1 / max(A, 1 s^-1); damping is max(0.1, 0.7 * resonance frequency) GHz.\nFidelity: {fidelity}.")
     def export_report(self,path=None):
         if path is False or path is None: path,_=QFileDialog.getSaveFileName(self,'Export laser report','laser_pcsel_report.txt','Text report (*.txt)')
         if not path: return None
         target=Path(path); target.write_text(self.report.toPlainText(),encoding='utf-8'); return target
+
+    def numerical_result_snapshot(self):
+        """Copy the completed result; exporting never reads current physical inputs."""
+        if self.last_result is None:
+            raise ValueError('Run the analytical laser model before exporting numerical results.')
+        result=deepcopy(self.last_result)
+        result['export_metadata']=dict(schema='optical-design-studio/laser-export/v1',
+            exported_at_utc=datetime.now(timezone.utc).isoformat(),
+            inputs_changed_since_calculation=bool(self._results_stale),
+            result_status='completed_for_previous_inputs' if self._results_stale else 'completed',
+            input_provenance='Captured inputs and calculation_context belong to this completed calculation; live edited controls are not substituted.',
+            table_units=dict(current_ma='mA',carrier_density_cm_3='cm^-3',photon_density_cm_3='cm^-3',
+                output_power_mw='mW',temperature_k='K',wavelength_nm='nm',wall_plug_efficiency='1',
+                relaxation_frequency_ghz='GHz',frequencies_ghz='GHz',magnitude_linear='1',magnitude_db='dB'))
+        return result
+
+    @staticmethod
+    def _numerical_json(result):
+        def encode(value):
+            if isinstance(value,np.ndarray):return value.tolist()
+            if isinstance(value,np.generic):return value.item()
+            if isinstance(value,Path):return str(value)
+            raise TypeError('Unsupported numerical result value: '+type(value).__name__)
+        return json.dumps(result,indent=2,ensure_ascii=False,allow_nan=False,default=encode)+'\n'
+
+    def export_result_json(self,path=None):
+        return self._export_numerical_result('json',path)
+
+    def export_sweep_csv(self,path=None):
+        return self._export_numerical_result('sweep',path)
+
+    def export_modulation_csv(self,path=None):
+        return self._export_numerical_result('modulation',path)
+
+    def _export_numerical_result(self,kind,path=None):
+        try:
+            result=self.numerical_result_snapshot()
+            raw_json=self._numerical_json(result)
+            if path is False or path is None:
+                default='laser_pcsel_result.json' if kind=='json' else 'laser_pcsel_'+kind+'.csv'
+                title='Export raw numerical laser result' if kind=='json' else 'Export laser '+kind+' CSV and result JSON'
+                path,_=QFileDialog.getSaveFileName(self,title,default,'JSON (*.json)' if kind=='json' else 'CSV (*.csv)')
+            if not path:return None
+            target=Path(path)
+            if kind=='json':
+                target.write_text(raw_json,encoding='utf-8')
+                paths=[target]
+            else:
+                source=target.with_suffix('.result.json')
+                if kind=='sweep':
+                    mapping=[('current_ma','current_mA'),('carrier_density_cm_3','carrier_density_cm^-3'),
+                        ('photon_density_cm_3','photon_density_cm^-3'),('output_power_mw','output_power_mW'),
+                        ('temperature_k','temperature_K'),('wavelength_nm','wavelength_nm'),
+                        ('wall_plug_efficiency','wall_plug_efficiency_1'),('relaxation_frequency_ghz','relaxation_frequency_GHz')]
+                    points=result.get('sweep',[])
+                    if not points:raise ValueError('The completed result has no current-sweep samples to export.')
+                else:
+                    modulation=result.get('modulation',{})
+                    keys=('frequencies_ghz','magnitude_linear','magnitude_db')
+                    values=[modulation.get(key,[]) for key in keys]
+                    if not len(values[0]) or any(len(value)!=len(values[0]) for value in values):
+                        raise ValueError('The completed result has no complete modulation arrays to export.')
+                    points=[dict(zip(keys,row),bias_current_ma=modulation['bias_current_ma']) for row in zip(*values)]
+                    mapping=[('frequencies_ghz','frequency_GHz'),('magnitude_linear','magnitude_linear_1'),
+                        ('magnitude_db','magnitude_dB'),('bias_current_ma','bias_current_mA')]
+                buffer=io.StringIO(newline='')
+                writer=csv.writer(buffer)
+                writer.writerow([title for _,title in mapping]+['result_id','inputs_changed_since_calculation','source_result_json'])
+                for point in points:
+                    writer.writerow([point[key] for key,_ in mapping]+[result.get('calculation_context',{}).get('result_id',''),
+                        str(result['export_metadata']['inputs_changed_since_calculation']).lower(),source.name])
+                # Build both serializations before touching either destination.
+                source.write_text(raw_json,encoding='utf-8')
+                target.write_text(buffer.getvalue(),encoding='utf-8',newline='')
+                paths=[target,source]
+            self.status.setProperty('error',False)
+            self.status.setText('Exported '+', '.join(item.name for item in paths)+
+                (' · inputs changed; saved data retain the completed calculation inputs.' if self._results_stale else ' · full numerical precision.'))
+            return target
+        except (ValueError,TypeError,KeyError,OSError) as exc:
+            self.status.setProperty('error',True);self.status.setText('Numerical export failed: '+str(exc))
+            return None
 
     def import_comsol(self,path=None):
         if path is False or path is None: path,_=QFileDialog.getOpenFileName(self,'Import COMSOL laser results','','COMSOL manifest (*.json)')
@@ -588,5 +962,6 @@ class PCSELPage(QWidget):
         return imported
 
     def _render_comsol(self):
-        self.plot_laser(self.last_result); d=self.design(); self.write_report(d,self.last_result)
+        self.plot_laser(self.last_result); d=self._optional_design_context(); self.write_report(d,self.last_result)
+        self.solver_status.setText('Optical parameters: supplied by user\n\nS4 / Meep: not run\n\nCOMSOL: external power imported\n\nSteady-state estimate: calculation complete')
         details=self.last_result['comsol']; self.report.appendPlainText(f"\n\nCOMSOL IMPORT\nModel: {details['provenance'].get('model_name','')}\nStudy: {details['provenance'].get('study','')}\nSamples: {len(details['current_ma'])}\nManifest: {details['manifest_path']}")

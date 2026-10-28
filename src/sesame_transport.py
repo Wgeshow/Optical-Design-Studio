@@ -144,11 +144,16 @@ def prepare(project, settings):
             key = axis+'_range_um'
             bounds = raw.get(key)
             if not isinstance(bounds, list) or len(bounds) != 2:
-                raise ValueError('Region '+identity+' needs '+key+'=[minimum,maximum]')
-            bounds = [_number(v, key) for v in bounds]
+                raise _invalid('Region '+identity+' needs '+key+'=[minimum,maximum]',
+                    'regions.'+identity+'.'+key, 'Device', identity, 'um')
+            try:
+                bounds = [_number(v, key) for v in bounds]
+            except ValueError as exc:
+                raise _invalid(str(exc), 'regions.'+identity+'.'+key, 'Device', identity, 'um') from exc
             nodes = cfg[axis+'_nodes_um']
             if bounds[0] >= bounds[1] or bounds[0] < nodes[0] or bounds[1] > nodes[-1]:
-                raise ValueError('Region '+identity+' bounds must lie within the mesh and have positive extent')
+                raise _invalid('Region '+identity+' bounds must lie within the mesh and have positive extent',
+                    'regions.'+identity+'.'+key, 'Device', identity, 'um')
             for bound in bounds:
                 if not np.any(np.isclose(nodes, bound, rtol=0., atol=max(1., abs(bound))*1e-12)):
                     raise _invalid('Region boundaries must coincide with supplied mesh nodes: '+identity+'.'+key, 'regions.'+identity+'.'+key, 'Device', identity, 'um')

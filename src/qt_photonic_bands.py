@@ -54,6 +54,25 @@ class _ShapeCaptionDelegate(QStyledItemDelegate):
         return str(value).capitalize()
 
 
+class _CoordinateLineEdit(QLineEdit):
+    """Keep the sign visible at rest without changing the stored numeric text."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.textChanged.connect(self.setToolTip)
+
+    def setText(self, value):
+        cursor, focused = self.cursorPosition(), self.hasFocus()
+        if focused and value == self.text():
+            return
+        if value != self.text():
+            super().setText(value)
+        self.setCursorPosition(min(cursor, len(value)) if focused else 0)
+
+    def focusOutEvent(self, event):
+        super().focusOutEvent(event)
+        self.setCursorPosition(0)
+
+
 class _CartesianInput(QWidget):
     """Separate Cartesian components while retaining malformed legacy/raw vectors."""
     textChanged = pyqtSignal(str)
@@ -67,11 +86,11 @@ class _CartesianInput(QWidget):
         for axis in ('X', 'Y', 'Z'):
             column = QWidget(); rows = QVBoxLayout(column); rows.setContentsMargins(0, 0, 0, 0); rows.setSpacing(2)
             rows.addWidget(label(axis))
-            edit = QLineEdit(); edit.setMinimumWidth(34); edit.setAccessibleName(axis+' component in units of a')
+            edit = _CoordinateLineEdit(); edit.setMinimumWidth(34); edit.setAccessibleName(axis+' component in units of a')
             rows.addWidget(edit); layout.addWidget(column)
             edit.textChanged.connect(self._component_edited)
             self.components.append(edit); self.component_labels.append(column)
-        self.raw = QLineEdit(); self.raw.setAccessibleName('Unfinished Cartesian vector')
+        self.raw = _CoordinateLineEdit(); self.raw.setAccessibleName('Unfinished Cartesian vector')
         self.raw.setPlaceholderText('Enter comma-separated X, Y, Z values')
         layout.addWidget(self.raw); self.raw.textChanged.connect(self._raw_edited)
         self.set_dimension(dimension)
@@ -89,9 +108,7 @@ class _CartesianInput(QWidget):
         for i, (edit, column) in enumerate(zip(self.components, self.component_labels)):
             column.setVisible(valid_count and i < self.dimension)
             edit.setText(parts[i] if valid_count and i < self.dimension else '')
-            edit.setCursorPosition(0)
         self.raw.setVisible(not valid_count); self.raw.setText(value)
-        self.raw.setCursorPosition(0)
         self.setFocusProxy(self.components[0] if valid_count else self.raw)
         self._updating = False
         if changed: self.textChanged.emit(value)
@@ -232,7 +249,8 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
             '(an absolute Linux path for WSL). Changing solver never silently rewrites the runtime or device.'))
         solver.addStretch()
         _, outputs = self.add_section('Outputs')
-        outputs.addWidget(label('Polarizations'))
+        outputs.addWidget(label('Choose 2D polarizations in Modes & accuracy.'))
+        outputs.addWidget(button('Choose modes & accuracy', lambda: self.show_stage('calculate')))
         self.te = QCheckBox('TE · 2D')
         self.tm = QCheckBox('TM · 2D')
         self.te.setChecked(True)
@@ -331,6 +349,58 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         self.refresh_benchmarks()
         self._refresh_inspector()
         self._queue_preview()
+        self._install_journey_navigation()
+        self._install_geometry_history()
+
+    def _install_journey_navigation(self):
+        """Expose task stages while retaining canonical editors and tab indices."""
+        from qt_journey import JourneyBar
+        from qt_research_journey import ensure_execution_panels
+        ensure_execution_panels(self)
+        self.journey_bar = JourneyBar([
+            dict(title='Unit cell', description='Set the reference scale and editable lattice.'),
+            dict(title='Build crystal', description='Select and edit actual dielectric objects in the crystal preview.'),
+            dict(title='Wavevectors', description='Edit fractional reciprocal coordinates, path intervals or grid sampling.'),
+            dict(title='Modes & accuracy', description='Choose bands, TE/TM where applicable, accuracy and the installed runtime.'),
+            dict(title='Check inputs', description='Review the current request, resolve missing inputs and check the installed runtime.'),
+            dict(title='Run & progress', description='Launch this study’s checked request, follow real solver events or stop its owned job.'),
+            dict(title='Saved results', description='Inspect calculated bands, sampled gaps and convergence evidence.')], self)
+        self.body_layout.insertWidget(2, self.journey_bar)
+        for control in self.stage_buttons.values(): control.hide()
+        # Retain the More menu and all its advanced sections, removing only
+        # redundant stage buttons from the former navigation strip.
+        for control in self.flow_bar.findChildren(QPushButton):
+            if control.menu() is None: control.hide()
+        self.journey_bar.stageRequested.connect(self._journey_requested)
+        self.tabs.currentChanged.connect(self._sync_journey_navigation)
+        from qt_optical_domain_canvas import ReciprocalPathCanvas
+        self.reciprocal_preview = ReciprocalPathCanvas(self)
+        self.tabs.widget(self.sections['k-space path']).widget().layout().insertWidget(1, self.reciprocal_preview)
+        self._sync_journey_navigation()
+
+    def _journey_requested(self, index):
+        if index < 2:
+            self.show_stage(('unit', 'build')[index])
+        else:
+            self.select_section(('k-space path', 'Solver & accuracy', 'Check inputs', 'Run & progress', 'Results')[index-2])
+        self._sync_journey_navigation()
+
+    def _sync_journey_navigation(self, *_):
+        if not hasattr(self, 'journey_bar'): return
+        current = self.tabs.currentIndex()
+        if current == self.sections.get('Crystal structure', 1):
+            index = 0 if self._crystal_stage == 'unit' else 1
+        elif current == self.tabs.indexOf(self.results): index = 6
+        else:
+            name = self.tabs.tabText(current)
+            # Every destination in More sections belongs to a visible stage.
+            # These are the same canonical pages used by diagnostics and drafts.
+            index = {'Overview': 0, 'Materials': 1, 'k-space path': 2,
+                     'Solver & accuracy': 3, 'Outputs': 3,
+                     'Parameter sweep': 3, 'Convergence': 3,
+                     'Review & Run': 4, 'Check inputs': 4, 'Paper benchmarks': 4,
+                     'Run & progress': 5}.get(name, -1)
+        self.journey_bar.set_current(index)
 
     def _replace_section_body(self, index, body):
         scroll = self.tabs.widget(index)
@@ -654,6 +724,11 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         cell.addWidget(self.template_apply)
         self.template_note = label('Illustrative sphere in air. This starting geometry does not promise a band gap.')
         cell.addWidget(self.template_note)
+        self.empty_crystal_button = button('Start empty crystal', self.start_empty_crystal)
+        self.empty_crystal_button.setAccessibleName('Start empty crystal')
+        self.empty_crystal_button.setToolTip('Remove all crystal objects. Keep the lattice, scale, background and calculation settings. Undo restores the objects.')
+        cell.addWidget(self.empty_crystal_button)
+        cell.addWidget(label('Start empty to build each object yourself. Your unit cell and scale stay unchanged.'))
         self.unit_custom_toggle = QCheckBox('Custom lattice vectors')
         cell.addWidget(self.unit_custom_toggle)
         self.unit_custom = QWidget(); custom = QVBoxLayout(self.unit_custom); custom.setContentsMargins(0, 0, 0, 0)
@@ -680,7 +755,16 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         for shape in ('sphere', 'block', 'cylinder', 'circle'):
             add = button('+ Add '+shape, lambda checked=False, s=shape: self.add_shape(s))
             self.add_shape_buttons[shape] = add; objects.addWidget(add)
+        self.duplicate_object_button = button('Duplicate object', self.duplicate_primitive)
+        objects.addWidget(self.duplicate_object_button)
         objects.addWidget(button('Remove object', self.remove_primitive))
+        history_row = QHBoxLayout()
+        self.undo_object_button = button('Undo', lambda: self.geometry_history.undo())
+        self.redo_object_button = button('Redo', lambda: self.geometry_history.redo())
+        self.undo_object_button.setToolTip('Undo the last crystal object edit')
+        self.redo_object_button.setToolTip('Redo the last crystal object edit')
+        history_row.addWidget(self.undo_object_button); history_row.addWidget(self.redo_object_button)
+        objects.addLayout(history_row)
         objects.addSpacing(12); objects.addWidget(label('Background material', 'setupHeading'))
         self.background.setAccessibleName('Background relative permittivity')
         background_form = QFormLayout(); background_form.addRow('εr', self.background); objects.addLayout(background_form)
@@ -724,7 +808,13 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         self.compact_add_button = QPushButton('Add object…'); add_menu = QMenu(self.compact_add_button)
         for shape in ('sphere', 'block', 'cylinder', 'circle'):
             add_menu.addAction('Add '+shape, lambda checked=False, s=shape: self.add_shape(s))
+        add_menu.addAction('Duplicate selected object', self.duplicate_primitive)
         add_menu.addAction('Remove selected object', self.remove_primitive)
+        self.undo_object_action = add_menu.addAction('Undo object edit', lambda: self.geometry_history.undo())
+        self.redo_object_action = add_menu.addAction('Redo object edit', lambda: self.geometry_history.redo())
+        add_menu.addSeparator()
+        add_menu.addAction('Import setup…', self.import_settings)
+        add_menu.addAction('Export setup…', self.export_settings)
         self.compact_add_button.setMenu(add_menu); inspector.addWidget(self.compact_add_button)
         self.inspector_group.setTitle('Selected object')
         self.primitive_form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
@@ -796,11 +886,22 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         for title, control in [('Solver', self.solver), ('Lowest bands at each wavevector', self.num_bands),
                                ('Grid points per lattice direction', self.resolution), ('Legume reciprocal cutoff gmax', self.gmax)]:
             accuracy.addRow(title, control)
+        self.polarization_controls = QWidget()
+        polarization_row = QHBoxLayout(self.polarization_controls)
+        polarization_row.setContentsMargins(0, 0, 0, 0)
+        polarization_row.addWidget(self.te)
+        polarization_row.addWidget(self.tm)
+        polarization_row.addStretch()
+        self.te.setToolTip('2D TE: magnetic field along the invariant z direction; electric field in the plane.')
+        self.tm.setToolTip('2D TM: electric field along the invariant z direction; magnetic field in the plane.')
+        accuracy.addRow('2D polarizations', self.polarization_controls)
         setup.addWidget(accuracy_group)
         setup.addWidget(label('Start with the supplied grid, then use Convergence to check that the frequencies stabilize.'))
         runtime_group = QGroupBox('3. Connect your solver'); runtime_box = QVBoxLayout(runtime_group)
         from qt_photonic_runtime import PhotonicRuntimeCheck
-        self.runtime_check = PhotonicRuntimeCheck(lambda: dict(solver=self.solver.currentData(), runtime=self.runtime_settings()), self)
+        self.runtime_check = PhotonicRuntimeCheck(
+            lambda: dict(solver=self.solver.currentData(), runtime=self.runtime_settings()), self,
+            get_discovery_settings=lambda: dict(solver=self.solver.currentData(), runtime=self.runtime_discovery_settings()))
         self.runtime_check.runtimeReady.connect(self._apply_automatic_runtime)
         runtime_box.addWidget(self.runtime_check)
         self.runtime_setup_toggle = QCheckBox('Set up or change the solver installation')
@@ -848,6 +949,7 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         self.tabs.setCurrentIndex(4 if stage == 'calculate' else 1)
         self._update_workflow()
         if stage == 'calculate': self._refresh_calculation_summary()
+        self._sync_journey_navigation()
         self._edited()
 
     def initialize_2d_document(self,solver='mpb'):
@@ -870,6 +972,8 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
             self._sync_materials();self.geometry.setCurrentCell(0,0)
             self._refresh_inspector();self._queue_preview()
         finally:self._loading=loading
+        if hasattr(self, 'geometry_history'):
+            self.geometry_history.reset()
         self._edited()
 
     def _update_workflow(self):
@@ -1016,7 +1120,7 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
     def _refresh_calculation_summary(self):
         dim = self.dimension.currentData()
         mode = self.sampling.currentData()
-        self.calculation_mode.setText('3D full-vector modes. TE/TM separation does not apply.' if dim == 3 else '2D crystal, invariant along z. Select TE/TM under More → Outputs.')
+        self.calculation_mode.setText('3D full-vector modes. TE/TM separation does not apply.' if dim == 3 else '2D crystal, invariant along z. Select TE, TM or both below.')
         if mode == 'grid': summary = 'Full reciprocal-cell grid: '+self.grid_counts.text()+' points per direction.'
         elif mode == 'points': summary = str(self.kpoints.rowCount())+' explicit reciprocal points.'
         else: summary = str(self.kpoints.rowCount())+' path vertices · '+self.points_per_segment.text()+' intervals per segment.'
@@ -1032,7 +1136,35 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
             self.unit_custom_toggle.setChecked(True)
             return
         self._apply_template_values(key)
+        # A different crystal also changes lattice and path conventions. Object
+        # history must start from that new setup rather than mix conventions.
+        if hasattr(self, 'geometry_history'):
+            self.geometry_history.reset()
         self._edited()
+
+    def start_empty_crystal(self):
+        """Clear only the authored motif; retain cell and numerical settings."""
+        with self.geometry_history.transaction():
+            self._restore_objects(dict(geometry=[], object_ids=[], epsilons={}))
+        self.show_stage('build')
+        # Clearing is a discrete action: do not display the removed motif while
+        # waiting for the debounce used by ordinary numeric edits.
+        self._preview_timer.stop()
+        self.preview_geometry()
+        self._geometry_status_text = 'Empty crystal. Add an object to begin; Undo restores the previous objects.'
+        self.status.setText(self._geometry_status_text)
+
+    def _refresh_empty_crystal_status(self):
+        # Geometry history owns only its own message. Runtime, validation and
+        # calculation messages remain authoritative after they replace it.
+        owned = getattr(self, '_geometry_status_text', None)
+        if not owned or self.status.text() != owned or self.store.busy:
+            return
+        count = self.geometry.rowCount()
+        self._geometry_status_text = (f'Crystal contains {count} '+('object' if count == 1 else 'objects')+
+            '. Check inputs before running.' if count else
+            'Empty crystal. Add an object to begin; Undo restores the previous objects.')
+        self.status.setText(self._geometry_status_text)
 
     def _mark_custom_crystal(self):
         if not getattr(self, '_workflow_ready', False) or getattr(self, '_applying_template', False): return
@@ -1133,6 +1265,7 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
                 self._epsilons[self._object_ids[row]] = value
                 self._sync_materials()
                 self._edited()
+                self._record_object_edit()
             else:
                 self.geometry.item(row, self.geometry_columns.index(key)).setText(value)
         finally:
@@ -1248,7 +1381,7 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
     def _section_changed(self, index):
         if hasattr(self, 'section_nav'):
             with QSignalBlocker(self.section_nav), QSignalBlocker(self.section_picker):
-                self.section_nav.setCurrentRow(self._navigation_rows[index])
+                self.section_nav.setCurrentRow(self._navigation_rows.get(index, -1))
                 self.section_picker.setCurrentIndex(self.section_picker.findData(index))
             self.step_label.setText(self.section_picker.currentText())
             self.back_step.setEnabled(index > 0)
@@ -1275,6 +1408,8 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         self.kpoints.setColumnHidden(2, dim == 2)
         self.te.setEnabled(dim == 2)
         self.tm.setEnabled(dim == 2)
+        if hasattr(self, 'polarization_controls'):
+            self._form_row_visible(self.solver_form, self.polarization_controls, dim == 2)
         if hasattr(self, 'dimension_note'):
             self._clear_path_labels()
             self.dimension_note.setText('2D is an infinite cross-section along z, not a finite-thickness slab.' if dim == 2 else
@@ -1328,6 +1463,56 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
             self.kpoints.setVisible(mode != 'grid')
             self.kpoint_actions.setVisible(mode != 'grid')
 
+    def _install_geometry_history(self):
+        from qt_geometry_history import GeometryHistory
+        self.geometry_history = GeometryHistory(self._object_draft, self._restore_objects, self._object_history_controls)
+        self._object_history_controls()
+        theme_manager().changed.connect(self._object_history_controls)
+
+    def _object_draft(self):
+        return dict(geometry=_rows(self.geometry), object_ids=list(self._object_ids), epsilons=dict(self._epsilons))
+
+    def _object_history_controls(self, *_):
+        history = getattr(self, 'geometry_history', None)
+        for control in (self.undo_object_button, self.undo_object_action):
+            control.setEnabled(bool(history and history.can_undo))
+        for control in (self.redo_object_button, self.redo_object_action):
+            control.setEnabled(bool(history and history.can_redo))
+        from qt_reference_style import reference_icon
+        color = COLORS[theme_manager().mode]['accent']
+        for control, icon in ((self.duplicate_object_button, 'layers'), (self.undo_object_button, 'back'),
+                (self.redo_object_button, 'next'), (self.undo_object_action, 'back'), (self.redo_object_action, 'next')):
+            control.setIcon(reference_icon(icon, color))
+        self._refresh_empty_crystal_status()
+
+    def _record_object_edit(self):
+        if hasattr(self, 'geometry_history') and not self._loading:
+            self.geometry_history.record()
+
+    def _restore_objects(self, state):
+        selected = self._object_ids[self.geometry.currentRow()] if 0 <= self.geometry.currentRow() < len(self._object_ids) else None
+        self._object_ids = list(state['object_ids'])
+        self._epsilons = dict(state['epsilons'])
+        _fill(self.geometry, state['geometry'])
+        self._sync_materials()
+        self.geometry.setCurrentCell(self._object_ids.index(selected) if selected in self._object_ids else 0, 0)
+        self._refresh_inspector(); self._mark_custom_crystal(); self._queue_preview(); self._edited()
+
+    def duplicate_primitive(self):
+        row = self.geometry.currentRow()
+        if not 0 <= row < len(self._object_ids):
+            return False
+        state = self._object_draft()
+        identity = uuid.uuid4().hex
+        values = list(state['geometry'][row]); values[0] += ' copy'
+        state['geometry'].insert(row+1, values)
+        state['object_ids'].insert(row+1, identity)
+        state['epsilons'][identity] = self._epsilons[self._object_ids[row]]
+        self._restore_objects(state)
+        self.geometry.setCurrentCell(row+1, 0)
+        self._record_object_edit()
+        return True
+
     def add_primitive(self):
         dim = self.dimension.currentData()
         shape = self.new_shape.currentData() or self.new_shape.currentText()
@@ -1344,6 +1529,7 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         self._refresh_inspector()
         self._queue_preview()
         self._edited()
+        self._record_object_edit()
 
     def remove_primitive(self):
         row = self.geometry.currentRow()
@@ -1359,6 +1545,7 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
             self._refresh_inspector()
             self._queue_preview()
             self._edited()
+            self._record_object_edit()
 
     def _geometry_changed(self, *args):
         self._mark_custom_crystal()
@@ -1366,6 +1553,7 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         self._refresh_inspector()
         self._queue_preview()
         self._edited()
+        self._record_object_edit()
 
     def _sync_materials(self):
         _fill(self.materials, [[row[0], self._epsilons.get(identity, '')] for row, identity in zip(_rows(self.geometry), self._object_ids)])
@@ -1408,6 +1596,7 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
             self._mark_custom_crystal()
             self._refresh_inspector()
             self._edited()
+            self._record_object_edit()
 
     def add_kpoint(self):
         rows = _rows(self.kpoints)
@@ -1458,8 +1647,11 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
             self._crystal_stage = state.get('workflow_stage', 'build' if self.tabs.currentIndex() == 1 else 'calculate')
             self._reference_scale_edited()
             self._update_workflow()
+            self._sync_journey_navigation()
             self.runtime_check.invalidate()
             self._mark_custom_crystal()
+        if hasattr(self, 'geometry_history'):
+            self.geometry_history.reset()
 
     def _geometry_inputs(self, materials=True):
         dim = self.dimension.currentData()
@@ -1561,6 +1753,15 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
             cfg['parameter_sweep'] = dict(parameters=list(parameters.values()))
         return dict(engine='photonic_bands', study='band_structure', settings=cfg)
 
+    def runtime_discovery_settings(self):
+        """Optional search hints, deliberately independent of required run inputs."""
+        runtime = dict(mode=self.runtime_mode.currentData(), distro=self.distro.text().strip(),
+                       executable=self.executable.text().strip())
+        if self.solver.currentData() == 'legume':
+            runtime['module_paths'] = [value.strip() for value in self.module_paths.text().split(';') if value.strip()]
+            runtime['library_paths'] = [value.strip() for value in self.library_paths.text().split(';') if value.strip()]
+        return runtime
+
     def runtime_settings(self):
         """Read runtime independently so unfinished geometry cannot block a reference run."""
         solver = self.solver.currentData()
@@ -1588,6 +1789,9 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
             return super().open_diagnostic(target)
         field = target.get('field', '').removeprefix('settings.')
         if getattr(self, '_workflow_ready', False):
+            if field == 'polarizations':
+                self.show_stage('calculate')
+                return reveal_and_focus(self.te, message=target.get('message', ''))
             if field == 'background_epsilon':
                 self.show_stage('build')
                 return reveal_and_focus(self.compact_background if self.width() < 1100 else self.background, message=target.get('message', ''))
@@ -1639,6 +1843,67 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         if field in ('resolution_levels', 'gmax_levels'):
             target = dict(target, field='convergence.levels')
         return super().open_diagnostic(target)
+
+    def journey_review_fields(self):
+        """Read the complete band draft, including controls hidden by layout.
+
+        Do not construct/normalize a request here: an unfinished value must stay
+        visible in the review and remain available to the input diagnostics.
+        """
+        dim = self.dimension.currentData()
+        rows = [('', 'Input state', 'Current draft values; Check inputs validates them. Reviewing does not change the crystal.'),
+            ('dimension', 'Periodic dimensions', self.dimension.currentText()),
+            ('solver', 'Solver', self.solver.currentText()),
+            ('reference_length_um', 'Reference length a', self.reference_length.text()+' µm' if self.reference_length.text().strip() else 'Normalized units only'),
+            ('background_epsilon', 'Background relative permittivity', self.background.text() or 'Not supplied')]
+        for index, values in enumerate(_rows(self.lattice)):
+            if index < dim:
+                rows.append((f'lattice_vectors.{index}.0', f'Lattice vector a{index+1} (Cartesian / a)',
+                    '['+', '.join(value or 'Not supplied' for value in values[:dim])+']'))
+        geometry = _rows(self.geometry)
+        rows.append(('geometry', 'Dielectric objects', str(len(geometry)) if geometry else 'Uniform background (no objects)', 'Crystal structure'))
+        for index, values in enumerate(geometry):
+            obj = dict(zip(self.geometry_columns, values))
+            shape = obj['shape'].strip().lower()
+            fields = ['center']
+            if shape in ('circle', 'sphere', 'cylinder'): fields.append('radius')
+            if shape == 'cylinder': fields.extend(['height', 'axis'])
+            if shape == 'block': fields.extend(['size', 'axes'])
+            identity = self._object_ids[index] if index < len(self._object_ids) else ''
+            detail = (shape or 'Shape not supplied')+'; '+ '; '.join(
+                field+' = '+(obj.get(field) or 'Not supplied') for field in fields)
+            detail += '; εr = '+str(self._epsilons.get(identity, 'Not supplied'))+'; lengths in a'
+            rows.append(('geometry', 'Object '+str(index+1)+' · '+(obj['name'] or 'Unnamed'), detail, 'Crystal structure'))
+        rows.append(('sampling', 'Reciprocal sampling', self.sampling.currentText()))
+        if self.sampling.currentData() == 'grid':
+            rows.extend([('k_grid.counts', 'Grid counts', self.grid_counts.text()),
+                ('k_grid.offset', 'Grid offset (fractional reciprocal)', self.grid_offset.text())])
+        else:
+            key = 'k_vertices' if self.sampling.currentData() == 'path' else 'k_points'
+            for index, values in enumerate(_rows(self.kpoints)):
+                rows.append((f'{key}.{index}.0', ('Path vertex ' if key == 'k_vertices' else 'Wavevector ')+str(index+1)+' (fractional reciprocal)',
+                    '['+', '.join(value or 'Not supplied' for value in values[:dim])+']'))
+            if key == 'k_vertices':
+                rows.append(('points_per_segment', 'Intervals per path segment', self.points_per_segment.text()))
+        polarization = 'Full-vector modes' if dim == 3 else '; '.join(
+            widget.text() for widget in (self.te, self.tm) if widget.isChecked()) or 'None selected — choose TE and/or TM'
+        rows.extend([('polarizations', 'Polarizations', polarization),
+            ('num_bands', 'Number of bands', self.num_bands.text())])
+        accuracy = [('resolution', self.resolution), ('tolerance', self.tolerance), ('mesh_size', self.mesh_size)] if self.solver.currentData() == 'mpb' else [('gmax', self.gmax)]
+        accuracy.extend([('convergence.levels', self.levels), ('frequency_tolerance', self.frequency_tolerance)])
+        for key, widget in accuracy:
+            rows.append((key, widget.accessibleName() or key.replace('_', ' '), widget.text() or 'Not supplied'))
+        for index, values in enumerate(_rows(self.sweeps)):
+            rows.append(('parameter_sweep', 'Parameter sweep '+str(index+1), ' · '.join(values), 'Parameter sweep'))
+        rows.extend([('runtime.mode', 'Run on', self.runtime_mode.currentText()),
+            ('runtime.executable', 'Solver executable', self.executable.text() or 'Not supplied'),
+            ('runtime.timeout_s', 'Runtime limit (s)', self.timeout.text())])
+        if self.runtime_mode.currentData() == 'wsl':
+            rows.append(('runtime.distro', 'WSL distribution', self.distro.text() or 'Not supplied'))
+        if self.solver.currentData() == 'legume':
+            for key, widget in [('runtime.module_paths', self.module_paths), ('runtime.library_paths', self.library_paths)]:
+                rows.append((key, widget.accessibleName(), widget.text() or 'None supplied'))
+        return rows
 
     def review_inputs(self):
         try:
@@ -1804,6 +2069,8 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         self._queue_preview()
 
         self._mark_custom_crystal()
+        if hasattr(self, 'geometry_history'):
+            self.geometry_history.reset()
 
     def import_settings(self):
         path, _ = QFileDialog.getOpenFileName(self, 'Import editable periodic-domain settings', '', 'JSON (*.json)')

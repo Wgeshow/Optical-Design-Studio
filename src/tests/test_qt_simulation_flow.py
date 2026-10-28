@@ -34,6 +34,14 @@ class SimulationFlowTests(unittest.TestCase):
             stage_sections = {mode+'.'+suffix for _, suffixes in STAGES[mode] for suffix in suffixes}
             self.assertEqual(stage_sections, {tab['id'] for tab in self.page._modes[mode]['tabs']})
             for section in stage_sections:
+                if section == mode+'.overview':
+                    # Device opens its full editor first. The visible Back
+                    # action reveals its original overview/settings controls.
+                    flow=self.page.setup_flow
+                    flow.show_stage(0); APP.processEvents()
+                    self.assertIs(flow.views.currentWidget(),flow.device_editor)
+                    self.assertTrue(flow.device_editor.isVisible())
+                    flow.device_editor.back_button.click(); APP.processEvents()
                 self.page.select_section(section); APP.processEvents()
                 self.assertTrue(self.page.stack.currentWidget().isVisible())
                 self.assertEqual(sum(b.isChecked() for b in self.page.setup_flow.step_buttons), 1)
@@ -42,6 +50,11 @@ class SimulationFlowTests(unittest.TestCase):
 
     def test_wide_scene_is_largest_column_and_compact_has_readable_views(self):
         flow = self.page.setup_flow
+        self.assertIs(flow.views.currentWidget(),flow.device_editor)
+        self.assertTrue(flow.device_editor.isVisible())
+        self.assertGreater(flow.device_editor.height(),400)
+        flow.device_editor.back_button.click(); QTest.qWait(30)
+        self.assertTrue(flow.view_choice.isVisible())
         self.assertGreater(flow.scene.width(), self.page.center.width())
         self.assertGreater(self.page.shared_preview.height(), 400)
         self.page.resize(776, 570); QTest.qWait(50)
@@ -70,11 +83,15 @@ class SimulationFlowTests(unittest.TestCase):
         self.page.shared_preview.object_selected.emit(ident)
         self.assertEqual(self.page.setup_flow.object_tree.currentItem().data(0,Qt.ItemDataRole.UserRole),ident)
         spy=QSignalSpy(self.page.diagnosticRequested); self.page.setup_flow.edit_selected()
-        self.assertEqual(spy[0][0]['object_id'],ident); self.assertEqual(spy[0][0]['workspace'],'structure')
+        self.assertEqual(len(spy),0)
+        self.assertEqual(self.page.setup_flow.device_editor.editor.selected_id,ident)
+        self.assertIs(self.page.setup_flow.views.currentWidget(),self.page.setup_flow.device_editor)
         self.assertEqual(before,self.store.portable_project()); self.assertEqual(editor.text(),'invalid')
 
     def test_view_changes_and_domain_details_do_not_change_inputs(self):
         before=self.store.portable_project(); flow=self.page.setup_flow
+        self.assertIs(flow.views.currentWidget(),flow.device_editor)
+        flow.device_editor.back_button.click(); APP.processEvents()
         self.page.resize(776,570)
         for index in range(3):
             flow.view_choice.setCurrentIndex(index); flow.show_compact('device')

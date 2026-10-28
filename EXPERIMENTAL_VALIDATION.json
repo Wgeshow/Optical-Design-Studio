@@ -1,11 +1,11 @@
 {
-  "version": "1.4.0-alpha.2",
-  "build_date": "2026-10-21",
+  "version": "1.4.0-alpha.3",
+  "build_date": "2026-10-28",
   "signed": false,
-  "source_tests_run": 35,
+  "source_tests_run": 175,
   "source_tests_skipped": 0,
-  "source_tests_passed": 35,
-  "source_tree_sha256": "bb9c587ef4bad93f8e975a54d725fe47e12ff99633fac95fca90ded32821bf69",
+  "source_tests_passed": 175,
+  "source_tree_sha256": "bc21642a7125ada36f78fca360db260c1217c80628778fff169410c7174cf738",
   "frozen_verification": "partial",
   "native_startup_verification": "passed",
   "packaged_checks": {
@@ -30,7 +30,7 @@
   "archive_integrity": "pending",
   "published": false,
   "release_channel": "highly_experimental",
-  "validation_scope": "35 targeted source tests and 34 packaging gates; 8 critical frozen checks including 29 destinations and exact S4 grid; 7 real Windows startup/display checks. A documentation-only license amendment was independently audited against unchanged executable, runtime and source hashes. The full installer/theme/field/scientific acceptance matrix, compiled paper physics and fresh optional-solver installations were not rerun.",
+  "validation_scope": "175 targeted source tests (0 failures/errors/skips), 34 packaging checks, exact compiled-code match for 200 staged modules per executable, critical frozen profile 8/8 checks across all 29 launcher choices and 28 independent setups, real Windows startup 7/7 checks, and GPT-6.1 Terra manual navigation of chooser/S4/blank material/C-V/2D bands/version with normal close. Full installer matrix and new scientific acceptance were not performed; campaign remains 7/28 UI-executed routes with 5 scoped reference agreements.",
   "packaged_self_tests_passed": false,
   "compiled_validation_profile": "critical_release",
   "critical_packaged_checks_passed": true,
@@ -47,56 +47,61 @@
   "package_gate_tests": 34,
   "incomplete_verification_reason": "Independent verification must finish successfully for this exact application.",
   "source_test_targets": [
-    "test_grid_sweep",
-    "test_simulation_documents.DocumentStoreTests",
-    "test_simulation_documents.DocumentUiTests.test_fdtd_project_reload_and_unrun_inputs_persist",
-    "test_simulation_documents.DocumentUiTests.test_pcsel_choices_have_separate_editors_and_independent_inputs",
-    "test_simulation_documents.DocumentUiTests.test_explicit_pcsel_transfer_copies_geometry_not_solver_controls",
-    "test_qt_simulation_picker",
-    "test_solver_environment",
-    "test_qt_core.QtCoreTests.test_worker_cleanup_preserves_qobject_event_handler"
+    "test_fixed_conductor_material",
+    "test_laser_zero_recombination",
+    "test_native_figure",
+    "test_qt_editor_feature_parity",
+    "test_qt_electrical_materials",
+    "test_qt_fdtd_exterior_editing",
+    "test_qt_fdtd_result_reset",
+    "test_qt_field_color_roundoff",
+    "test_qt_fixed_conductor_material",
+    "test_qt_global_catalog_settings",
+    "test_qt_laser_zero_recombination",
+    "test_qt_optical_exterior_editing",
+    "test_qt_pcsel_repeat_layers",
+    "test_qt_photonic_band_results",
+    "test_qt_photonic_bands_usability",
+    "test_qt_results_workspace",
+    "test_qt_s4_input_review",
+    "test_qt_setup_choice_recovery",
+    "test_qt_simulation_flow",
+    "test_qt_simulation_setup",
+    "test_qt_thermal_result_reset",
+    "test_qt_thermal_review",
+    "test_solver_discovery_priority",
+    "test_app_version",
+    "test_installer_chrome_smoke",
+    "test_qt_solver_environment_ownership"
   ],
-  "source_test_scope": "Targeted current source checks; offscreen Qt and bounded mocked installer/grid contracts, no paper physics rerun",
-  "executable_sha256": "78026f5672db0dd818dd5e7aacf7b42ed813767dbfdcf7e0337628d6ddad39cf",
-  "backend_executable_sha256": "d28852c38b8dd1b6b098d3c9d7f6c8dd905aeed6466fd774d4f46f0b20f7cb56",
+  "source_test_scope": "23 campaign regression modules plus version receipt, migrated harness chrome, and launcher ownership regressions; offscreen Qt, no full suite or paper physics rerun",
+  "executable_sha256": "61152d7738130f793741d01c6a5dd45b8e9b9f501db646d84aa38504f24d840e",
+  "backend_executable_sha256": "fd93c024cbc779a4b1acc30770b3dd132925ef121210aab3874be978b1d4a7f4",
   "frozen_module_inventory": {
     "Optical Design Studio.exe": {
-      "sha256": "78026f5672db0dd818dd5e7aacf7b42ed813767dbfdcf7e0337628d6ddad39cf",
-      "required_modules": 106,
+      "sha256": "61152d7738130f793741d01c6a5dd45b8e9b9f501db646d84aa38504f24d840e",
+      "required_modules": 117,
       "numpy_version": "1.26.4"
     },
     "OpticalDesignBackend.exe": {
-      "sha256": "d28852c38b8dd1b6b098d3c9d7f6c8dd905aeed6466fd774d4f46f0b20f7cb56",
-      "required_modules": 106,
+      "sha256": "fd93c024cbc779a4b1acc30770b3dd132925ef121210aab3874be978b1d4a7f4",
+      "required_modules": 117,
       "numpy_version": "1.26.4"
     }
   },
   "dependency_license_files": 14,
   "documentation_amendments": [
     {
-      "kind": "documentation_only_license_restoration",
-      "added": [
-        "THIRD_PARTY_LICENSES/DEVSIM-2.11.0/LICENSE",
-        "THIRD_PARTY_LICENSES/DEVSIM-2.11.0/NOTICE",
-        "THIRD_PARTY_LICENSES/GPU/cuda_pathfinder-1.8.3.dist-info/licenses/LICENSE",
-        "THIRD_PARTY_LICENSES/GPU/cupy_cuda13x-14.2.0.dist-info/licenses/LICENSE",
-        "THIRD_PARTY_LICENSES/GPU/cupy_cuda13x-14.2.0.dist-info/licenses/docs/source/license.rst",
-        "THIRD_PARTY_LICENSES/GPU/fastrlock-0.8.3.dist-info/LICENSE",
-        "THIRD_PARTY_LICENSES/GPU/nvidia_cublas-13.8.0.4.dist-info/licenses/License.txt",
-        "THIRD_PARTY_LICENSES/GPU/nvidia_cuda_nvrtc-13.4.92.dist-info/licenses/License.txt",
-        "THIRD_PARTY_LICENSES/GPU/nvidia_cuda_runtime-13.4.92.dist-info/licenses/License.txt",
-        "THIRD_PARTY_LICENSES/GPU/nvidia_cufft-12.4.0.43.dist-info/licenses/License.txt",
-        "THIRD_PARTY_LICENSES/GPU/nvidia_curand-10.4.4.72.dist-info/licenses/License.txt",
-        "THIRD_PARTY_LICENSES/GPU/nvidia_cusolver-12.3.4.7.dist-info/licenses/License.txt",
-        "THIRD_PARTY_LICENSES/GPU/nvidia_cusparse-12.8.6.72.dist-info/licenses/License.txt",
-        "THIRD_PARTY_LICENSES/GPU/nvidia_nvjitlink-13.4.92.dist-info/licenses/License.txt"
-      ],
+      "kind": "portable_archive_extraction_documentation",
+      "added": [],
       "changed": [
-        "THIRD_PARTY_NOTICES.md"
+        "BUILD_VERIFICATION.json",
+        "RELEASE_NOTES.md",
+        "START_HERE.md"
       ],
       "gui_rerun": false,
       "prior_gui_and_native_results_reused": true,
-      "scope": "Only verbatim license copies and THIRD_PARTY_NOTICES.md changed. Prior critical and native checks apply to byte-identical executables, runtime, source, and application resources."
+      "scope": "Only extraction instructions changed from ZIP to 7z plus generated archive-verification metadata. All other payload files, executable code, runtime, and readable source exactly match the original independently verified baseline."
     }
   ],
   "limitations": [

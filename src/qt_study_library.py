@@ -21,8 +21,8 @@ STUDIES = (
      'Add explicit contact/interface resistivity and optional recombination, temperature feedback or tunnelling.'),
     ('high_field_optics', 'High-field optical response', 'Absorption and changes in refractive index',
      'Edit the material, electric fields, carrier states and wavelengths for an optical sensitivity study.'),
-    ('lumped_laser', 'Laser rate-equation model', 'Threshold, L–I, modulation and lumped temperature',
-     'Edit the gain, recombination, mode and thermal parameters for the existing reduced laser model.'),
+    ('lumped_laser', 'Steady-state laser estimate', 'Threshold, L–I, heuristic modulation and lumped temperature',
+     'Edit supplied mode, gain, recombination and thermal parameters for a steady-state estimate with carrier clamping.'),
 )
 
 
@@ -129,6 +129,17 @@ class StudyLibrary(QWidget):
         self.paper_splitter.addWidget(editable)
         self.paper_splitter.setSizes([240,480,330])
         self.paper_splitter.setChildrenCollapsible(False)
+        from qt_journey import JourneyBar
+        self.paper_journey = JourneyBar([
+            dict(title='Find reference', icon='paper', description='Choose the paper and figure you want to reproduce.'),
+            dict(title='Inspect scope', icon='info', description='Review source conventions, model limits and the structure before making an editable copy.'),
+            dict(title='Open editable setup', icon='cube', description='Continue in the selected simulation’s structure, parameters, checks and run steps. Its source metadata stays attached.')], paper)
+        page.insertWidget(0, self.paper_journey)
+        self._paper_stage = 0
+        self.paper_journey.stageRequested.connect(self._show_paper_stage)
+        self.reference_button.setText('Run unchanged reference')
+        self.reference_button.setToolTip('Run the original registered inputs. To change the structure or parameters, open the editable setup first.')
+        self.paper_journey.set_current(0)
         self._cases = []
         self.search.textChanged.connect(self.filter_cases)
         self.family.currentIndexChanged.connect(self.filter_cases)
@@ -245,14 +256,23 @@ class StudyLibrary(QWidget):
         else:
             self.simulationRequested.emit(target)
 
+    def _show_paper_stage(self, index):
+        self._paper_stage = index
+        self.paper_journey.set_current(index)
+        self.adapt_layout()
+
     def adapt_layout(self):
         if hasattr(self, 'picker'):
             self.picker.adapt_layout()
         if hasattr(self,'paper_splitter'):
             compact=self.width()<1050
+            stage=getattr(self,'_paper_stage',0)
+            self.paper_splitter.widget(0).setVisible(stage==0)
+            self.paper_splitter.widget(1).setVisible(stage in (0,1))
+            self.paper_splitter.widget(2).setVisible(stage in (1,2))
             self.paper_splitter.setOrientation(Qt.Orientation.Vertical if compact else Qt.Orientation.Horizontal)
             self.case_list.setMaximumHeight(150 if compact else 16777215)
-            self.paper_splitter.setMinimumHeight(700 if compact else 0)
+            self.paper_splitter.setMinimumHeight(520 if compact and stage!=2 else 0)
             for index,height in enumerate((190,230,240)):
                 self.paper_splitter.widget(index).setMinimumHeight(height if compact else 0)
 

@@ -75,7 +75,8 @@ class DesktopApplicationTests(unittest.TestCase):
                 self.window.run_button.click()
                 run.assert_called_once_with()
         self.window._navigate_route(10)
-        self.assertEqual(self.window.optical_workflow.tabText(self.window.optical_workflow.currentIndex()),'Simulation')
+        self.assertIs(self.window.study_navigation.source,self.window.photonic_bands_page.journey_bar)
+        self.assertEqual(self.window.study_navigation.current,self.window.photonic_bands_page.journey_bar._current)
         self.assertIn('Photonic',self.window.active_simulation_label.text())
         self.window._route_setup_action('research.overview')
         self.assertEqual(self.window.stack.currentIndex(),11)
@@ -341,48 +342,44 @@ class DesktopApplicationTests(unittest.TestCase):
         self.assertFalse(any('Laser' in label or 'PCSEL' in label for label,_,_ in self.window._tool_pages))
 
         for page in range(8):
-
             self.window.navigation.setCurrentRow(page)
-
             self.app.processEvents()
-
             self.assertTrue(self.window.sidebar.isHidden())
+            controller=self.window.study_navigation
+            if page in (5,6,7):
+                self.assertEqual(controller.current,-1)
+                self.assertTrue(controller.return_button.isVisible())
+            else:
+                self.assertGreaterEqual(controller.current,0)
 
-            expected_route=2 if page in (4,5) else page
-            self.assertEqual(self.window.optical_routes[self.window.optical_workflow.currentIndex()],2 if page==3 else expected_route)
-
-        self.window._navigate_route(0)
-        self.assertEqual([self.window.optical_workflow.tabText(i) for i in range(self.window.optical_workflow.count())],
-            ['Structure','Materials','Simulation','Results','Settings','Help'])
         for engine in (0,5,6):
             self.window._navigate_route(2,engine)
-            self.assertEqual([self.window.optical_workflow.tabText(i) for i in range(self.window.optical_workflow.count())],
-                ['Structure','Materials','Simulation','Results','Settings','Help'])
-            self.assertEqual(self.window.optical_routes,[0,1,2,9,6,7])
+            controller=self.window.study_navigation
+            self.assertEqual([self.window.optical_workflow.tabText(i).replace('&&','&')
+                for i in range(self.window.optical_workflow.count())],
+                [stage['title'] for stage in controller.source.stages])
+            self.assertEqual(self.window.optical_routes,list(range(len(controller.source.stages))))
+            self.assertFalse(controller.source.isVisible())
         self.window._navigate_route(9)
         self.assertIs(self.window.stack.currentWidget(),self.window.results_page)
-        self.assertEqual(self.window.optical_routes,[0,1,2,9,6,7])
+        self.assertEqual(self.window.study_navigation.current,5)
 
         for width in (640,1460):
-
             self.window.resize(width,800)
-
-            for label,route in [('Structure',0),('Materials',1),('Simulation',2),('Results',9),('Settings',6),('Help',7)]:
-                target=next(i for i in range(self.window.optical_workflow.count()) if self.window.optical_workflow.tabText(i)==label) if label!='Results' else None
-                if target is None:
-                    self.window._navigate_route(2,0)
-                    target=next(i for i in range(self.window.optical_workflow.count()) if self.window.optical_workflow.tabText(i)==label)
-                self.window.optical_workflow.setCurrentIndex(target)
-
+            self.window._navigate_route(2,0)
+            controller=self.window.study_navigation
+            for index in range(len(controller.source.stages)):
+                controller.request(index)
                 self.app.processEvents()
-
-                self.assertEqual(self.window.stack.currentIndex(),route)
-
+                self.assertEqual(self.window.stack.currentIndex(),2)
+                self.assertEqual(controller.source._current,index)
                 self.assertFalse(self.window.sidebar.isVisible())
-
                 self.assertFalse(self.window.workspace_tabs.isVisible())
-
-
+            for route in (6,7):
+                self.window._navigate_route(route)
+                self.assertEqual(controller.current,-1)
+                controller.return_to_study()
+                self.assertEqual(self.window.stack.currentIndex(),2)
 
     def test_redesigned_header_fits_compact_and_full_windows(self):
 

@@ -97,6 +97,23 @@ class NativeFigureTests(unittest.TestCase):
         self.assertEqual(values,[.25,.75,1.])
         self.assertEqual(native.tickStrings(values,1,.25),['quarter','three-quarter','one'])
 
+    def test_horizontal_fixed_path_labels_paint_at_both_range_endpoints(self):
+        distances = np.array([0., .5, 1., 1. + np.sqrt(.5)])
+        figure = Figure(); source = figure.subplots()
+        line, = source.plot(distances, [0., .3, .4, 0.])
+        source.set_xticks(distances, ['Γ', 'X', 'M', 'Γ'])
+        source.set_xlim(distances[0], distances[-1])
+        source.grid(True, alpha=.2)
+        for width in (520, 1400):
+            with self.subTest(width=width):
+                self.plot.resize(width, 440)
+                canvas = self.draw(figure)
+                native = canvas.plots[source].getAxis('bottom')
+                self.assertEqual(self.painted_axis_labels(native), ['Γ', 'X', 'M', 'Γ'])
+                record = next(row for row in canvas.data_records if row['source_artist'] is line)
+                np.testing.assert_array_equal(record['raw_x'], distances)
+                np.testing.assert_allclose(canvas.axis_views[source].viewRange()[0], distances[[0, -1]])
+
     def test_full_line_arrays_fraction_formatter_and_host_size_are_independent_of_paper(self):
         figure = Figure(figsize=(2, 9))
         axis = figure.subplots()

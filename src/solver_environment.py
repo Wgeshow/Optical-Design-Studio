@@ -172,12 +172,21 @@ def probe(engine, runtime, *, cancel=None):
     return dict(runtime)
 
 
-def saved_runtime(engine, root=None):
+def saved_runtime(engine, root=None, *, discovery_candidate=False):
     root = Path(root) if root is not None else root_directory()
     try:
         file = _owned_path(root, root/(engine+'.json'))
         value = json.loads(file.read_text(encoding='utf-8'))
-        if value.get('schema') == 1 and value.get('engine') == engine and value.get('root') == str(root.resolve()):
+        saved_root = value.get('root')
+        same_root = saved_root == str(root.resolve())
+        # MSIX file virtualization can leave a receipt in the real user folder
+        # with its old virtual root in metadata. Discovery may probe that
+        # existing runtime, but must never treat it as installer-owned or
+        # rewrite the receipt merely because its API works.
+        relocated_candidate = (discovery_candidate and isinstance(saved_root,str)
+                               and Path(saved_root).is_absolute())
+        if (value.get('schema') == 1 and value.get('engine') == engine
+                and (same_root or relocated_candidate) and isinstance(value.get('runtime'),dict)):
             return value['runtime']
     except (OSError, ValueError, KeyError, TypeError):
         pass
@@ -186,38 +195,53 @@ def saved_runtime(engine, root=None):
 
 def discover(engine, configured=None, *, root=None, cancel=None, progress=lambda text: None):
     """Probe known locations; never install into an environment found here."""
-    candidates = [configured or {}, saved_runtime(engine, root)]
-    if engine in WSL_PACKAGES:
-        if os.name == 'nt' and shutil.which(wsl_executable()):
-            try:
-                names = _run([wsl_executable(), '--list', '--quiet'], cancel=cancel, timeout=15).replace('\ufeff', '').splitlines()
-            except (OSError, RuntimeError, TimeoutError):
-                names = []
-            candidates.extend(dict(mode='wsl', distro=name.strip(), executable='mpb' if engine == 'mpb' else '/usr/bin/python3', timeout_s=86400.) for name in names if name.strip())
-            # Recover working app-owned environments even if Windows settings
-            # were reset or a different portable copy created the installation.
-            # This only probes discovered executables; it never modifies them.
-            if DISTRO in [name.strip() for name in names]:
-                suffix = 'mpb' if engine == 'mpb' else 'python'
-                script = 'for p in /opt/ods-solvers/*/bin/'+suffix+'; do if [ -x "$p" ]; then printf "%s\\n" "$p"; fi; done'
+    def candidates():
+        # Find installed solver prefers the last verified installation. Checking
+        # one specific selection remains the separate Check solver action.
+        yield saved_runtime(engine, root, discovery_candidate=True)
+        yield configured or {}
+        # Enumerating or starting another WSL distribution can be slow. Delay
+        # that work until both known locations have actually failed their probe.
+        if engine in WSL_PACKAGES:
+            if os.name == 'nt' and shutil.which(wsl_executable()):
+                progress('Looking for installed WSL distributions…')
                 try:
-                    found = _run([wsl_executable(), '--distribution', DISTRO, '--exec', '/bin/sh', '-c', script], cancel=cancel, timeout=15)
-                    candidates.extend(dict(mode='wsl', distro=DISTRO, executable=path, timeout_s=86400.)
-                        for path in found.splitlines() if path.startswith('/opt/ods-solvers/') and path.endswith('/bin/'+suffix))
+                    names = _run([wsl_executable(), '--list', '--quiet'], cancel=cancel, timeout=15).replace('\ufeff', '').splitlines()
                 except (OSError, RuntimeError, TimeoutError):
-                    pass
-        elif engine == 'mpb' and shutil.which('mpb'):
-            candidates.append(dict(mode='local', executable=shutil.which('mpb'), timeout_s=86400.))
-    elif not getattr(sys, 'frozen', False):
-        candidates.append(dict(mode='local', executable=sys.executable, module_paths=[], library_paths=[], timeout_s=86400.))
+                    names = []
+                yield from (dict(mode='wsl', distro=name.strip(), executable='mpb' if engine == 'mpb' else '/usr/bin/python3', timeout_s=86400.) for name in names if name.strip())
+                # Recover working app-owned environments even if Windows settings
+                # were reset or a different portable copy created the installation.
+                # This only probes discovered executables; it never modifies them.
+                if DISTRO in [name.strip() for name in names]:
+                    progress('Looking for installed '+engine+' environments in '+DISTRO+'…')
+                    suffix = 'mpb' if engine == 'mpb' else 'python'
+                    script = 'for p in /opt/ods-solvers/*/bin/'+suffix+'; do if [ -x "$p" ]; then printf "%s\\n" "$p"; fi; done'
+                    try:
+                        found = _run([wsl_executable(), '--distribution', DISTRO, '--exec', '/bin/sh', '-c', script], cancel=cancel, timeout=15)
+                        yield from (dict(mode='wsl', distro=DISTRO, executable=path, timeout_s=86400.)
+                            for path in found.splitlines() if path.startswith('/opt/ods-solvers/') and path.endswith('/bin/'+suffix))
+                    except (OSError, RuntimeError, TimeoutError):
+                        pass
+            elif engine == 'mpb' and shutil.which('mpb'):
+                yield dict(mode='local', executable=shutil.which('mpb'), timeout_s=86400.)
+        elif not getattr(sys, 'frozen', False):
+            yield dict(mode='local', executable=sys.executable, module_paths=[], library_paths=[], timeout_s=86400.)
     seen = set()
-    for runtime in candidates:
+    for runtime in candidates():
         _check_cancel(cancel)
         if not isinstance(runtime, dict) or not runtime.get('executable'):
             continue
         if getattr(sys, 'frozen', False) and os.path.normcase(runtime['executable']) == os.path.normcase(sys.executable):
             continue
-        signature = json.dumps(runtime, sort_keys=True)
+        identity = dict(mode='local',distro='Ubuntu',timeout_s=86400.,module_paths=[],library_paths=[])
+        identity.update(runtime)
+        if identity['mode']=='local':
+            identity['distro']=''
+            identity['executable']=os.path.normcase(identity['executable'])
+        try:identity['timeout_s']=float(identity['timeout_s'])
+        except (ValueError,TypeError):pass
+        signature = json.dumps(identity, sort_keys=True)
         if signature in seen:
             continue
         seen.add(signature)

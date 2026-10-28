@@ -272,6 +272,7 @@ class StructurePage(QWidget):
         self._selected = None
         self._region = None
         self._unit = 'nm'
+        self._layer_thickness_um = 0.
         self._refreshing = False
         self._snapshot = None
         self._lattice_snapshot = None
@@ -449,7 +450,8 @@ class StructurePage(QWidget):
         self.layer_material.setObjectName('layerMaterial')
         self.layer_material.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.layer_material.setMinimumContentsLength(14)
-        self.layer_thickness = _number(250, 0)
+        self.layer_thickness = _number(250, 0, decimals=12)
+        self.layer_thickness.valueChanged.connect(self._edit_layer_thickness)
         self.layer_thickness.setObjectName('layerThickness')
         form.addRow('Layer name', self.layer_name)
         form.addRow('Material', self.layer_material)
@@ -654,7 +656,11 @@ class StructurePage(QWidget):
         with QSignalBlocker(self.layer_material):
             self.layer_material.setCurrentIndex(self.layer_material.findData('current:' + str(layer['Material'])))
         factor = 1000 if self._unit == 'nm' else 1
-        self.layer_thickness.setValue(float(layer['Thickness_um']) * factor)
+        # Keep the source value separately: merely applying another property
+        # must not quantize a paper/imported layer to the display precision.
+        self._layer_thickness_um = float(layer['Thickness_um'])
+        with QSignalBlocker(self.layer_thickness):
+            self.layer_thickness.setValue(self._layer_thickness_um * factor)
         self.layer_thickness.setSuffix(' ' + self._unit)
         self.layer_thickness.setEnabled(not halfspace and not self.store.busy)
         self.layer_hint.setText('Semi-infinite medium: thickness stays zero.' if halfspace else
@@ -709,11 +715,18 @@ class StructurePage(QWidget):
         self.region_hint.setText('Circles use radius; ellipses use X/Y radii; rectangles use full X/Y widths. '
                                  'Select Air for an air hole. Regions repeat with the unit cell.')
 
+    def _edit_layer_thickness(self, value):
+        self._layer_thickness_um = value / self._display_factor()
+
     def _change_units(self, unit):
         if unit == self._unit:
             return
+        self.layer_thickness.interpretText()
         factor = .001 if unit == 'µm' else 1000.
-        for widget in (self.lattice_x, self.lattice_y, self.cut_y, self.layer_thickness,
+        with QSignalBlocker(self.layer_thickness):
+            self.layer_thickness.setValue(self._layer_thickness_um * (1000 if unit == 'nm' else 1))
+            self.layer_thickness.setSuffix(' ' + unit)
+        for widget in (self.lattice_x, self.lattice_y, self.cut_y,
                        self.region_x, self.region_y, self.region_sx, self.region_sy):
             with QSignalBlocker(widget):
                 widget.setValue(widget.value() * factor)
@@ -754,10 +767,11 @@ class StructurePage(QWidget):
         if self.store.busy:
             return
         try:
+            self.layer_thickness.interpretText()
             result = mutate_structure(self.store.context, self.store.materials, self.store.layers,
                                       self.store.patterns, self._selected, action,
                                       name=self.layer_name.text(), material=self.layer_material.currentData(),
-                                      thickness=self.layer_thickness.value(), unit=self._unit,
+                                      thickness=self._layer_thickness_um, unit='µm',
                                       start=self.repeat_start.currentData(), end=self.repeat_end.currentData(),
                                       count=self.repeat_count.value())
             old_selection = self._selected

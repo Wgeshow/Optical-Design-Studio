@@ -29,7 +29,7 @@ def main():
     print(f'Compiled {count} Python files; building both Windows executables.', flush=True)
     with (ROOT / 'build.log').open('w', encoding='utf-8') as log:
         result = subprocess.run([
-            sys.executable, '-m', 'PyInstaller', '--noconfirm',
+            sys.executable, '-m', 'PyInstaller', '--clean', '--noconfirm',
             '--distpath', str(destination), '--workpath', str(ROOT / 'work'),
             str(ROOT / 'OpticalDesignStudio.spec')], cwd=ROOT,
             stdout=log, stderr=subprocess.STDOUT)

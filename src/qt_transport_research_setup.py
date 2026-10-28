@@ -154,7 +154,7 @@ class TransportDevicePanel(QWidget):
         _, group, obj = self.objects[identity]
         self.selected_title.setText(item.text(0))
         props = [('material_id', 'Material', ''), ('thickness_um', 'Thickness', ' µm'),
-                 ('shape', 'Shape', ''), ('radius_um', 'Radius', ' µm'), ('voltage', 'Voltage', ' V'),
+                 ('shape', 'Shape', ''), ('radius_um', 'Radius', ' µm'), ('voltage_V', 'Base voltage', ' V'),
                  ('donor_cm3', 'Donors', ' cm⁻³'), ('acceptor_cm3', 'Acceptors', ' cm⁻³')]
         lines = [f'{title}: {obj[key]}{unit}' for key, title, unit in props if key in obj]
         if identity == 'device':
@@ -169,8 +169,7 @@ class TransportDevicePanel(QWidget):
         self.edit_object(self.current_id)
 
     def edit_object(self, identity):
-        self.workspace.diagnosticRequested.emit(dict(workspace='structure', section='device', field='device',
-            object_id=identity, message='Edit this simulation device object; return to the study to continue.'))
+        self.workspace.open_device_editor(identity)
 
     def _view_changed(self):
         self.canvas.mode = self.view_choice.currentData()
@@ -259,6 +258,12 @@ class TransportResearchWorkspace(StructuredStudyWorkspace):
         self.device_preview = self.device_panel.canvas
         self.contact_picker = self.device_panel.contact_picker
         domain.addWidget(self.device_panel, 1)
+        from qt_study_device_editor import StudyDeviceEditor
+        _, edit_layout = self.add_section('Edit device geometry', 'device_editor')
+        self.device_editor = StudyDeviceEditor(self)
+        self.device_editor.continue_requested.connect(lambda: self.study_flow.show_stage(1))
+        edit_layout.addWidget(self.device_editor, 1)
+        self._install_assignment_contexts()
         _, review = self.add_section('Review calculation', 'calculation_review')
         self.review_note = label('')
         review.addWidget(self.review_note)
@@ -267,9 +272,10 @@ class TransportResearchWorkspace(StructuredStudyWorkspace):
             'A completed job and agreement with a paper are reported separately.'))
         review.addStretch()
         self.study_flow = install_study_flow(self, [
-            ('Device', ['device_context', 'Bias', 'Device assignments']),
-            ('Physics', ['Materials', 'Contacts', 'Interfaces', 'Recombination', 'Heat', 'Tunnelling', 'Optical response']),
-            ('Calculate', ['Solver', 'Model', 'calculation_review', 'Review & files'])],
+            ('Device', ['device_context', 'device_editor', 'Bias', 'Device assignments']),
+            ('Contacts & materials', ['Materials', 'Contacts', 'Interfaces']),
+            ('Optional physics', ['Recombination', 'Heat', 'Tunnelling', 'Optical response']),
+            ('Accuracy & sources', ['Solver', 'Model', 'calculation_review', 'Review & files'])],
             subtitle='Set the device and bias, choose the physical models, then check and calculate.',
             details='\n\n'.join(capability.get('limitations', [])))
         self.tabs.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Ignored)
@@ -287,13 +293,60 @@ class TransportResearchWorkspace(StructuredStudyWorkspace):
         _, advanced = self.add_section('Advanced properties', 'advanced_properties')
         advanced.addWidget(label('Exact property editors retain every supported value. Normal setup uses the labeled forms in the study steps.'))
         for key, editor in self.structured.items():
-            replacement = SequenceField(editor, 'For example: 0, 0.1, 0.2') if key in ('biases_V', 'wavelengths_nm') else NamedPropertyForm(editor)
+            replacement = SequenceField(editor, 'For example: 0, 0.1, 0.2') if key in ('biases_V', 'wavelengths_nm') else NamedPropertyForm(
+                editor, array_types={'materials': 'text'} if key == 'interfaces' else None,
+                root_array_type='object' if key in ('interfaces', 'samples') else None,
+                nullable_numbers=('void_conductivity_W_mK', 'temperature_limit_K') if key == 'thermal' else ())
             if replace_structured_form(self, key, replacement):
                 self.input_forms[key] = replacement
                 advanced.addWidget(label(next((row.get('label', key) for row in self.schema if row['path'] == key), key), 'setupHeading'))
                 advanced.addWidget(editor)
                 editor.show()
         advanced.addStretch()
+
+    def open_device_editor(self, identity='device'):
+        if not self._is_active_document() or not hasattr(self, 'device_editor'):
+            return False
+        self.select_section('device_editor')
+        return self.device_editor.open_editor(identity)
+
+    def _install_assignment_contexts(self):
+        """Keep typed law editors compact beside their actual finite geometry."""
+        from qt_custom_device import DeviceCanvas
+        for key, form in self.input_forms.items():
+            if not isinstance(form, NamedPropertyForm):
+                continue
+            canvas = DeviceCanvas('3d'); canvas.setMinimumSize(210, 260)
+            canvas.object_selected.connect(lambda identity, group=key: self._select_law_geometry(group, identity))
+            form.assignment_canvas = canvas
+            form.splitter.insertWidget(1, canvas)
+            scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(form.panel)
+            scroll.setMinimumWidth(290); scroll.setMaximumWidth(470)
+            form.assignment_scroll = scroll
+            form.splitter.insertWidget(2, scroll)
+            form.splitter.setStretchFactor(1, 3); form.splitter.setStretchFactor(2, 2)
+            form.splitter.setSizes([170, 550, 400])
+            form.form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
+            form.form.setProperty('studyAlwaysStacked', True)
+
+    def _select_law_geometry(self, key, identity):
+        if not self._is_active_document():
+            return False
+        form=self.input_forms[key]
+        device=self.store.device or {}
+        obj=next((row for group in ('layers','shapes','contacts','doping_regions') for row in device.get(group,[]) if row['id']==identity),{})
+        material=obj.get('material_id')
+        if not material:
+            layer=next((row for row in device.get('layers',[]) if row['id']==obj.get('layer_id')), {})
+            material=layer.get('material_id','')
+        prefix={'thermal':'thermal.conductivity','temperature_feedback':'temperature_feedback.temperature_models',
+                'high_field_optics':'high_field_optics.materials','nonlocal_tunnelling':'nonlocal_tunnelling.materials'}.get(key,key)
+        target=identity if key=='contacts' else material
+        form.assignment_canvas.set_device(device,identity)
+        if target and form.open_field(prefix+'.'+target,target):
+            return True
+        self.status.setText('Selected '+str(obj.get('name',identity))+'. Assign its optional model fields explicitly in this inspector; no coefficients are inferred.')
+        return False
 
     def _refresh_forms(self):
         for form in self.input_forms.values():
@@ -312,6 +365,21 @@ class TransportResearchWorkspace(StructuredStudyWorkspace):
 
     def create_model_fields(self, key):
         super().create_model_fields(key)
+        if key == 'thermal':
+            # These two supported coefficients are genuinely optional; the
+            # generic blank-number template must not make them mandatory.
+            editor = self.structured[key]
+            blocked = editor.tree.blockSignals(True)
+            try:
+                root = editor.tree.topLevelItem(0)
+                for index in range(root.childCount()):
+                    item = root.child(index)
+                    if item.text(0) in ('void_conductivity_W_mK', 'temperature_limit_K') and not item.text(1).strip():
+                        item.setData(0, Qt.ItemDataRole.UserRole, 'null')
+                        item.setText(2, 'null')
+            finally:
+                editor.tree.blockSignals(blocked)
+            editor.changed.emit()
         self._refresh_forms()
 
     def refresh_context(self, *args):
@@ -322,6 +390,9 @@ class TransportResearchWorkspace(StructuredStudyWorkspace):
         layers = [row for row in device.get('layers', []) if row.get('enabled', True)]
         contacts = [row for row in device.get('contacts', []) if row.get('enabled', True)]
         self.device_panel.refresh(device)
+        for form in self.input_forms.values():
+            if hasattr(form,'assignment_canvas'):
+                form.assignment_canvas.set_device(device,form.assignment_canvas.selected)
         self.device_note.setText(str(len(layers))+' enabled layers · '+str(len(contacts))+' enabled contacts · simulation device')
         self.contact_picker.blockSignals(True)
         self.contact_picker.clear()
@@ -340,6 +411,8 @@ class TransportResearchWorkspace(StructuredStudyWorkspace):
 
     def open_diagnostic(self, target):
         field = target.get('field', '').removeprefix('settings.')
+        if field == 'device' and hasattr(self, 'device_editor'):
+            return self.open_device_editor(target.get('object_id') or 'device')
         root = field.split('.')[0]
         form = self.input_forms.get(root)
         if form is not None:
@@ -365,6 +438,10 @@ class TransportResearchWorkspace(StructuredStudyWorkspace):
         if hasattr(self, 'study_flow'): self.study_flow.adapt_layout()
         if hasattr(self, 'device_panel'): self.device_panel.adapt_layout()
         for form in self.input_forms.values():
+            if hasattr(form, 'assignment_canvas'):
+                compact=self.width()<1000
+                form.splitter.setOrientation(Qt.Orientation.Vertical if compact else Qt.Orientation.Horizontal)
+                form.assignment_scroll.setMaximumWidth(16777215 if compact else 470)
             if hasattr(form, 'band_preview'):
                 compact = self.width() < 1100
                 preview = form.preview_choice.currentIndex() == 1
@@ -440,8 +517,8 @@ class HighFieldOpticsWorkspace(TransportResearchWorkspace):
         review.addWidget(button('Check inputs', self.validate_inputs))
         review.addStretch()
         self.study_flow = install_study_flow(self, [
-            ('Material', ['Material']), ('States', ['States']),
-            ('Calculate', ['Spectrum', 'Accuracy', 'calculation_review', 'Review & files'])],
+            ('Material', ['Material']), ('States', ['States']), ('Spectrum', ['Spectrum']),
+            ('Accuracy & reference', ['Accuracy', 'calculation_review', 'Review & files'])],
             subtitle='Define the material, add field and carrier states, then calculate the optical response.',
             details='\n\n'.join(capability.get('limitations', [])))
         for form_layout in self.findChildren(QFormLayout):

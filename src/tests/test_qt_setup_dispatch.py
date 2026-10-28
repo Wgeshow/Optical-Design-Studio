@@ -93,17 +93,23 @@ class NativeSetupDispatchTests(unittest.TestCase):
                 if mode!='optical':
                     self.assertEqual(start.call_args.args[1]['optical_enabled'],mode=='coupled')
 
-    def test_user_mode_buttons_roundtrip_and_run_dispatch_stay_aligned(self):
+    def test_workspace_menu_roundtrip_and_visible_run_stage_dispatch_stay_aligned(self):
+        from PyQt6.QtGui import QAction
+        from qt_simulation_picker import SIMULATIONS
         self.open_mode('optical')
-        current=self.window.optical_setup
         for mode,index in (('electrical',5),('coupled',6),('optical',0)):
-            QTest.mouseClick(current.mode_buttons[mode],Qt.MouseButton.LeftButton)
+            title=next(title for identity,title,_,_ in SIMULATIONS if identity==mode)
+            action=next(action for action in self.window.studies_menu.findChildren(QAction)
+                        if action.text().replace('&&','&')==title)
+            action.trigger()
             APP.processEvents()
             current={0:self.window.optical_setup,5:self.window.electrical_page,6:self.window.coupled_page}[index]
             self.assertEqual(self.window.simulation_engines.currentIndex(),index)
             self.assertEqual(current.current_mode,mode)
+            current.setup_flow.show_stage(4); APP.processEvents()
+            self.assertTrue(current.setup_flow.run_button.isVisible())
             with patch.object(self.store,'start_run') as start:
-                QTest.mouseClick(self.window.run_button,Qt.MouseButton.LeftButton)
+                QTest.mouseClick(current.setup_flow.run_button,Qt.MouseButton.LeftButton)
             self.assertEqual(start.call_count,1)
             self.assertEqual(start.call_args.args[0],'simulation' if mode=='optical' else mode)
 
@@ -227,9 +233,13 @@ class NativeSetupDispatchTests(unittest.TestCase):
             load.assert_called_once_with(str(directory))
 
     def test_named_tool_routes_select_exact_nested_tabs(self):
+        # Compare navigation within the sweep's own document, not against the
+        # previously active optical fixture's different structure and bounds.
+        self.window._open_simulation_choice('tools.sweep');APP.processEvents()
+        sweep_options=copy.deepcopy(self.window.pages['Optimize'].peak_options())
         expected=[
             ('tools.sweep.target.sampling','Optimize','target_advanced_tabs',0),
-            ('tools.sweep.explore.learning','Optimize','general_detail_tabs',2),
+            ('tools.sweep.explore.learning','Optimize','general_detail_tabs',1),
             ('tools.sweep.explore.matches','Optimize','general_result_tabs',2),
             ('tools.ai.training','AI Search','setup_tabs',1),
             ('tools.ai.rta','AI Search','result_tabs',2),
@@ -247,6 +257,9 @@ class NativeSetupDispatchTests(unittest.TestCase):
                     widget=getattr(widget,part)
                 self.assertEqual(widget.currentIndex(),index)
                 self.assertTrue(page.isVisible())
+                if route=='tools.sweep.explore.learning':
+                    self.assertFalse(widget.isTabVisible(2))
+                    self.assertEqual(page.peak_options(),sweep_options)
         self.window._route_setup_action('tools.index_shift.shifts');APP.processEvents()
         self.assertEqual(self.window.index_shift_page.result_tabs.currentIndex(),2)
         self.assertTrue(self.window.index_shift_page.isVisible())

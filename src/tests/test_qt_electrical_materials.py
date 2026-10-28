@@ -9,7 +9,7 @@ from unittest.mock import patch
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from PyQt6.QtWidgets import QApplication, QDialog
 
-from electrical_material_library import builtin_materials, export_materials, lookup_material
+from electrical_material_library import builtin_materials, export_materials, lookup_material, new_material
 from qt_electrical_materials import ElectricalMaterialDialog, ElectricalMaterialManagerDialog
 
 APP = QApplication.instance() or QApplication([])
@@ -54,6 +54,46 @@ class ElectricalMaterialDialogTests(unittest.TestCase):
         self.assertEqual(original, before)
         edited['properties']['epsilon_r'] = 999
         self.assertEqual(dialog.material()['properties']['epsilon_r'], 15.)
+
+    def test_new_dialog_starts_blank_while_edit_and_duplicate_keep_explicit_values(self):
+        originals = builtin_materials()
+        before = deepcopy(originals)
+        fresh = ElectricalMaterialDialog()
+        self.assertFalse(fresh.ident.isReadOnly())
+        self.assertTrue(all(control.text() == '' for control in fresh.controls.values()))
+        self.assertEqual(fresh.optical_material.text(), '')
+        self.assertEqual(fresh.sources.toPlainText(), '[]')
+        self.assertIn('blank', fresh.status.text())
+        fresh.accept()
+        self.assertNotEqual(fresh.result(), QDialog.DialogCode.Accepted)
+        fresh.kind.setCurrentIndex(fresh.kind.findData('dielectric'))
+        fresh.controls['epsilon_r'].setText('5')
+        fresh.accept()
+        self.assertEqual(fresh.result(), QDialog.DialogCode.Accepted)
+        self.assertEqual(fresh.material()['properties'], {'epsilon_r': 5.})
+        self.assertEqual(fresh.material()['optical_material_name'], '')
+        for material in (originals[0], new_material('Explicit duplicate', originals[0])):
+            dialog = ElectricalMaterialDialog(material)
+            self.assertEqual(dialog.optical_material.text(), material['optical_material_name'])
+            for key, value in material['properties'].items():
+                self.assertEqual(dialog.controls[key].text(), f'{value:.12g}')
+        self.assertEqual(originals, before)
+
+    def test_add_actions_pass_fresh_dialog_sentinel_while_duplicate_passes_source(self):
+        from qt_electrical_material_catalog import ElectricalMaterialCatalog
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        for owner in (ElectricalMaterialManagerDialog, ElectricalMaterialCatalog):
+            fake = SimpleNamespace(_edit=Mock(), selected_material_id=lambda: 'gaas', _library=builtin_materials)
+            owner.add_material(fake)
+            fake._edit.assert_called_once_with(None)
+            fake._edit.reset_mock()
+            owner.duplicate_material(fake)
+            duplicate = fake._edit.call_args.args[0]
+            source = lookup_material(builtin_materials(), 'gaas')
+            self.assertNotEqual(duplicate['id'], source['id'])
+            self.assertEqual(duplicate['properties'], source['properties'])
+            self.assertEqual(duplicate['optical_material_name'], source['optical_material_name'])
 
     def test_alloy_composition_updates_reference_and_preserves_manual_values(self):
         dialog = ElectricalMaterialDialog(lookup_material(builtin_materials(), 'algaas'))

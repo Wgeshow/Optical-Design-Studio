@@ -84,6 +84,44 @@ def interaction_surface(faces, target_faces=1800):
     return reduced
 
 
+def surface_values(xyz, values, faces):
+    """Interpolate saved intensity at display triangle centres within one layer.
+
+    Domain caps can have intensity greater than the isosurface cutoff. Coloring
+    every triangle with the cutoff incorrectly makes a uniform high field dark.
+    This samples only the saved rectilinear layer; it adds no simulated detail.
+    """
+    xyz = np.asarray(xyz, dtype=float)
+    values = np.asarray(values, dtype=float)
+    faces = np.asarray(faces, dtype=float).reshape(-1, 3, 3)
+    if not len(faces):
+        return np.empty(0)
+    axes = [np.unique(xyz[:, i]) for i in range(3)]
+    shape = tuple(len(axis) for axis in axes)
+    if min(shape) < 2 or np.prod(shape) != len(xyz):
+        raise ValueError('Surface colors require a complete 3D grid in each layer.')
+    indices = tuple(np.searchsorted(axes[i], xyz[:, i]) for i in range(3))
+    if len(np.unique(np.ravel_multi_index(indices, shape))) != len(xyz):
+        raise ValueError('Surface colors cannot use duplicate volume samples.')
+    volume = np.empty(shape)
+    volume[indices] = values
+    centres = faces.mean(axis=1)
+    lower, weights = [], []
+    for i, axis in enumerate(axes):
+        coordinate = np.clip(centres[:, i], axis[0], axis[-1])
+        index = np.clip(np.searchsorted(axis, coordinate, side='right') - 1, 0, len(axis) - 2)
+        lower.append(index)
+        weights.append((coordinate - axis[index]) / (axis[index + 1] - axis[index]))
+    result = np.zeros(len(faces))
+    for x in (0, 1):
+        for y in (0, 1):
+            for z in (0, 1):
+                corner = (x, y, z)
+                weight = np.prod([weights[i] if corner[i] else 1. - weights[i] for i in range(3)], axis=0)
+                result += weight * volume[tuple(lower[i] + corner[i] for i in range(3))]
+    return result
+
+
 def field_surface(xyz, values, cutoff, resolution=24):
     """Piecewise-linear isosurface, capped at the sampled domain, using NumPy.
 

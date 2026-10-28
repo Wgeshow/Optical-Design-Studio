@@ -14,8 +14,8 @@ BUILD = Path(__file__).resolve().parent
 ROOT = BUILD.parent
 SRC = BUILD/'source'
 APP = BUILD/'dist'/'Optical Design Studio'
-OUT = ROOT/'GitHub-Release-1.4.0-alpha.2'
-VERSION = '1.4.0-alpha.2'
+OUT = ROOT/'GitHub-Release-1.4.0-alpha.3'
+VERSION = '1.4.0-alpha.3'
 REQUIRED_FROZEN_MODULES = ('field_volume', 'qt_field_volume', 'qt_native_field_volume',
     'qt_native_figure', 'qt_native_plot', 'qt_structure_3d', 'qt_lattice_diagram',
     'qt_windows_glass', 'qt_help', 'qt_materials', 'qt_core', 'data_library',
@@ -37,6 +37,8 @@ REQUIRED_FROZEN_MODULES = ('field_volume', 'qt_field_volume', 'qt_native_field_v
 FORBIDDEN_FILES = {'user data', 'data_library', 'runs', '.git', '.env',
     'portable_settings.json', 'desktop_preferences.ini', 'session.json', 'desktop_session.json'}
 
+
+REQUIRED_FROZEN_MODULES += ('ai_campaign_storage', 'optical_ui_scope', 'pcsel_paper_studies', 'qt_geometry_history', 'qt_journey', 'qt_optical_domain_canvas', 'qt_optical_journey', 'qt_pcsel_paper', 'qt_research_journey', 'qt_study_device_editor', 'qt_study_navigation')
 
 def verify_stage():
     stage = json.loads((BUILD/'stage-manifest.json').read_text(encoding='utf-8'))
@@ -213,7 +215,7 @@ def prepare_payload(stage, tests, report=None):
                                 'csv_files': stage['help']['scientific_csv_files'], 'metadata_paths_rebased': True},
         'python_installation_required': False,
         'public_payload': 'Application, dependency runtime, public Silicon tutorial, guides, licenses and corresponding source. Empty user library.',
-        'archive_integrity': 'verified after ZIP creation in VALIDATION.json', 'published': False}
+        'archive_integrity': 'verified after archive creation in VALIDATION.json', 'published': False}
     write_json(APP/'BUILD_VERIFICATION.json', validation)
     return validation
 

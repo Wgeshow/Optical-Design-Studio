@@ -11,7 +11,7 @@ import uuid
 
 import numpy as np
 import pandas as pd
-from PyQt6.QtCore import QThread, Qt, QUrl, pyqtSignal
+from PyQt6.QtCore import QThread, Qt, QUrl, QSignalBlocker, pyqtSignal
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox,
     QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QProgressBar, QPushButton,
@@ -388,13 +388,13 @@ class FDTDPage(QWidget):
         layout.addWidget(note)
         note.hide()
         self.controls = dict(
-            dimensions=QComboBox(), resolution=integer(30, 5, 1000),
+            dimensions=QComboBox(), resolution=integer(30, 5, 1000), max_cells=integer(30000000, 100, 100000000),
             wavelength_min_nm=number(1200, .001), wavelength_max_nm=number(1800, .001),
             frequency_points=integer(101, 2, 2001), polarization=QComboBox(),
             pml_um=number(1., .001), padding_um=number(1., .001),
             run_after_sources=number(200., 1., 1e7), courant=number(.5, .001, .5),
             section_y_um=number(0.), decay_by=number(1e-7, 1e-12, .1, 12),
-            fit_materials=QCheckBox('Fit material dispersion'),
+            fit_materials=QCheckBox('Fit material dispersion'), fit_tolerance=number(.05, .000001, .1, 6),
             save_fields=QCheckBox('Save XZ field map'))
         self.controls['save_fields'].setToolTip('Save the centre-frequency XZ field map.')
         self.controls['dimensions'].addItem('2D · XZ section (extruded along Y)', 2)
@@ -406,6 +406,19 @@ class FDTDPage(QWidget):
         self.controls['dimensions'].currentIndexChanged.connect(lambda: self.controls['section_y_um'].setEnabled(self.controls['dimensions'].currentData()==2))
         left = QWidget()
         controls_layout = QVBoxLayout(left)
+        self.exterior_group = QGroupBox('Incident and exit media')
+        exterior_form = QFormLayout(self.exterior_group)
+        self.exterior_controls = {}
+        for side, label in [('incident', 'Incident medium'), ('exit', 'Exit medium')]:
+            control = QComboBox()
+            control.setAccessibleName('Meep '+label.lower())
+            control.currentIndexChanged.connect(lambda _, side=side: self._set_exterior(side))
+            self.exterior_controls[side] = control
+            exterior_form.addRow(label, control)
+        controls_layout.addWidget(self.exterior_group)
+        if hasattr(store, 'changed'):
+            store.changed.connect(self._refresh_exterior)
+        self._refresh_exterior()
         self.input_groups = []
         for group_title, rows in [
             ('Domain & excitation', [('View', 'dimensions'), ('Resolution (cells/µm)', 'resolution'), ('Section Y (µm)', 'section_y_um'), ('Polarization', 'polarization')]),
@@ -419,7 +432,7 @@ class FDTDPage(QWidget):
             controls_layout.addWidget(group)
             self.input_groups.append(group)
         controls_layout.addWidget(self.controls['fit_materials'])
-        fit_note = QLabel('Fits must stay within 5% relative permittivity error over the selected band. Complex constant materials need tabulated n,k data. Incident and exit media must be lossless constants.')
+        fit_note = QLabel('Fits must satisfy the selected relative permittivity error tolerance over the selected band. Complex constant materials need tabulated n,k data. Incident and exit media must be lossless constants.')
         fit_note.setWordWrap(True)
         self.controls['fit_materials'].setToolTip(fit_note.text());fit_note.hide()
         controls_layout.addWidget(fit_note)
@@ -511,9 +524,10 @@ class FDTDPage(QWidget):
         load_button.clicked.connect(self.load_results)
         recent_layout.addWidget(load_button)
         from qt_result_export import export_frame
-        export_button=QPushButton('Export spectrum CSV…')
-        export_button.clicked.connect(lambda:export_frame(self,self.result_frame,self.status,'meep-spectrum.csv'))
-        recent_layout.addWidget(export_button)
+        self.export_button=QPushButton('Export spectrum CSV…')
+        self.export_button.clicked.connect(lambda:export_frame(self,self.result_frame,self.status,'meep-spectrum.csv'))
+        self.export_button.setEnabled(False)
+        recent_layout.addWidget(self.export_button)
         store.library_changed.connect(self.refresh_recent)
         self.refresh_recent()
         store.busy_changed.connect(self._busy)
@@ -541,6 +555,7 @@ class FDTDPage(QWidget):
         self.workbench.set_step_targets(self.input_groups)
         layout.insertWidget(0, self.workbench, 1)
         splitter.hide()
+        self._clear_result()
 
     def _restore(self):
         self._restoring=True
@@ -565,6 +580,37 @@ class FDTDPage(QWidget):
         try:self.store.save_search('fdtd',self.options())
         except ValueError:pass
 
+    def apply_setup_preset(self, payload):
+        """Import the selected solver's options without copying geometry or S4."""
+        if self.store.busy or (getattr(self.store,'study_navigation_enabled',False) and self.store.active_study!='fdtd'):
+            raise ValueError('Open the idle Meep study before importing its setup.')
+        from optical_ui_scope import meep_preset_options
+        options=meep_preset_options(payload)
+        self.store.save_search('fdtd',options)
+        self._restore()
+        self.status.setText('Meep setup imported. This study’s geometry and other solver settings were retained.')
+        return options
+
+    def load_setup_preset(self):
+        filename,_=QFileDialog.getOpenFileName(self,'Load Meep setup','','Simulation setup (*.json)')
+        if not filename:return
+        try:
+            self.apply_setup_preset(json.loads(Path(filename).read_text(encoding='utf-8')))
+        except (ValueError,TypeError,KeyError,OSError) as exc:
+            self.status.setText('Could not load Meep setup: '+str(exc))
+
+    def save_setup_preset(self):
+        try:
+            options=self.options()
+            filename,_=QFileDialog.getSaveFileName(self,'Save Meep setup','meep-setup.json','Simulation setup (*.json)')
+            if not filename:return
+            payload=dict(schema_version=1,kind='ods_simulation_setup',scope='optical',fdtd=options,
+                         values={'ui.optical.engine':'meep'})
+            Path(filename).write_text(json.dumps(payload,indent=2),encoding='utf-8')
+            self.status.setText('Saved Meep parameters. Save project to include device geometry and materials.')
+        except (ValueError,TypeError,KeyError,OSError) as exc:
+            self.status.setText('Could not save Meep setup: '+str(exc))
+
     def options(self):
         return validate_options({key: control.currentData() if isinstance(control, QComboBox)
             else control.isChecked() if isinstance(control, QCheckBox) else control.value()
@@ -583,6 +629,36 @@ class FDTDPage(QWidget):
     def _busy(self, busy):
         self.start_button.setEnabled(not busy and self._runtime_available is not False)
         self.stop_button.setEnabled(busy and self._active)
+        self._refresh_exterior()
+
+    def _refresh_exterior(self, *_):
+        if not hasattr(self.store, 'materials') or not hasattr(self.store, 'layers') or len(self.store.layers) < 2:
+            self.exterior_group.setEnabled(False)
+            return
+        current = not getattr(self.store, 'study_navigation_enabled', False) or self.store.active_study == 'fdtd'
+        self.exterior_group.setEnabled(current and not self.store.busy)
+        if not current:
+            return
+        names = list(self.store.materials['Name'])
+        for side, control in self.exterior_controls.items():
+            with QSignalBlocker(control):
+                selected = self.store.layers.iloc[0 if side == 'incident' else -1]['Material']
+                control.clear()
+                for name in names:
+                    control.addItem(name, name)
+                control.setCurrentIndex(control.findData(selected))
+
+    def _set_exterior(self, side):
+        if self.store.busy or (getattr(self.store, 'study_navigation_enabled', False) and self.store.active_study != 'fdtd'):
+            return
+        material = self.exterior_controls[side].currentData()
+        if material is None:
+            return
+        try:
+            self.store.set_optical_exterior_material(side, material)
+        except Exception as exc:
+            self.status.setText('Could not change Meep exterior medium: '+str(exc))
+            self._refresh_exterior()
 
     def refresh_runtime(self, result):
         """Receive verified setup results without importing Meep in the GUI."""
@@ -667,22 +743,31 @@ class FDTDPage(QWidget):
         self.peak_summary.setText(f'Highest sampled {name}: {100 * float(best[key]):.7g}%{location} (sample {position + 1}).')
         self.samples.selectRow(position)
 
+    def _clear_result(self):
+        self.directory = None
+        self.result_frame = pd.DataFrame()
+        self.samples.clear()
+        self.samples.setRowCount(0)
+        self.samples.setColumnCount(0)
+        self.plot.clear()
+        self.field_plot.clear()
+        for value in self.power_values.values():
+            value.setText('—')
+        self.peak_summary.setText('No Meep result data is loaded.')
+        self.peak_quantity.setEnabled(False)
+        self.export_button.setEnabled(False)
+
     def _display_result(self, event):
+        self._clear_result()
         self.workbench.show_results()
         try:
-            self.directory = Path(event['directory'])
-            from qt_compute import _read_csv
-            frame = _read_csv(Path(event.get('output') or self.directory/'results.csv'))
-            self.result_frame = frame
-            fill_table(self.samples, frame)
-            self.update_peak()
-            self.field_plot.clear()
+            directory = Path(event['directory'])
+            frame = pd.read_csv(Path(event.get('output') or directory/'results.csv'))
+            if frame.empty or 'wavelength_nm' not in frame or not {'R', 'T', 'A'}.intersection(frame.columns):
+                raise ValueError('Expected wavelength_nm and at least one R, T or A column with saved samples.')
             info = event.get('info', {})
-            self.log.appendPlainText(json.dumps(info, indent=2))
-            warnings=info.get('warnings', [])
-            self.status.setText(('Saved simulation loaded. ' if event.get('loaded') else 'Completed. ') +
-                                ('Warnings: ' + ' '.join(warnings) if warnings else ''))
-            field_path = self.directory/'fdtd_fields.npz'
+            figure = None
+            field_path = directory/'fdtd_fields.npz'
             if field_path.exists():
                 from matplotlib.figure import Figure
                 with np.load(field_path, allow_pickle=False) as data:
@@ -693,9 +778,24 @@ class FDTDPage(QWidget):
                     figure.colorbar(image, ax=axis, label='Raw |DFT E|² (not incident-normalized)')
                     axis.set(xlabel='x (µm)', ylabel='Depth from stack centre (µm)', title=f'XZ · {float(data["wavelength_nm"]):g} nm')
                     axis.invert_yaxis()
-                    self.field_plot.draw_figure(figure)
+            self.directory = directory
+            self.result_frame = frame
+            fill_table(self.samples, frame)
+            self.update_peak()
+            if figure is not None:
+                self.field_plot.draw_figure(figure)
+            self.peak_quantity.setEnabled(True)
+            self.export_button.setEnabled(True)
+            self.log.appendPlainText(json.dumps(info, indent=2))
+            warnings=info.get('warnings', [])
+            self.status.setText(('Saved simulation loaded. ' if event.get('loaded') else 'Completed. ') +
+                                ('Warnings: ' + ' '.join(warnings) if warnings else ''))
+            return True
         except Exception as exc:
-            self.status.setText('Result saved; could not render it: '+str(exc))
+            self._clear_result()
+            self.status.setText(('Could not load saved Meep results: ' if event.get('loaded')
+                                else 'Could not display Meep results: ')+str(exc))
+            return False
 
     def open_results(self):
         if self.directory:

@@ -46,6 +46,10 @@ class GlobalWorkspaceTests(unittest.TestCase):
             dialog=APP.activeModalWidget()
             self.assertIsInstance(dialog,ElectricalMaterialDialog)
             dialog.name.setText(name)
+            if not dialog.ident.isReadOnly():
+                # This fixture authors an epsilon-only dielectric, not a
+                # semiconductor silently populated by the old GaAs seed.
+                dialog.kind.setCurrentIndex(dialog.kind.findData('dielectric'))
             if epsilon is not None:dialog.controls['epsilon_r'].setText(str(epsilon))
             dialog.reject() if reject else dialog.accept()
         QTimer.singleShot(0,edit)

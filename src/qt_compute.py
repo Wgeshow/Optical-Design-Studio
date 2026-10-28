@@ -1077,6 +1077,14 @@ class SimulationPage(_RunPage):
         self.status.setText('Completed. ' + ('Warnings: '+' '.join(warnings)+' ' if warnings else '') + f' Saved to {self.directory}')
 
 
+def sweep_analysis_display(frame):
+    """Prioritize the requested result without changing saved/exported data."""
+    preferred=('design_id','response','feature','Q_estimate','response_value',
+               'wavelength_nm','fwhm_nm','linewidth_status','status','reason','angle_deg')
+    front=[key for key in preferred if key in frame.columns]
+    return frame.loc[:,front+[key for key in frame.columns if key not in front]]
+
+
 class OptimizePage(_RunPage):
     routeRequested=pyqtSignal(str)
     def __init__(self, store, parent=None):
@@ -1409,7 +1417,7 @@ class OptimizePage(_RunPage):
                 direction=self.grid_direction.currentData(), metric=self.grid_metric.currentData(),
                 threshold=self.grid_threshold.value() if self.grid_use_threshold.isChecked() else None)
             self.grid_analysis_frame = pd.DataFrame(matches)
-            fill_table(self.peak_feasible if q else self.peak_matches, self.grid_analysis_frame)
+            fill_table(self.peak_feasible if q else self.peak_matches, sweep_analysis_display(self.grid_analysis_frame))
             self.general_result_tabs.setCurrentIndex(1 if q else 2)
             self.grid_analysis_status.setText(f'{len(matches):,} matches in saved data. ' +
                 ('Q includes resolved peaks and dips; unresolved linewidths have no Q. Check wavelength/basis convergence.' if q else
@@ -1839,7 +1847,7 @@ class FieldsPage(_RunPage):
         self.workbench = StudyWorkbench(store, 'Optical fields',
             ['Device & excitation', 'Field sampling', 'Calculate'], left, center,
             edit_geometry=lambda: self.routeRequested.emit('structure.original'),
-            preview_note='Shared optical unit cell. Field maps appear only after a calculation or when saved field data is loaded.')
+            preview_note='Current study optical unit cell. Field maps appear only after a calculation or when saved field data is loaded.')
         self.workbench.add_parameter_tab(right, 'Compare & export')
         self.workbench.set_step_targets([inputs, inputs, status_box])
         self.layout_.insertWidget(0, self.workbench, 1)

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import zipfile
+from copy import deepcopy
 import sys
 import uuid
 from pathlib import Path
@@ -221,21 +223,70 @@ class TransportResultsPanel(ResearchResultsPanel):
 
     def load_state(self, *args):
         self.state = None
+        self.state_plot.clear()
+        self.state_note.setText('This run has no saved transport field or band states.')
+        with QSignalBlocker(self.section):
+            self.section.setRange(0, 0)
+        self.section.setEnabled(False)
+        for index in range(self.quantity.count()):
+            self.quantity.model().item(index).setEnabled(False)
         path = self.states.currentData()
         if not path:
             return
         try:
             with np.load(path, allow_pickle=False) as data:
-                self.state = {key: data[key].copy() for key in data.files}
-            self.section.setRange(0, len(self.state['y_um'])-1)
+                state = {key: data[key].copy() for key in data.files}
+            for key in ('x_um', 'y_um'):
+                values = np.asarray(state[key], dtype=float)
+                if (values.ndim != 1 or not len(values) or not np.isfinite(values).all()
+                        or np.any(np.diff(values) <= 0)):
+                    raise ValueError(key+' must contain finite increasing coordinates.')
+                state[key] = values
+            voltage = np.asarray(state['voltage_V'], dtype=float)
+            if voltage.ndim != 0 or not np.isfinite(voltage):
+                raise ValueError('Saved bias must be one finite voltage.')
+            shape = (len(state['y_um']), len(state['x_um']))
+            for index in range(1, self.quantity.count()):
+                key = self.quantity.itemData(index)
+                if key in state:
+                    values = np.asarray(state[key], dtype=float)
+                    if values.shape != shape:
+                        raise ValueError('Saved '+key+' does not match the x/y coordinates.')
+                    state[key] = values
+            # Commit only a complete, shape-checked state. A failed load must
+            # never leave a prior run's field or a partially loaded archive.
+            self.state = state
+            available = []
+            for index in range(self.quantity.count()):
+                key = self.quantity.itemData(index)
+                exists = (all(name in state for name in ('conduction_band_eV', 'valence_band_eV',
+                    'electron_quasi_fermi_eV', 'hole_quasi_fermi_eV')) if key == '__bands__' else key in state)
+                self.quantity.model().item(index).setEnabled(exists)
+                if exists: available.append(index)
+            with QSignalBlocker(self.quantity):
+                if self.quantity.currentIndex() not in available:
+                    self.quantity.setCurrentIndex(available[0] if available else -1)
+            with QSignalBlocker(self.section):
+                self.section.setRange(0, shape[0]-1)
+            self.section.setEnabled(shape[0] > 1)
             self.draw_state()
-        except (OSError, ValueError, KeyError) as exc:
+        except (OSError, ValueError, KeyError, EOFError, zipfile.BadZipFile) as exc:
+            self.state = None
+            self.state_plot.clear()
             self.state_note.setText('Cannot load saved state: '+str(exc))
 
     def draw_state(self, *args):
         if self.state is None:
             return
         state, key, section = self.state, self.quantity.currentData(), self.section.value()
+        self.state_plot.clear()
+        if key is None or (key != '__bands__' and key not in state):
+            self.state_note.setText('The selected quantity was not saved in this bias state.')
+            return
+        if key == '__bands__' and not all(name in state for name in ('conduction_band_eV', 'valence_band_eV',
+                'electron_quasi_fermi_eV', 'hole_quasi_fermi_eV')):
+            self.state_note.setText('A complete band diagram was not saved in this bias state.')
+            return
         figure = Figure(figsize=(7, 4), layout='constrained')
         if key == '__bands__':
             axis = figure.add_subplot(111)
@@ -340,6 +391,7 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
         self.executable = self.line(form, 'Python executable', 'runtime.executable', sys.executable)
         self.distro = self.line(form, 'WSL distribution', 'runtime.distro', 'Ubuntu')
         self.module_paths = self.line(form, 'Python package folders', 'runtime.module_paths', '', '', 'Explicit paths separated by semicolons')
+        self.library_paths = self.line(form, 'Shared-library folders', 'runtime.library_paths', '', '', 'Explicit native-library paths separated by semicolons')
         self.timeout = self.line(form, 'Runtime limit', 'runtime.timeout_s', '86400', 's')
         solver.addLayout(form)
         solver.addWidget(label('Select a Python installation containing Sesame and its dependencies. '
@@ -359,7 +411,7 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
         self._build_guided_setup()
         self.finish_build()
         from qt_study_flow import install_study_flow
-        self.study_flow = install_study_flow(self, [('Domain', [0]), ('Materials & contacts', [1, 2, 3]), ('Calculate', [4, 5])],
+        self.study_flow = install_study_flow(self, [('Domain', [0]), ('Materials', [1]), ('Contacts & defects', [2, 3]), ('Bias & accuracy', [4, 5])],
             subtitle='Build the transport domain, assign its physical properties, then apply a bias sequence.',
             details='Independent 1D / 2D rectilinear domain. Fixed temperature and Boltzmann carriers; no tunnelling or self-heating.')
         self._queue_clean_refresh()
@@ -405,6 +457,7 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
         self.domain_splitter = QSplitter(Qt.Orientation.Horizontal)
         context = QWidget(); left = QVBoxLayout(context); left.setContentsMargins(0, 0, 0, 0)
         self.domain_preview = PlotWidget(); self.domain_preview.setMinimumSize(260, 290)
+        self.domain_preview.canvas.mpl_connect('button_press_event', self._select_domain_geometry)
         self.domain_preview.toolbar.hide(); left.addWidget(self.domain_preview, 1)
         self.preview_note = label(''); self.preview_note.setToolTip('The sketch uses region and grain-boundary geometry only. Material and runtime settings are validated separately.')
         left.addWidget(self.preview_note)
@@ -421,13 +474,22 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
         self.domain_splitter.setStretchFactor(0, 3); self.domain_splitter.setStretchFactor(1, 2)
         layout.addWidget(self.domain_splitter, 1); replace_section(self, 0, body)
         # Materials and contacts retain independent sections and exact targets.
+        self.assignment_previews = {}
         for index, group, caption, explanation in [
             (1, 'materials', 'Material properties', 'Choose a material and enter its electrical properties. Required values are never filled from an unrelated example.'),
             (2, 'contacts', 'Two end contacts', 'The left end is the reference. The bias sequence raises the right-contact potential. Both carrier surface velocities are explicit.'),
             (3, 'defects', 'Grain boundaries · optional', 'In 1D enter one x coordinate. In 2D enter two endpoints as x, y; x, y. Leave this list empty when no grain boundary is intended.')]:
             body = QWidget(); box = QVBoxLayout(body)
             box.addWidget(label(caption, 'setupHeading')); box.addWidget(label(explanation))
-            box.addWidget(self.inspectors[group]); replace_section(self, index, body)
+            split = QSplitter(Qt.Orientation.Horizontal)
+            preview = PlotWidget(); preview.setMinimumSize(230, 280); preview.toolbar.hide()
+            preview.canvas.mpl_connect('button_press_event', self._select_domain_material if group=='materials' else self._select_domain_geometry)
+            split.addWidget(preview)
+            scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(self.inspectors[group])
+            scroll.setMinimumWidth(290); scroll.setMaximumWidth(500)
+            split.addWidget(scroll); split.setStretchFactor(0,3); split.setStretchFactor(1,2)
+            box.addWidget(split,1); replace_section(self, index, body)
+            self.assignment_previews[group]=(preview,split,scroll)
         self.inspectors['materials'].note.setText('Additional coefficients default to zero when blank; blank effective masses retain the solver default of 1. All required material values remain explicit.')
         self.inspectors['defects'].note.setText('Defect energy is referenced to the intrinsic level. The two charge states describe empty and occupied defects.')
         # Bias and temperature are the ordinary Calculate controls; installation/numerics are separate.
@@ -453,7 +515,8 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
         self.solver_advanced_toggle = QCheckBox('Advanced solver and package settings'); box.addWidget(self.solver_advanced_toggle)
         self.solver_advanced = QWidget(); form = native_form(self.solver_advanced)
         for title, edit in [('Newton update tolerance', self.tolerance), ('Maximum Newton iterations', self.max_iterations),
-                            ('Python package folders (semicolon separated)', self.module_paths), ('Runtime limit (s)', self.timeout)]:
+                            ('Python package folders (semicolon separated)', self.module_paths),
+                            ('Shared-library folders (semicolon separated)', self.library_paths), ('Runtime limit (s)', self.timeout)]:
             form.addRow(title, edit)
         box.addWidget(self.solver_advanced); self.solver_advanced.hide()
         self.solver_advanced_toggle.toggled.connect(self.solver_advanced.setVisible)
@@ -466,7 +529,7 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
         for edit in (self.x_nodes, self.y_nodes, self.voltages, self.temperature): edit.textChanged.connect(self._queue_clean_refresh)
         self.runtime_mode.currentIndexChanged.connect(self._refresh_clean_ui)
         self.runtime_mode.currentIndexChanged.connect(self.runtime_check.invalidate)
-        for edit in (self.executable,self.distro,self.module_paths,self.timeout): edit.textChanged.connect(self.runtime_check.invalidate)
+        for edit in (self.executable,self.distro,self.module_paths,self.library_paths,self.timeout): edit.textChanged.connect(self.runtime_check.invalidate)
         self.periodic.toggled.connect(self._refresh_clean_ui)
         from qt_common import theme_manager
         theme_manager().changed.connect(self._restyle_inspectors)
@@ -475,6 +538,12 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
     def _restyle_inspectors(self, *args):
         """A QObject-bound receiver disconnects when this page is deleted."""
         restyle_inspectors(self)
+
+    def runtime_settings(self):
+        runtime = super().runtime_settings()
+        if runtime is not None:
+            runtime['library_paths'] = [path.strip() for path in self.library_paths.text().split(';') if path.strip()]
+        return runtime
 
     def _apply_automatic_runtime(self, runtime):
         for key, value in runtime.items():
@@ -565,14 +634,71 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
                     if len(points)!=2: raise ValueError('grain-boundary line needs two endpoints')
                     ax.plot([p[0] for p in points],[p[1] for p in points],color='#B45309',linewidth=2)
                 else: ax.axvline(number(row[1],'defects.location_um'),color='#B45309',linewidth=2)
+            for node in x:
+                ax.axvline(node, color='#66788a', alpha=.16, linewidth=.6)
+            if two:
+                for node in y:
+                    ax.axhline(node, color='#66788a', alpha=.16, linewidth=.6)
+            ax.axvline(x[0], color='#334155', linewidth=3)
+            ax.axvline(x[-1], color='#2563eb', linewidth=3)
             ax.set_xlim(x[0],x[-1]); ax.set_ylim(y[0],y[-1]); ax.set_xlabel('x · transport direction (µm)')
             if two: ax.set_ylabel('y (µm)'); ax.set_aspect('equal',adjustable='box')
             else: ax.set_yticks([]); ax.set_ylabel('1D region schematic')
             ax.set_title('Reference contact  →  Biased contact',fontsize=9)
             self.domain_preview.draw_figure(figure)
+            for preview, _, _ in self.assignment_previews.values():
+                preview.draw_figure(figure)
             self.preview_note.setText('Region and grain-boundary geometry preview.')
         except (ValueError, IndexError, TypeError) as exc:
             self.preview_note.setText('Preview needs geometry input: '+str(exc)+'. The last valid view is retained.')
+
+    def _select_domain_geometry(self, event):
+        """Native plot hits select the existing authoritative table inspector."""
+        if event.xdata is None or not self._is_active_document():
+            return
+        try:
+            nodes = self._sequence(self.x_nodes.text(), 'x_nodes_um')
+            tolerance = (nodes[-1] - nodes[0]) * .02
+            if abs(event.xdata-nodes[0]) <= tolerance or abs(event.xdata-nodes[-1]) <= tolerance:
+                side = 'left' if abs(event.xdata-nodes[0]) <= tolerance else 'right'
+                self.open_diagnostic(dict(field='contacts.kind', object_id=side))
+                return
+            two = self.dimension.currentData() == 2
+            for row in _rows(self.defects):
+                if not row[1].strip():
+                    continue
+                if two and event.ydata is not None:
+                    a,b=[np.asarray(vector(v,2,'defects.location_um')) for v in row[1].split(';')]
+                    delta=b-a; position=np.array([event.xdata,event.ydata])
+                    fraction=np.clip(np.dot(position-a,delta)/max(np.dot(delta,delta),1e-30),0,1)
+                    hit=np.linalg.norm(position-(a+fraction*delta))<=tolerance
+                else:
+                    hit=abs(event.xdata-number(row[1],'defects.location_um'))<=tolerance
+                if hit:
+                    self.open_diagnostic(dict(field='defects.energy_eV',object_id=row[0]))
+                    return
+            for row in reversed(_rows(self.regions)):
+                xr = vector(row[2], 2, 'regions.x_range_um')
+                yr = vector(row[3], 2, 'regions.y_range_um') if two else [0, 1]
+                if xr[0] <= event.xdata <= xr[1] and (not two or event.ydata is not None and yr[0] <= event.ydata <= yr[1]):
+                    self.open_diagnostic(dict(field='regions.material', object_id=row[0]))
+                    return
+        except (ValueError, IndexError, TypeError):
+            self.preview_note.setText('Finish the region bounds before selecting its geometry. Your draft is retained.')
+
+    def _select_domain_material(self, event):
+        if event.xdata is None or not self._is_active_document():
+            return
+        try:
+            two=self.dimension.currentData()==2
+            for row in reversed(_rows(self.regions)):
+                xr=vector(row[2],2,'regions.x_range_um')
+                yr=vector(row[3],2,'regions.y_range_um') if two else [0,1]
+                if xr[0]<=event.xdata<=xr[1] and (not two or event.ydata is not None and yr[0]<=event.ydata<=yr[1]):
+                    self.open_diagnostic(dict(field='materials.Nc',object_id=row[1]))
+                    return
+        except (ValueError,IndexError,TypeError):
+            return
 
     def adapt_layout(self):
         if hasattr(self,'study_flow'): self.study_flow.adapt_layout()
@@ -580,6 +706,9 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
             self.domain_splitter.setMinimumHeight(330)
             self.domain_splitter.setMaximumHeight(390 if self.width()<1000 else 550)
             self.domain_splitter.setSizes([max(280,self.width()-370),320])
+        for _, split, scroll in getattr(self,'assignment_previews',{}).values():
+            split.setOrientation(Qt.Orientation.Vertical if self.width()<900 else Qt.Orientation.Horizontal)
+            scroll.setMaximumWidth(16777215 if self.width()<900 else 500)
 
     def _dimension_changed(self, *args):
         active=getattr(self.store,'active_study','sesame_transport')
@@ -630,7 +759,8 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
             max_iterations=number(self.max_iterations.text(), 'max_iterations', integer=True, minimum=1),
             runtime=dict(mode=self.runtime_mode.currentData(), executable=self.executable.text(), distro=self.distro.text(),
                 timeout_s=number(self.timeout.text(), 'runtime.timeout_s', positive=True),
-                module_paths=[path.strip() for path in self.module_paths.text().split(';') if path.strip()]), materials={}, regions=[], contacts={}, defects=[])
+                module_paths=[path.strip() for path in self.module_paths.text().split(';') if path.strip()],
+                library_paths=[path.strip() for path in self.library_paths.text().split(';') if path.strip()]), materials={}, regions=[], contacts={}, defects=[])
         if dim == 2:
             cfg['y_nodes_um'] = self._sequence(self.y_nodes.text(), 'y_nodes_um')
         for axis in ('x', 'y')[:dim]:
@@ -698,15 +828,23 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
             return self.inspectors[group].reveal(match, keys[group][column], target.get('message', ''))
         if field in ('x_nodes_um', 'y_nodes_um'):
             self.mesh_toggle.setChecked(True)
-        if field in ('tolerance', 'max_iterations', 'runtime.module_paths', 'runtime.timeout_s'):
+        if field in ('tolerance', 'max_iterations', 'runtime.module_paths', 'runtime.library_paths', 'runtime.timeout_s'):
             self.solver_advanced_toggle.setChecked(True)
         return super().open_diagnostic(target)
 
     def load_settings(self, cfg):
+        if not isinstance(cfg, dict):
+            raise ValueError('Semiconductor settings must be a JSON object.')
         if 'dimension' in getattr(self,'_document_fields',{}) and cfg.get('dimension',1)!=self._document_fields['dimension']:
             raise ValueError('These settings belong to the other transport dimension. Choose that simulation before importing them.')
         from sesame_transport import prepare
-        prepare({}, cfg)
+        runtime_draft = {key: control.currentData() if isinstance(control, QComboBox) else control.text()
+            for key, control in self.fields.items() if key.startswith('runtime.')} if 'runtime' not in cfg else {}
+        validation_cfg = deepcopy(cfg)
+        # A physical-only file has no runtime to import or validate. Preserve the
+        # current raw installation draft, including unfinished input, for Check.
+        validation_cfg.setdefault('runtime', {'mode': 'local', 'executable': sys.executable})
+        prepare({}, validation_cfg)
         self._loading = True
         try:
             self.restore_draft(self._default_draft)
@@ -726,13 +864,20 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
             for group, keys in [('regions', self.region_keys), ('defects', self.defect_keys)]:
                 _fill(getattr(self, group), [[display(row.get(key, 0 if key in ('donors_cm3', 'acceptors_cm3', 'generation_cm3_s') else '')) for key in keys] for row in cfg.get(group, [])])
             _fill(self.contacts, [[side, row['kind'], row['electron_velocity_cm_s'], row['hole_velocity_cm_s'], row.get('work_function_eV', '')] for side, row in cfg['contacts'].items()])
-            runtime = cfg.get('runtime', {})
+            runtime = cfg.get('runtime') or {}
             for key in ('executable', 'distro', 'timeout_s'):
                 if key in runtime:
                     self.fields['runtime.'+key].setText(str(runtime[key]))
             if 'mode' in runtime:
                 self.runtime_mode.setCurrentIndex(self.runtime_mode.findData(runtime['mode']))
             self.module_paths.setText('; '.join(runtime.get('module_paths', [])))
+            self.library_paths.setText('; '.join(runtime.get('library_paths', [])))
+            for key, value in runtime_draft.items():
+                control = self.fields[key]
+                if isinstance(control, QComboBox):
+                    control.setCurrentIndex(control.findData(value))
+                else:
+                    control.setText(value)
             self._dimension_changed()
         finally:
             self._loading = False
@@ -745,6 +890,8 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
             try:
                 with open(path, encoding='utf-8') as stream:
                     value = json.load(stream)
+                if not isinstance(value, dict):
+                    raise ValueError('Semiconductor settings must be a JSON object.')
                 self.load_settings(value.get('settings', value))
             except (OSError, ValueError, KeyError) as exc:
                 self.status.setText('Import failed: '+str(exc))

@@ -43,6 +43,8 @@ _NONNEGATIVE = set(PROPERTY_UNITS) - _POSITIVE - {'affinity_eV'}
 _CARRIER_REQUIRED = {'bandgap_eV', 'affinity_eV', 'Nc_cm3', 'Nv_cm3',
                      'electron_mass_ratio', 'hole_mass_ratio',
                      'electron_mobility_cm2_Vs', 'hole_mobility_cm2_Vs', 'intrinsic_cm3'}
+CARRIER_PROPERTY_KEYS = frozenset(_CARRIER_REQUIRED | {
+    'electron_dos_mass_ratio', 'hole_dos_mass_ratio', 'bulk_electron_cm3', 'bulk_hole_cm3'})
 _AL_BASIC = 'https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/basic.html'
 _AL_BAND = 'https://www.ioffe.ru/SVA/NSM/Semicond/AlGaAs/bandstr.html'
 _COLORADO = 'https://www.colorado.edu/ecee/sites/default/files/attached-files/sd_constants_sheet.pdf'
@@ -69,9 +71,10 @@ def _number(value, label, minimum=None, maximum=None, strictly_positive=False):
 def validate_materials(materials):
     """Validate and normalize a complete library, without mutating its input.
 
-    Dielectrics require static permittivity only. Semiconductors and transparent
-    conductors require the carrier model fields, so an incomplete custom record
-    cannot silently fall back to GaAs parameters when running a simulation.
+    Dielectrics require static permittivity only. A constant conductor with an
+    explicit fixed conductivity may omit carrier fields for field-only/Ohmic
+    calculations. Carrier models must additionally call require_carrier_properties.
+    Semiconductors and other conductors retain their full material requirements.
     """
     if not isinstance(materials, list) or len(materials) > 10000:
         raise ValueError('Electrical materials must be a list of at most 10000 definitions.')
@@ -102,7 +105,9 @@ def validate_materials(materials):
         props = material.get('properties')
         if not isinstance(props, dict) or 'epsilon_r' not in props:
             raise ValueError(f'{name}: properties must include epsilon_r.')
-        required = _CARRIER_REQUIRED if kind != 'dielectric' else set()
+        fixed_conductor = (kind == 'conductor' and material.get('model', 'constant') == 'constant'
+                           and 'conductivity_S_m' in props)
+        required = _CARRIER_REQUIRED if kind != 'dielectric' and not fixed_conductor else set()
         missing = required - props.keys()
         if missing:
             raise ValueError(f'{name}: missing electrical properties: {", ".join(sorted(missing))}.')
@@ -140,6 +145,18 @@ def validate_materials(materials):
         if 'aliases' in material and (not isinstance(material['aliases'], list) or any(not isinstance(item, str) for item in material['aliases'])):
             raise ValueError(f'{name}: aliases must be a list of names.')
     return result
+
+
+def require_carrier_properties(material, context='Carrier model'):
+    """Reject an incomplete active carrier material instead of supplying defaults."""
+    if material.get('kind') == 'dielectric':
+        return
+    missing = _CARRIER_REQUIRED - material.get('properties', {}).keys()
+    if missing:
+        raise ValueError(f'{material.get("name", "Material")}: {context} requires carrier data; '
+                         f'missing electrical properties: {", ".join(sorted(missing))}. '
+                         'Use dielectric charge mode for a fixed-conductivity field/Ohmic calculation, '
+                         'or supply the carrier properties explicitly.')
 
 
 def _ni(props, temperature):
@@ -228,6 +245,7 @@ def conductivity_S_m(material, electrons_cm3=None, holes_cm3=None):
     props = material['properties']
     if electrons_cm3 is None and holes_cm3 is None and 'conductivity_S_m' in props:
         return props['conductivity_S_m']
+    require_carrier_properties(material, 'Carrier-derived conductivity')
     n = props.get('bulk_electron_cm3', props.get('intrinsic_cm3', 0.)) if electrons_cm3 is None else electrons_cm3
     p = props.get('bulk_hole_cm3', props.get('intrinsic_cm3', 0.)) if holes_cm3 is None else holes_cm3
     n = _number(n, 'Electron concentration', 0)

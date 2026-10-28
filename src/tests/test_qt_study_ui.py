@@ -90,7 +90,9 @@ class StudyUITests(unittest.TestCase):
         self.assertEqual(page.structured['biases_V'].draft()['children'][-1]['value'], '1e-')
         self.assertEqual(self.store.device, before)
         self.assertFalse(page.tabs.tabBar().isVisible())
-        self.assertEqual(len(page.study_flow.buttons), 3)
+        stage_titles=[title for title,_ in page.study_flow.stages]
+        for name in ('Device','Contacts & materials','Optional physics','Accuracy & sources','Check inputs','Run & progress','Results'):
+            self.assertIn(name,stage_titles)
         self.assertEqual(len(page.study_flow.menu.actions()), page.tabs.count()+2)
 
     def test_paper_search_and_family_keep_real_case_identity(self):

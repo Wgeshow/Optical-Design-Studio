@@ -168,6 +168,17 @@ class SourceAxis(pg.AxisItem):
         self.norm = norm
         self.enableAutoSIPrefix(False)
 
+    def boundingRect(self):
+        rect = super().boundingRect()
+        source = getattr(self, 'source_axis', None)
+        if (self.orientation in ('bottom', 'top') and source is not None
+                and isinstance(source.get_major_locator(), FixedLocator)):
+            # Fixed scientific ticks can lie exactly at the data limits. The
+            # native grid branch ignores hideOverlappingLabels; reserve the
+            # same small text overhang with or without that grid enabled.
+            return rect.adjusted(-15, 0, 15, 0)
+        return rect
+
     def tickValues(self, minVal, maxVal, size):
         source = self.source_axis
         locator = source.get_major_locator() if source is not None else None
@@ -193,7 +204,17 @@ class SourceAxis(pg.AxisItem):
 
     def tickStrings(self, values, scale, spacing):
         if self.norm is not None:
-            return [f'{float(self.norm.inverse(value)):.4g}' for value in values]
+            actual = [float(self.norm.inverse(value)) for value in values]
+            finite = np.unique([value for value in actual if np.isfinite(value)])
+            precision = 4
+            if len(finite) > 1:
+                step = float(np.min(np.diff(finite)))
+                magnitude = float(np.max(np.abs(finite)))
+                if step > 0 and magnitude > 0:
+                    # Retain variation near a large baseline (e.g. microkelvin
+                    # changes at 300 K) without changing the source Normalize.
+                    precision = min(17, max(4, int(math.ceil(math.log10(magnitude)-math.log10(step)))+2))
+            return [format(value, f'.{precision}g') for value in actual]
         source = self.source_axis
         if source is None:
             return [f'{value:.5g}' for value in values]
@@ -816,6 +837,10 @@ class NativeFigureCanvas(QWidget):
                 source_axis = axis.xaxis if specification['horizontal'] else axis.yaxis
                 bar.getAxis(side).tickStrings = SourceAxis(side, norm=mappable.norm).tickStrings
                 bar.getAxis(side).source_axis = source_axis
+                if not specification['horizontal']:
+                    # ColorBarItem reserves only 45 px by default and silently
+                    # omits wider labels. Allow measured physical ticks to fit.
+                    bar.getAxis(side).setWidth(None)
                 bar.getAxis(side).setLabel(plain_text(axis.get_xlabel() if specification['horizontal'] else axis.get_ylabel()),
                     color=self.colors.get('text', '#ecf6fc'), **axis_label_style(source_axis.label))
                 row, col, rowspan, colspan = specification['grid_position']

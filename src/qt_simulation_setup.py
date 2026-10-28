@@ -173,7 +173,9 @@ class _FieldRow(QWidget):
                 return
         try:
             self.workspace.state.set(self.key, value)
+            self.workspace.draft_errors.pop(self.key, None)
             self.error.hide()
+            self.workspace.refresh()
         except (ValueError, TypeError, KeyError) as exc:
             self.error.setText(str(exc))
             self.error.show()
@@ -259,7 +261,7 @@ class _FieldRow(QWidget):
             self.value_widget.layout().addWidget(self.identity_value, 1)
         self.editor.setVisible(not identity_field)
         if hasattr(self, 'identity_value'):
-            self.identity_value.setText(self.editor.currentText() if isinstance(self.editor,QComboBox) else _text(value))
+            self.identity_value.setText(self.editor.currentText() if isinstance(self.editor,QComboBox) else self.workspace.display_value(self.key,value))
             self.identity_value.setVisible(identity_field)
         message = self.workspace.draft_errors.get(self.key, '')
         self.error.setText(message)
@@ -641,7 +643,8 @@ class SimulationSetupWorkspace(QWidget):
         self._simulation_context = document_id
         self.state = state or SimulationSetupState(store,self)
         self.store = self.state.store
-        self.plan = load_plan()
+        from optical_ui_scope import s4_setup_plan
+        self.plan = s4_setup_plan(load_plan())
         self._modes = self.plan.get('modes',self.plan)
         self._mode = workflow or mode
         self.workflow = self._mode
@@ -678,6 +681,10 @@ class SimulationSetupWorkspace(QWidget):
         mode_note.setWordWrap(False)
         row.addWidget(mode_note)
         self.layout_.addWidget(mode_bar)
+        self.engine_recovery = _button('Restore S4 workflow for this study — keep stored inputs', self.restore_s4_workflow)
+        self.engine_recovery.setToolTip('An older document selected Meep in this S4 workspace. Restore its S4 identity without deleting either solver’s stored parameters. Meep runs in its separate workspace.')
+        self.engine_recovery.hide()
+        self.layout_.addWidget(self.engine_recovery)
         self.body = QHBoxLayout()
         self.body.setSpacing(8)
         self.layout_.addLayout(self.body,1)
@@ -743,6 +750,15 @@ class SimulationSetupWorkspace(QWidget):
         from qt_simulation_flow import SimulationSetupFlow
         self.setup_flow = SimulationSetupFlow(self)
         self.set_simulation_context(document_id)
+        # Restored projects and lazy bank pages loaded before this widget
+        # connected to store.changed. Recover their unfinished controls now.
+        self._reset_project_drafts('project')
+
+    def restore_s4_workflow(self):
+        if not self._is_active_document() or self.store.busy:
+            return
+        self.state.set('ui.optical.engine','s4')
+        self.set_status('S4 workflow restored. Stored S4 and Meep parameter values were retained.')
         self.refresh()
 
     def _is_active_document(self):
@@ -777,6 +793,8 @@ class SimulationSetupWorkspace(QWidget):
         return self._mode
 
     def display_value(self,key,value):
+        if key=='ui.optical.engine':
+            return 'S4 · periodic RCWA' if value=='s4' else 'Incompatible Meep setup — open its separate workspace'
         if key=='device.mesh' and isinstance(value,dict):
             return f'{value.get("nx",0)} × {value.get("ny",0)} cells · {value.get("nz_per_layer",0)} depth cells / layer'
         if key=='settings.optical_unit_cell' and isinstance(value,dict):
@@ -793,6 +811,8 @@ class SimulationSetupWorkspace(QWidget):
         return _text(value)
 
     def condition(self, condition):
+        if isinstance(condition,bool):
+            return condition
         if not condition:
             return True
         if isinstance(condition,list):
@@ -817,6 +837,24 @@ class SimulationSetupWorkspace(QWidget):
         return bool(value)
 
     def _make_page(self, tab):
+        if tab['id'] == 'electrical.study':
+            # Presentation only: commit/check the draft before browsing its
+            # applied previews or the longer model-scope explanations.
+            tab = deepcopy(tab)
+            by_id = {card['id']: card for card in tab['cards']}
+            offsets = by_id['electrical.study.range']
+            schedule = by_id['electrical.study.schedule']
+            check = next(action for action in schedule['actions'] if action['target'] == 'electrical.validate_biases')
+            offsets['actions'].append(check)
+            offsets['actions_after_key'] = 'ui.electrical.bias_list_text'
+            schedule['actions'].remove(check)
+            for field in offsets['fields']:
+                if field['key'] == 'ui.electrical.bias_list_text':
+                    field['label'] = 'Manual offsets · draft until Apply'
+                elif field['key'] == 'search.electrical.biases_V':
+                    field['label'] = 'Submitted offsets · applied values'
+            tab['cards'].remove(schedule)
+            tab['cards'].insert(tab['cards'].index(offsets)+1, schedule)
         content = QWidget()
         content.setObjectName('setupCards')
         grid = QGridLayout(content)
@@ -879,6 +917,7 @@ class SimulationSetupWorkspace(QWidget):
         rule.setObjectName('setupRule')
         rule.setFixedHeight(1)
         layout.addWidget(rule)
+        action_index = None
         for field in card.get('fields',[]):
             if field.get('widget')=='table':
                 row=QWidget(frame)
@@ -887,6 +926,8 @@ class SimulationSetupWorkspace(QWidget):
                 row_layout.setSpacing(5)
                 row_layout.addWidget(_label(field.get('label',''),'setupFieldLabel'))
                 table=_PlanTable(self,field,parent=row)
+                if field['key'] in ('search.electrical.biases_V', 'ui.electrical.voltage_schedule'):
+                    table.setMaximumHeight(170)
                 row_layout.addWidget(table)
                 notice=_label('','setupMuted')
                 notice.hide()
@@ -896,11 +937,15 @@ class SimulationSetupWorkspace(QWidget):
                 layout.addWidget(row)
             else:
                 layout.addWidget(_FieldRow(self,field,parent=frame))
+            if field.get('key') == card.get('actions_after_key'):
+                action_index = layout.count()
         actions = card.get('actions',[])
         for index, action in enumerate(actions):
             button = _button(action['label'],lambda checked=False,value=action:self.perform_action(value))
             button.setProperty('setupActionId',action.get('id'))
-            if card.get('actions_position') == 'top':
+            if action_index is not None:
+                layout.insertWidget(action_index + index, button)
+            elif card.get('actions_position') == 'top':
                 layout.insertWidget(2 + index, button)
             else:
                 layout.addWidget(button)
@@ -1104,6 +1149,8 @@ class SimulationSetupWorkspace(QWidget):
             return
         self.refreshing=True
         try:
+            self.engine_recovery.setVisible(self._mode in ('optical','coupled') and self.state.get('ui.optical.engine') != 's4')
+            self.engine_recovery.setEnabled(not self.store.busy)
             for field in self.fields:
                 field.refresh()
                 field.set_horizontal(not hasattr(self,'setup_flow') and self.width()>=1400)
@@ -1128,9 +1175,15 @@ class SimulationSetupWorkspace(QWidget):
                 view.set_device(device,selected)
             self.summary_title.setText({'optical':'Optical domain','electrical':'Finite electrical domain','coupled':'Shared simulation domains'}[self._mode])
             width,depth=device.get('width_um',0),device.get('depth_um',0)
-            layer_count=len([obj for obj in device.get('layers',[]) if obj.get('enabled',True)])
-            hole_count=sum(obj.get('enabled',True) and obj.get('material_id')=='air' for obj in device.get('shapes',[]))
-            lines=[f'Finite device  {_text(width)} × {_text(depth)} µm',f'Finite array: {hole_count:,} air holes · {layer_count} enabled layers']
+            enabled_layers={obj['id'] for obj in device.get('layers',[]) if obj.get('enabled',True)}
+            layer_count=len(enabled_layers)
+            regions=[obj for obj in device.get('shapes',[]) if obj.get('enabled',True) and obj.get('layer_id') in enabled_layers]
+            array_ids={obj['id'] for obj in device.get('pc_arrays',[])}
+            array_regions=sum(obj.get('pc_array_id') in array_ids for obj in regions)
+            lines=[f'Finite device  {_text(width)} × {_text(depth)} µm',
+                   f'Finite geometry: {layer_count} enabled layer{"s" if layer_count!=1 else ""} · {len(regions):,} enabled region{"s" if len(regions)!=1 else ""}']
+            if array_ids:
+                lines.append(f'PC-array regions: {array_regions:,} · Other regions: {len(regions)-array_regions:,}')
             if self._mode!='electrical':
                 from optical_unit_cell import pc_unit_cell,pc_unit_cell_issue
                 pc_cell=pc_unit_cell(device)
@@ -1333,7 +1386,7 @@ class SimulationSetupWorkspace(QWidget):
                 self.routeRequested.emit('optical.outputs')
             elif target in self.pages or '/' in target and target.split('/')[0] in self.pages:
                 self.select_section(target)
-            elif target.startswith(('global.','structure.','materials.','results.')) or target.startswith('settings.') and target not in ('settings.optical_unit_cell','settings.theta_deg'):
+            elif target.startswith(('global.','structure.','materials.','results.','engine.')) or target.startswith('settings.') and target not in ('settings.optical_unit_cell','settings.theta_deg'):
                 self.routeRequested.emit(target)
             elif target in ('dialog.save-preset','dialog.export-setup'):
                 self.save_setup()
@@ -1603,27 +1656,97 @@ class SimulationSetupWorkspace(QWidget):
         layout.addWidget(buttons)
         dialog.exec()
 
-    def _review_setup(self):
-        dialog=QDialog(self)
-        dialog.setWindowTitle(self._mode.title()+' setup review')
-        dialog.resize(780,680)
-        layout=QVBoxLayout(dialog)
-        table=QTableWidget()
-        table.setColumnCount(2)
-        table.setHorizontalHeaderLabels(['Setting','Current value'])
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        table.verticalHeader().hide()
-        keys=set()
+    def setup_review_rows(self):
+        """Read applied values and unfinished text without committing or solving."""
         rows=[]
+        if self._mode in ('optical','coupled'):
+            device=self.store.device or {}
+            source=getattr(self.store,'optical_geometry_source','device')
+            rows.append(('Applied geometry source','Device editor' if source=='device' else 'Original optical tables'))
+            if source=='device':
+                rows.append(('Applied finite footprint',f"{_text(device.get('width_um'))} × {_text(device.get('depth_um'))} µm"))
+                layers=[row for row in device.get('layers',[]) if row.get('enabled',True)]
+                active={row['id']:row for row in layers}
+                assignments={row['id']:row.get('optical_material') or 'Not assigned'
+                    for row in self.state.get('ui.optical.assignment_rows',[])}
+                for layer in layers[:100]:
+                    rows.append(('Applied layer: '+layer['name'],
+                        f"{_text(layer['thickness_um'])} µm · {assignments.get(layer['id'],'Not resolved')}"))
+                regions=[row for row in device.get('shapes',[]) if row.get('enabled',True) and row.get('layer_id') in active]
+                for region in regions[:100]:
+                    shape=region.get('shape','region')
+                    size=(f"diameter {_text(region.get('size_x_um'))} µm" if shape=='circle' else
+                        f"full size {_text(region.get('size_x_um'))} × {_text(region.get('size_y_um'))} µm")
+                    rows.append(('Applied region: '+region['name'],f"{shape} · {size} · "
+                        f"center ({_text(region.get('cx_um'))}, {_text(region.get('cy_um'))}) µm · "
+                        f"{active[region['layer_id']]['name']} · {assignments.get(region['id'],'Not resolved')}"))
+                if len(layers)>100 or len(regions)>100:
+                    rows.append(('Geometry review extent',f'{len(layers)} enabled layers and {len(regions)} enabled regions; first100 of each shown. Inspect the remaining objects in Device.'))
+            else:
+                assignments={}
+                for layer in self.store.layers.to_dict('records')[1:-1]:
+                    rows.append(('Applied layer: '+str(layer.get('Name','')),f"{_text(layer.get('Thickness_um'))} µm · {layer.get('Material','Not assigned')}"))
+            incident=self.state.get('ui.optical.incident_material')
+            exit_material=self.state.get('ui.optical.exit_material')
+            rows.extend([('Applied incident medium',str(incident)),('Applied exit medium',str(exit_material))])
+            used={incident,exit_material,*assignments.values()}
+            if source!='device':
+                used.update(self.store.layers['Material'].tolist())
+                used.update(self.store.patterns['Material'].tolist())
+            for material in self.store.materials.to_dict('records'):
+                if material.get('Name') not in used:continue
+                model=material.get('Model')
+                if model=='constant_nk':value=f"n = {_text(material.get('A'))} · k = {_text(material.get('B'))} (constant)"
+                elif model=='constant_eps':value=f"ε real = {_text(material.get('A'))} · ε imaginary = {_text(material.get('B'))} (constant)"
+                else:value='Tabulated n,k · '+Path(str(material.get('DataFile',''))).name
+                rows.append(('Applied material: '+material['Name'],value))
+            for label,key in [('Applied optical domain','ui.optical.compiled_domain_extent'),
+                ('Applied boundary rule','ui.optical.periodic_boundary_text'),
+                ('Applied sample count','ui.optical.compiled_samples'),
+                ('Applied first sample','ui.optical.first_sample'),
+                ('Applied last sample','ui.optical.actual_last_sample')]:
+                rows.append((label,self.display_value(key,self.state.get(key))))
+        keys=set()
         modes=('optical','electrical','coupled') if self._mode=='coupled' else (self._mode,)
         for mode in modes:
             for tab in self._modes[mode]['tabs']:
                 for card in tab.get('cards',[]):
+                    if not self.condition(card.get('visible_when')):continue
                     for field in card.get('fields',[]):
-                        if field['key'] in keys or field['widget'] in ('readonly','table') or not self.condition(field.get('visible_when')):
+                        key=field['key']
+                        if key in keys or field['widget'] in ('readonly','table') or not self.condition(field.get('visible_when')):
                             continue
-                        keys.add(field['key'])
-                        rows.append((field['label'],self.display_value(field['key'],self.state.get(field['key']))))
+                        keys.add(key)
+                        applied=self.display_value(key,self.state.get(key))
+                        unit=' '+str(field['unit']) if field.get('unit') else ''
+                        value=applied+unit
+                        if key in self.drafts:
+                            value=f'Draft (not applied): {self.drafts[key]}{unit} · Applied: {value}'
+                        if key in self.draft_errors:value+=' · Invalid: '+self.draft_errors[key]
+                        rows.append((field['label'],value))
+        # Table edits also remain drafts until their existing Apply action.
+        for (key,ident,column),raw in self.table_drafts.items():
+            if not any(key==field.get('key') for mode in modes for tab in self._modes[mode]['tabs']
+                for card in tab.get('cards',[]) for field in card.get('fields',[])):continue
+            name=next((obj.get('name') for group in ('layers','shapes','contacts','doping_regions')
+                for obj in (self.store.device or {}).get(group,[]) if obj.get('id')==ident),'table row')
+            rows.append(('Draft table edit: '+str(name),f'{column}: {raw} (not applied)'))
+        return rows
+
+    def _review_setup(self):
+        dialog=QDialog(self)
+        dialog.setWindowTitle(self._mode.title()+' setup review')
+        dialog.resize(900,720)
+        layout=QVBoxLayout(dialog)
+        layout.addWidget(_label('Read-only review. Geometry and values marked Applied are committed inputs. Draft text is shown separately and is not applied by opening this review. This is not validation or a solver result.'))
+        table=QTableWidget()
+        table.setAccessibleName('Current simulation inputs review')
+        table.setColumnCount(2)
+        table.setHorizontalHeaderLabels(['Setting','Current value'])
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        table.verticalHeader().hide()
+        rows=self.setup_review_rows()
         table.setRowCount(len(rows))
         for row,values in enumerate(rows):
             for column,value in enumerate(values):
@@ -1873,6 +1996,8 @@ class SimulationSetupWorkspace(QWidget):
             return
         try:
             payload=json.loads(Path(filename).read_text(encoding='utf-8'))
+            from optical_ui_scope import require_s4_preset
+            require_s4_preset(payload)
             if not hasattr(self.state,'import_preset'):
                 raise ValueError('Preset persistence is unavailable.')
             dialog=QDialog(self)

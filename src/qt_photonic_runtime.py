@@ -47,9 +47,10 @@ class PhotonicRuntimeCheck(QWidget):
     """Readiness belongs to the checked configuration, not to the saved project."""
     runtimeReady = pyqtSignal(object)
 
-    def __init__(self, get_settings, parent=None):
+    def __init__(self, get_settings, parent=None, *, get_discovery_settings=None):
         super().__init__(parent)
         self.get_settings = get_settings
+        self.get_discovery_settings = get_discovery_settings or get_settings
         self._revision = 0
         self._checked_revision = -1
         self._running = False
@@ -72,6 +73,7 @@ class PhotonicRuntimeCheck(QWidget):
         from qt_solver_environment import SolverEnvironmentSetup
         self.setup = SolverEnvironmentSetup(self._setup_request, self)
         self.setup.runtimeReady.connect(self.runtimeReady)
+        self.setup.launcherChanged.connect(self.invalidate)
         layout.addWidget(self.setup)
         self.process = QProcess(self)
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
@@ -84,7 +86,8 @@ class PhotonicRuntimeCheck(QWidget):
         self.timer.timeout.connect(self._timeout)
 
     def _setup_request(self):
-        settings = self.get_settings()
+        # Discovery must work before a user knows an executable or distribution.
+        settings = self.get_discovery_settings()
         return settings.get('solver'), settings.get('runtime', {})
 
     def invalidate(self, *args):

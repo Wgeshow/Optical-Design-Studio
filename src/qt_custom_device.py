@@ -9,7 +9,7 @@ from pathlib import Path
 import uuid
 
 from PyQt6.QtCore import Qt, QPointF, QRect, QRectF, QSize, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QIcon, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap, QPolygonF, QRadialGradient, QTransform
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QIcon, QKeySequence, QShortcut, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap, QPolygonF, QRadialGradient, QTransform
 from PyQt6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QHeaderView, QLayout,
     QAbstractSpinBox, QDialog, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QPushButton,
     QMenu, QScrollArea, QSizePolicy, QSplitter, QTabWidget, QToolButton, QTreeWidget,
@@ -1286,10 +1286,14 @@ class CustomDevicePage(QWidget):
         self.tree_actions=QMenu(self.tree_menu_button)
         self.tree_menu_button.setMenu(self.tree_actions)
         self.tree_actions.addAction('Find object…',self.find_device_object)
+        self.undo_shortcut = QShortcut(QKeySequence(QKeySequence.StandardKey.Undo), self)
+        self.undo_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        self.undo_shortcut.activated.connect(self.undo_device)
         for text,key,callback in [('Add doping region','add_doping',self.add_doping),('Duplicate','duplicate',self.duplicate_selected),('Delete','delete',self.delete_selected),('Move layer up','up',lambda:self.reorder_layer(-1)),('Move layer down','down',lambda:self.reorder_layer(1)),('Undo device edit','undo',self.undo_device),('Load reference device','load_reference',self.load_reference_device)]:
             button=_button(text,lambda checked=False,callback=callback:(self.tree_actions.close(),callback()))
             button.setObjectName('device_'+key);self.action_buttons[key]=button
             action=QWidgetAction(self.tree_actions);action.setDefaultWidget(button);self.tree_actions.addAction(action)
+        self.action_buttons['undo'].setToolTip('Undo the last applied device edit (' + self.undo_shortcut.key().toString(QKeySequence.SequenceFormat.NativeText) + '). Text fields keep their own Undo history.')
         self.mesh_preview = QToolButton()
         self.mesh_preview.setCheckable(True)
         self.mesh_preview.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
@@ -1536,7 +1540,8 @@ class CustomDevicePage(QWidget):
         self.material_properties_group=QGroupBox('Material properties')
         properties_layout=QVBoxLayout(self.material_properties_group);properties_layout.setContentsMargins(8,13,8,8)
         properties_layout.addWidget(self.material_note)
-        electrical_layout.addWidget(_label('Electrical simulation uses static carrier-reservoir Poisson. Current transport is not solved. Doping is uniform per layer or shaped region.'))
+        self.electrical_model_note = _label('Set material properties, contacts and doping here. For electrical studies, choose the electrostatic or current-transport model in Bias & physics. Doping is uniform within each layer or shaped region.')
+        electrical_layout.addWidget(self.electrical_model_note)
         geometry_layout.addStretch()
         electrical_layout.addStretch()
         optical_layout.addStretch()
@@ -1894,7 +1899,14 @@ class CustomDevicePage(QWidget):
         _set_value(self.enabled_edit, obj.get('enabled', True))
         self.enabled_edit.setEnabled(kind not in ('device', 'mesh'))
         materials = [(entry['name'], entry['id']) for entry in self.store.electrical_materials]
-        _choices(self.material_edit, materials, obj.get('material_id', materials[0][1] if materials else None))
+        material_id=obj.get('material_id','')
+        if kind in ('layers','shapes') and material_id not in {value for _,value in materials}:
+            # Optical imports can intentionally have no electrical material.
+            # Display that exact assignment instead of silently selecting the
+            # first library material, which would erase the optical override on Apply.
+            caption=(str(material_id)+' (missing electrical material)') if material_id else 'No electrical material assigned'
+            materials.insert(0,(caption,material_id))
+        _choices(self.material_edit, materials, material_id)
         _choices(self.layer_edit, [(layer['name'], layer['id']) for layer in device['layers']], obj.get('layer_id', self.active_layer_id))
         self.material_edit.setEnabled(kind in ('layers', 'shapes'))
         self.layer_edit.setEnabled(kind in ('shapes', 'contacts', 'doping_regions','pc_arrays'))
@@ -1963,7 +1975,48 @@ class CustomDevicePage(QWidget):
             layer=next((row for row in device['layers'] if row['id']==obj.get('layer_id')), {})
             material=next((entry for entry in self.store.electrical_materials if entry['id']==layer.get('material_id')),None)
             if material:_set_value(self.material_edit,material['id'])
-        self.material_note.setText(f"{material['name']} · {'Built-in' if material['id'] in ('gaas','ito','algaas','silicon','air') else 'Custom'}" if material else 'Shared electrical material library')
+        self.material_note.setText(f"{material['name']} · {'Built-in' if material['id'] in ('gaas','ito','algaas','silicon','air') else 'Custom'}" if material else
+            'No electrical material assigned · optical material '+obj['optical_material_name'] if kind in ('layers','shapes') and not material_id and obj.get('optical_material_name') else
+            'Missing electrical material: '+str(material_id) if kind in ('layers','shapes') and material_id else 'Shared electrical material library')
+        self._remember_inspector_precision()
+
+    def _remember_inspector_precision(self):
+        """A compact display must not round the source when Apply is unchanged."""
+        self._inspector_numeric_baseline = {}
+        self._inspector_numeric_edited = set()
+        for widget in self._diagnostic_widgets().values():
+            if not isinstance(widget, QAbstractSpinBox) and widget not in (self.donor_edit, self.acceptor_edit):
+                continue
+            edit = widget.lineEdit() if isinstance(widget, QAbstractSpinBox) else widget
+            value = widget.value() if isinstance(widget, QAbstractSpinBox) else edit.text()
+            self._inspector_numeric_baseline[widget] = (value, edit.text())
+            if not getattr(widget, '_inspector_precision_connected', False):
+                edit.textEdited.connect(lambda _text, control=widget: self._mark_inspector_numeric_edit(control))
+                widget._inspector_precision_connected = True
+
+    def _mark_inspector_numeric_edit(self, widget):
+        if self.loading:
+            return
+        self._inspector_numeric_edited.add(widget)
+        # These duplicate controls edit one physical quantity. Explicitly typing
+        # its displayed rounded value is still an edit, even without valueChanged.
+        for key, control in self.contact_position_controls.items():
+            if widget in (control, self.geometry_controls[key]):
+                self._inspector_numeric_edited.update((control, self.geometry_controls[key]))
+        if widget in (self.contact_height_edit, self.optical_contact_controls['thickness']):
+            self._inspector_numeric_edited.update((self.contact_height_edit, self.optical_contact_controls['thickness']))
+        if widget is self.geometry_controls['size_x_um'] and self.shape_edit.currentData() == 'circle':
+            self._inspector_numeric_edited.add(self.geometry_controls['size_y_um'])
+
+    def _inspector_number(self, widget, original):
+        spin = isinstance(widget, QAbstractSpinBox)
+        edit = widget.lineEdit() if spin else widget
+        value = widget.value() if spin else edit.text()
+        baseline = getattr(self, '_inspector_numeric_baseline', {}).get(widget)
+        if (original is not None and widget not in getattr(self, '_inspector_numeric_edited', set())
+                and baseline == (value, edit.text())):
+            return original
+        return value if spin else float(value)
 
     def update_mesh_resources(self,*_):
         """Preview requested counts and planning RAM without allocating a mesh."""
@@ -2050,7 +2103,9 @@ class CustomDevicePage(QWidget):
                 values[key] = ('plain', widget.toPlainText())
             else:
                 values[key] = ('text', widget.text())
-        return dict(values=values, snapshot=self._diagnostic_object_snapshot(self.selected_id),
+        numeric_edited = [key for key, widget in self._diagnostic_widgets().items()
+                          if widget in getattr(self, '_inspector_numeric_edited', set())]
+        return dict(values=values, numeric_edited=numeric_edited, snapshot=self._diagnostic_object_snapshot(self.selected_id),
                     inspector_tab=self.inspector_tabs.currentIndex(), page=self.tabs.currentIndex())
 
     def _restore_diagnostic_draft(self, draft):
@@ -2083,6 +2138,7 @@ class CustomDevicePage(QWidget):
             for key, value in draft['values'].items():
                 if value[0] == 'spin':
                     widgets[key].lineEdit().setText(value[2])
+            self._inspector_numeric_edited = {widgets[key] for key in draft.get('numeric_edited', ()) if key in widgets}
             self.inspector_tabs.setCurrentIndex(draft['inspector_tab'])
             self.tabs.setCurrentIndex(draft['page'])
         finally:
@@ -2276,25 +2332,25 @@ class CustomDevicePage(QWidget):
             return False
         try:
             if kind == 'mesh':
-                obj.update({key: widget.value() for key, widget in self.mesh_controls.items()})
+                obj.update({key: self._inspector_number(widget, obj.get(key)) for key, widget in self.mesh_controls.items()})
             else:
                 obj['name'] = self.name_edit.text().strip()
                 if kind == 'device':
-                    obj.update({key: widget.value() for key, widget in self.device_controls.items()})
+                    obj.update({key: self._inspector_number(widget, obj.get(key)) for key, widget in self.device_controls.items()})
                 else:
                     obj['enabled'] = self.enabled_edit.isChecked()
                 if kind in ('layers', 'shapes'):
                     obj['material_id'] = self.material_edit.currentData()
                     obj['optical_material_name'] = self.optical_assignment.currentData() or ''
                 if kind == 'layers':
-                    obj['thickness_um'] = self.thickness_edit.value()
+                    obj['thickness_um'] = self._inspector_number(self.thickness_edit, obj.get('thickness_um'))
                 if kind in ('shapes', 'contacts', 'doping_regions'):
-                    obj.update({key: widget.value() for key, widget in self.geometry_controls.items()})
+                    obj.update({key: self._inspector_number(widget, obj.get(key)) for key, widget in self.geometry_controls.items()})
                     obj['shape'] = self.shape_edit.currentData()
                     obj['layer_id'] = self.layer_edit.currentData()
                     obj['vertices'] = json.loads(self.vertices_edit.toPlainText()) if obj['shape'] == 'polygon' else []
                     if obj['shape'] == 'square_ring':
-                        obj.update({key: widget.value() for key, widget in self.inner_controls.items()})
+                        obj.update({key: self._inspector_number(widget, obj.get(key)) for key, widget in self.inner_controls.items()})
                 if kind=='pc_arrays':
                     obj['layer_id']=self.layer_edit.currentData()
                     for shape in device['shapes']:
@@ -2303,12 +2359,12 @@ class CustomDevicePage(QWidget):
                 if kind == 'shapes':
                     obj['operation'] = self.operation_edit.currentData()
                 if kind == 'contacts':
-                    obj.update({key: widget.currentData() if isinstance(widget, QComboBox) else widget.value() for key, widget in self.contact_controls.items()})
+                    obj.update({key: widget.currentData() if isinstance(widget, QComboBox) else self._inspector_number(widget, obj.get(key)) for key, widget in self.contact_controls.items()})
                     obj['optical_material_name'] = self.optical_contact_controls['material'].currentData() or ''
-                    obj['optical_thickness_um'] = self.optical_contact_controls['thickness'].value()
+                    obj['optical_thickness_um'] = self._inspector_number(self.optical_contact_controls['thickness'], obj.get('optical_thickness_um'))
                 if kind in ('layers', 'doping_regions'):
-                    obj['donor_cm3'] = float(self.donor_edit.text())
-                    obj['acceptor_cm3'] = float(self.acceptor_edit.text())
+                    obj['donor_cm3'] = self._inspector_number(self.donor_edit, obj.get('donor_cm3'))
+                    obj['acceptor_cm3'] = self._inspector_number(self.acceptor_edit, obj.get('acceptor_cm3'))
             applied = self._commit(device)
             if applied:
                 self._diagnostic_drafts.pop(self.selected_id, None)

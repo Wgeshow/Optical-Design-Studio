@@ -106,6 +106,7 @@ class NativeOriginalOpticalWorkspaceTests(unittest.TestCase):
             self.store.settings['angle_stop'],self.store.settings['angle_step']),(1482.,7.,19.,6.))
 
     def test_original_manual_fields_button_submits_its_own_nondefault_controls(self):
+        self.page.optical_journey.select_stage('outputs');APP.processEvents()
         self.assertTrue(self.page.field_run.isVisible());self.assertTrue(self.page.field_run.isEnabled())
         self.enter_number(self.page.field_wavelength,1567.5)
         self.enter_number(self.page.field_controls['grid'],4)
@@ -133,15 +134,17 @@ class NativeOriginalOpticalWorkspaceTests(unittest.TestCase):
         self.assertEqual(self.window.simulation_engines.currentIndex(),7)
 
     def test_original_narrow_results_preserve_metric_text_and_3d_viewer_height(self):
+        self.page.optical_journey.show_results();APP.processEvents()
         self.page.result_tabs.setCurrentWidget(self.page.generated_volume)
         for width in (1024,640):
             self.window.resize(width,760);APP.processEvents();QTest.qWait(100)
-            panels=self.page.workspace_splitter
+            panels=self.page.journey_results_layout
             self.assertEqual(panels.orientation(),Qt.Orientation.Vertical)
-            self.assertGreaterEqual(panels.widget(1).height(),850)
+            self.assertGreaterEqual(panels.widget(0).height(),700)
             self.assertGreaterEqual(self.page.generated_volume.plot.height(),300)
             tabs=self.window.optical_workflow
-            self.assertEqual(tabs.tabText(tabs.currentIndex()),'Simulation')
+            self.assertIn('results',tabs.tabText(tabs.currentIndex()).lower())
+            self.assertEqual(self.window.study_navigation.current,self.page.optical_journey.bar._current)
             for label in self.page.power_values.values():
                 self.assertGreaterEqual(label.width(),label.fontMetrics().horizontalAdvance('0.7140'))
             self.assertLessEqual(self.window.chrome.file_button.geometry().right(),self.window.chrome.width())

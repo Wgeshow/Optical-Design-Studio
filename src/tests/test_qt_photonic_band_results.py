@@ -4,11 +4,13 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+import math
+import numpy as np
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
 from PyQt6.QtWidgets import QApplication
-from qt_photonic_band_results import PhotonicBandResultsPanel
+from qt_photonic_band_results import PhotonicBandResultsPanel, _path_vertex_ticks
 
 
 class PhotonicBandResultTests(unittest.TestCase):
@@ -72,6 +74,57 @@ class PhotonicBandResultTests(unittest.TestCase):
         self.assertEqual(self.panel.gaps.rowCount(), 0)
         self.assertIn('Partial', self.panel.status.text())
         self.assertEqual(self.panel.files.count(), 0)
+
+    def test_saved_square_path_uses_registered_unequal_vertex_distances(self):
+        folder = self.root/'square'
+        folder.mkdir()
+        points = [(0, 0), (.25, 0), (.5, 0), (.5, .25), (.5, .5), (.25, .25), (0, 0)]
+        distances = [0, .25, .5, .75, 1, 1+math.sqrt(.5)/2, 1+math.sqrt(.5)]
+        cfg = dict(dimension=2, lattice_vectors=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+            k_vertices=[[0, 0, 0], [.5, 0, 0], [.5, .5, 0], [0, 0, 0]],
+            sampling='k_vertices', points_per_segment=2)
+        summary = dict(engine='mpb', status='complete', path_connectivity=True, options=cfg)
+        (folder/'band_summary.json').write_text(json.dumps(summary), encoding='utf-8')
+        rows = ['k_index,k1,k2,k3,path_distance_reciprocal_a,band_1_a_over_lambda']
+        rows += [f'{i+1},{point[0]},{point[1]},0,{distance},{.1+i*.01}'
+                 for i, (point, distance) in enumerate(zip(points, distances))]
+        (folder/'bands_tm.csv').write_text('\n'.join(rows)+'\n', encoding='utf-8')
+        self.assertTrue(self.panel.load_directory(folder))
+        axis = self.panel.plot.figure.axes[0]
+        self.assertEqual([item.get_text() for item in axis.get_xticklabels()], ['Γ', 'X', 'M', 'Γ'])
+        np.testing.assert_allclose(axis.get_xticks(), [0, .5, 1, 1+math.sqrt(.5)])
+        np.testing.assert_allclose(self.panel.data['path_distance_reciprocal_a'], distances)
+        self.assertEqual(axis.get_legend_handles_labels()[1], ['Band 1'])
+
+        # Editing the saved cell or path must never keep inappropriate labels.
+        for change in ('lattice', 'vertices', 'sampling'):
+            modified = json.loads(json.dumps(summary))
+            if change == 'lattice': modified['options']['lattice_vectors'][1][0] = .2
+            elif change == 'vertices': modified['options']['k_vertices'][1] = [.37, .12, 0]
+            else: modified['options']['sampling'] = 'k_points'
+            self.assertIsNone(_path_vertex_ticks(modified, self.panel.data))
+        summary['options']['lattice_vectors'][1][0] = .2
+        (folder/'band_summary.json').write_text(json.dumps(summary), encoding='utf-8')
+        self.assertTrue(self.panel.load_directory(folder))
+        self.assertNotIn('Γ', [item.get_text() for item in self.panel.plot.figure.axes[0].get_xticklabels()])
+
+    def test_triangular_and_fcc_saved_paths_keep_their_own_coordinate_conventions(self):
+        cases = [
+            (2, [[1, 0, 0], [.5, math.sqrt(3)/2, 0], [0, 0, 1]],
+             [[0, 0, 0], [.5, 0, 0], [2/3, 1/3, 0], [0, 0, 0]], ['Γ', 'M', 'K', 'Γ']),
+            (3, [[0, .5, .5], [.5, 0, .5], [.5, .5, 0]],
+             [[0, 0, 0], [.5, 0, .5], [.5, .25, .75], [.375, .375, .75],
+              [.5, .5, .5], [.625, .25, .625]], ['Γ', 'X', 'W', 'K', 'L', 'U'])]
+        for dimension, lattice, vertices, labels in cases:
+            # The presentation must use the saved distances, never equally spaced ticks.
+            distances = np.cumsum([0] + [.4 + .1*i for i in range(len(vertices)-1)])
+            data = {f'k{i+1}': np.array(vertices)[:, i] for i in range(dimension)}
+            data['path_distance_reciprocal_a'] = distances
+            summary = dict(path_connectivity=True, options=dict(dimension=dimension,
+                lattice_vectors=lattice, k_vertices=vertices, sampling='k_vertices', points_per_segment=1))
+            actual_positions, actual_labels = _path_vertex_ticks(summary, data)
+            np.testing.assert_array_equal(actual_positions, distances)
+            self.assertEqual(actual_labels, labels)
 
 
 if __name__ == '__main__':

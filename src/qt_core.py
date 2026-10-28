@@ -696,6 +696,27 @@ class ProjectStore(QObject):
                 if not (name in constants and mode=='log_k')})
         self._finish_change(previous,reason)
 
+    def set_optical_exterior_material(self, side, material):
+        """Change one halfspace assignment without rebuilding the finite device."""
+        if side not in ('incident', 'exit'):
+            raise ValueError('Choose the incident or exit optical medium.')
+        if material not in set(self.materials['Name']):
+            raise ValueError('Choose an existing project optical material.')
+        if len(self.layers) < 2:
+            raise ValueError('The optical stack needs incident and exit media.')
+        index = 0 if side == 'incident' else len(self.layers)-1
+        if self.layers.iloc[index]['Material'] == material:
+            return
+        layers = self.layers.copy(deep=True)
+        layers.iat[index, layers.columns.get_loc('Material')] = material
+        validate_structure(self.materials, layers, self.patterns)
+        previous = self._capture()
+        self._undo.append(dict(device=copy.deepcopy(self.device), electrical_materials=copy.deepcopy(self.electrical_materials),
+            tables=(self.materials.copy(deep=True), self.layers.copy(deep=True), self.patterns.copy(deep=True)), settings=copy.deepcopy(self.settings)))
+        self._undo = self._undo[-30:]
+        self.layers = layers
+        self._finish_change(previous, 'structure')
+
     def undo(self):
         if not self._undo:
             raise ValueError('There is no earlier structure edit to restore.')

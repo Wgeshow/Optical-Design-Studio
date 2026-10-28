@@ -71,7 +71,9 @@ class SquareLatticeTests(unittest.TestCase):
         self.assertEqual(self.page.plot.figure.axes[0].get_xlabel(), 'x (nm)')
         self.assertAlmostEqual(self.page.plot.figure._s4_geometry['cut_y_um'], .03)
         self.page.view_mode.setCurrentIndex(1)
-        self.assertEqual(self.page.plot.figure.axes[0].get_zlabel(), 'Depth z (nm)')
+        self.assertIs(self.page.preview_plot_host.currentWidget(), self.page.native_geometry)
+        self.assertEqual(self.page.native_geometry.layers[1]['Thickness_um'], .25)
+        self.assertEqual(self.page.layer_thickness.value(), 333)
 
     def test_rectangular_unit_conversion_preserves_both_draft_lengths(self):
         self.page.square_lattice.setChecked(False)

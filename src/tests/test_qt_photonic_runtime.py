@@ -87,5 +87,48 @@ class RuntimeCheckTests(unittest.TestCase):
         widget.deleteLater()
 
 
+class RuntimeDiscoveryTests(unittest.TestCase):
+    def test_discovery_uses_optional_hints_not_strict_run_validation(self):
+        def strict():
+            raise ValueError('Enter an explicit runtime executable.')
+        widget = PhotonicRuntimeCheck(strict, get_discovery_settings=lambda: dict(
+            solver='legume', runtime=dict(mode='local', executable='', distro='')))
+        self.assertEqual(widget._setup_request(), ('legume', dict(mode='local', executable='', distro='')))
+        with patch('qt_solver_environment._SetupTask') as task_class:
+            widget.setup.start(False)
+            task_class.assert_called_once_with('legume', dict(mode='local', executable='', distro=''), False)
+            task_class.return_value.start.assert_called_once()
+            from qt_solver_environment import _tasks
+            _tasks.discard(task_class.return_value); widget.setup._task = None
+        widget.check()
+        self.assertIn('explicit runtime executable', widget.status.text())
+        widget.deleteLater()
+
+    def test_bands_discovery_accepts_missing_executable_and_timeout(self):
+        from types import SimpleNamespace
+        from qt_photonic_bands import PhotonicBandsWorkspace
+        text = lambda value: SimpleNamespace(text=lambda: value)
+        page = SimpleNamespace(runtime_mode=SimpleNamespace(currentData=lambda:'local'),
+            solver=SimpleNamespace(currentData=lambda:'legume'), distro=text(''), executable=text(''),
+            module_paths=text(''), library_paths=text(''), timeout=text('unfinished'))
+        self.assertEqual(PhotonicBandsWorkspace.runtime_discovery_settings(page),
+            dict(mode='local', distro='', executable='', module_paths=[], library_paths=[]))
+        with self.assertRaisesRegex(ValueError, 'explicit runtime executable'):
+            PhotonicBandsWorkspace.runtime_settings(page)
+
+    def test_launcher_file_choice_persists_and_invalidates_readiness(self):
+        widget = PhotonicRuntimeCheck(lambda: dict(solver='mpb', runtime={}))
+        widget._solver = 'mpb'; widget._checked_revision = widget._revision
+        selected = 'C:/User selected/WSL.exe'
+        with patch('qt_solver_environment.QFileDialog.getOpenFileName', return_value=(selected,'')), \
+             patch('meep_runtime.saved_wsl_launcher', return_value=''), \
+             patch('meep_runtime.save_wsl_launcher', return_value=selected) as save:
+            widget.setup.choose_wsl_launcher()
+        save.assert_called_once_with(selected)
+        self.assertNotEqual(widget._checked_revision, widget._revision)
+        self.assertIn('saved', widget.setup.status.text())
+        widget.deleteLater()
+
+
 if __name__ == '__main__':
     unittest.main()

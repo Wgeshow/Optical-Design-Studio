@@ -27,8 +27,39 @@ def wsl_executable():
         if not path.is_absolute() or not path.is_file() or path.suffix.lower() != '.exe':
             raise ValueError('ODS_WSL_EXECUTABLE must name an existing absolute WSL .exe path.')
         return str(path.resolve())
+    saved = saved_wsl_launcher()
+    if saved:
+        path = Path(saved)
+        if not path.is_absolute() or not path.is_file() or path.suffix.lower() != '.exe':
+            raise ValueError('The saved Windows WSL launcher is unavailable. Choose Windows WSL launcher in solver setup.')
+        return str(path.resolve())
     found = shutil.which('wsl.exe')
     return str(Path(found).resolve()) if found else 'wsl.exe'
+
+
+def wsl_launcher_configuration_path():
+    return configuration_path().with_name('wsl-launcher.json')
+
+
+def saved_wsl_launcher():
+    try:
+        value = json.loads(wsl_launcher_configuration_path().read_text(encoding='utf-8'))
+        if value.get('schema') == 1 and isinstance(value.get('executable'), str):
+            return value['executable']
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    return ''
+
+
+def save_wsl_launcher(executable):
+    """Save an explicit per-user launcher; never repair or replace Windows files."""
+    path = Path(executable)
+    if not path.is_absolute() or not path.is_file() or path.suffix.lower() != '.exe':
+        raise ValueError('Choose an existing absolute Windows WSL .exe path.')
+    value = str(path.resolve())
+    from data_library import write_json
+    write_json(wsl_launcher_configuration_path(), dict(schema=1, executable=value))
+    return value
 
 
 def configuration_path():

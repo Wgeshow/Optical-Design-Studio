@@ -18,46 +18,30 @@ class StudyFlow(QWidget):
         self.details = details
         self._updating = False
         self._last_theme = None
+        from qt_journey import JourneyBar
+        from qt_research_journey import ensure_execution_panels
+        ensure_execution_panels(workspace)
         self.stages = []
-        for title, sections in stages:
-            indices = []
-            for section in sections:
-                index = section if isinstance(section, int) else workspace.sections.get(section)
-                if index is None:
-                    index = next((i for i in range(workspace.tabs.count())
-                                  if workspace.tabs.tabText(i) == section), None)
-                if index is not None and 0 <= index < workspace.tabs.count() and index not in indices:
-                    indices.append(index)
-            if indices:
-                self.stages.append((title, indices))
-        self._last_sections = {i: values[1][0] for i, values in enumerate(self.stages)}
+        self._last_sections = {}
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(9)
-        self.navigation = QHBoxLayout()
-        self.buttons = []
-        for index, (title, _) in enumerate(self.stages):
-            button = QPushButton(str(index + 1)+'  '+title.replace('&', '&&'))
-            button.setCheckable(True)
-            button.setMinimumHeight(34)
-            button.setObjectName('studyStage')
-            button.setAccessibleName('Step '+str(index+1)+': '+title)
-            button.clicked.connect(lambda checked=False, value=index: self.show_stage(value))
-            self.navigation.addWidget(button)
-            self.buttons.append(button)
-        self.navigation.addStretch()
-        self.results_button = QPushButton('Results')
-        self.results_button.setMinimumHeight(34)
+        self.bar = JourneyBar(parent=self)
+        self.bar.stageRequested.connect(self.show_stage)
+        self.navigation = self.bar.navigation
+        self.buttons = self.bar.buttons
+        layout.addWidget(self.bar)
+        self.results_button = QPushButton('Results', self)
         self.results_button.clicked.connect(self.show_results)
-        self.navigation.addWidget(self.results_button)
-        self.more = QToolButton()
-        self.more.setText('More')
-        self.more.setMinimumHeight(34)
+        self.results_button.hide()
+        self.more = QToolButton(self)
+        self.more.setText('All sections')
+        self.more.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.more.setAccessibleName('All sections for this simulation')
+        self.more.setMinimumHeight(32)
         self.more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.menu = QMenu(self.more)
         self.more.setMenu(self.menu)
-        self.navigation.addWidget(self.more)
-        layout.addLayout(self.navigation)
         row = QHBoxLayout()
         self.section_label = QLabel('Section')
         row.addWidget(self.section_label)
@@ -72,6 +56,7 @@ class StudyFlow(QWidget):
         self.section_hint.setWordWrap(True)
         self.section_hint.setObjectName('studyMuted')
         row.addWidget(self.section_hint, 2)
+        row.addWidget(self.more)
         layout.addLayout(row)
         workspace.tabs.tabBar().hide()
         workspace.setProperty('guidedStudyWorkspace', True)
@@ -87,12 +72,82 @@ class StudyFlow(QWidget):
             install_results_navigation(workspace.results)
         theme_manager().appearance_changed.connect(self.apply_theme)
         theme_manager().changed.connect(self.apply_theme)
+        self.set_stages(stages)
         self.refresh()
         self.apply_theme()
 
+    def set_stages(self, stages):
+        resolved = []
+        used = set()
+        for title, sections in stages:
+            indices = []
+            for section in sections:
+                index = section if isinstance(section, int) else self.workspace.sections.get(section)
+                if index is None:
+                    index = next((i for i in range(self.workspace.tabs.count())
+                        if self.workspace.tabs.tabText(i) == section), None)
+                if index is not None and 0 <= index < self.workspace.tabs.count() and index not in used:
+                    indices.append(index)
+                    used.add(index)
+            if indices:
+                resolved.append((title, indices))
+        reserved = {self.workspace.sections['__journey_check'], self.workspace.sections['__journey_run']}
+        result = self.workspace.tabs.indexOf(getattr(self.workspace, 'results', None))
+        reserved.add(result)
+        allowed = getattr(self.workspace, 'journey_allowed_sections', lambda: None)()
+        for index in range(self.workspace.tabs.count()):
+            if index in used or index in reserved or not self.workspace.tabs.isTabVisible(index):
+                continue
+            if allowed is not None and index not in allowed:
+                continue
+            owner = self._section_owner(index, resolved)
+            if owner is None:
+                # Keep an otherwise unmatched section explicitly reachable rather
+                # than leaving the shell without a selected destination.
+                resolved.append((self.workspace.tabs.tabText(index), [index]))
+            else:
+                resolved[owner][1].append(index)
+            used.add(index)
+        for title, key in (('Check inputs', '__journey_check'), ('Run & progress', '__journey_run')):
+            index = self.workspace.sections[key]
+            if index not in used:
+                resolved.append((title, [index]))
+        result = self.workspace.tabs.indexOf(getattr(self.workspace, 'results', None))
+        if result >= 0 and result not in used:
+            resolved.append(('Results', [result]))
+        self.stages = resolved
+        self._last_sections = {i: self._last_sections.get(i, values[0]) if self._last_sections.get(i) in values else values[0]
+            for i, (_, values) in enumerate(self.stages)}
+        self.refresh()
+
+    def _section_owner(self, index, stages):
+        """Attach alternate views to the stage containing their real editor."""
+        w = self.workspace
+        keys = [key for key, value in w.sections.items() if value == index]
+        advanced_root = next((key[len('advanced_'):] for key in keys if key.startswith('advanced_')), None)
+        if advanced_root:
+            # Friendly inspectors and the full typed editor share one model.
+            # Their actual widget ancestry is authoritative after model-specific
+            # controls have been moved into their appropriate stage.
+            for collection in ('friendly_hosts', 'friendly_forms', 'fields'):
+                widget = getattr(w, collection, {}).get(advanced_root)
+                if widget is None:
+                    continue
+                for owner, (_, indices) in enumerate(stages):
+                    if any(w.tabs.widget(section).isAncestorOf(widget) for section in indices):
+                        return owner
+        if any(key.lower() in ('geometry', 'overview') for key in keys):
+            for key in ('design', 'device_editor', 'device_context'):
+                target = w.sections.get(key)
+                owner = next((i for i, (_, indices) in enumerate(stages) if target in indices), None)
+                if owner is not None:
+                    return owner
+            return 0 if stages else None
+        return None
+
     def show_stage(self, index):
         if 0 <= index < len(self.stages):
-            self.workspace.tabs.setCurrentIndex(self._last_sections[index])
+            self.workspace.tabs.setCurrentIndex(self._last_sections.get(index, self.stages[index][1][0]))
             self.refresh()
 
     def show_results(self):
@@ -107,6 +162,16 @@ class StudyFlow(QWidget):
     def refresh(self, *args):
         current = self.workspace.tabs.currentIndex()
         selected = next((i for i, (_, sections) in enumerate(self.stages) if current in sections), None)
+        icons = {'Check inputs':'check', 'Run & progress':'play', 'Results':'spectrum'}
+        describe = getattr(self.workspace, 'journey_stage_description', lambda title, sections: '')
+        self.bar.set_stages([dict(title=title, icon=icons.get(title, 'cube' if i==0 else 'settings'),
+            description=('Review the current inputs and jump directly to anything that needs attention.' if title=='Check inputs'
+                else 'Start or stop this workspace’s job and inspect its actual progress.' if title=='Run & progress'
+                else 'Inspect saved outputs, model limits and provenance.' if title=='Results'
+                else describe(title, sections) or 'Edit '+', '.join(self.workspace.tabs.tabText(j) for j in sections)+'.'))
+            for i, (title, sections) in enumerate(self.stages)])
+        self.buttons = self.bar.buttons
+        self.bar.set_current(selected if selected is not None else -1)
         self._updating = True
         try:
             self.sections.clear()
@@ -125,7 +190,10 @@ class StudyFlow(QWidget):
             self.section_hint.setText(self.workspace.tabs.tabText(current))
             self.section_hint.setVisible(len(indices) == 1)
             self.menu.clear()
+            allowed = getattr(self.workspace, 'journey_allowed_sections', lambda: None)()
             for index in range(self.workspace.tabs.count()):
+                if not self.workspace.tabs.isTabVisible(index) or (allowed is not None and index not in allowed):
+                    continue
                 action = self.menu.addAction(self.workspace.tabs.tabText(index))
                 action.setCheckable(True)
                 action.setChecked(index == current)
@@ -133,7 +201,7 @@ class StudyFlow(QWidget):
             if self.details:
                 self.menu.addSeparator()
                 self.menu.addAction('About this model', self.show_details)
-            self.results_button.setVisible(hasattr(self.workspace, 'results'))
+            self.results_button.hide()
         finally:
             self._updating = False
         self.adapt_layout()
@@ -170,7 +238,9 @@ class StudyFlow(QWidget):
         colors = COLORS[theme_manager().mode]
         from qt_reference_style import reference_icon
         for index, action in enumerate(self.buttons):
-            action.setIcon(reference_icon(('cube','settings','play')[min(index,2)], colors['accent']))
+            title=self.stages[index][0].lower()
+            icon='check' if 'check' in title else 'play' if 'run' in title else 'spectrum' if 'result' in title else 'cube' if index==0 else 'settings'
+            action.setIcon(reference_icon(icon, colors['accent']))
         self.results_button.setIcon(reference_icon('spectrum', colors['accent']))
         self.more.setIcon(reference_icon('more', colors['muted']))
         for action in self.workspace.findChildren(QPushButton):

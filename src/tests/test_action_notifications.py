@@ -22,6 +22,15 @@ class ActionNotificationTests(unittest.TestCase):
                      'Comparing saved field maps…', 'Results saved. Restarting the application…'):
             self.assertIsNone(completion_notice(text),text)
 
+    def test_long_completion_uses_one_unicode_ellipsis(self):
+        boundary='Exported '+('x'*136)
+        self.assertEqual(len(boundary),145)
+        self.assertEqual(completion_notice(boundary),('Exported',boundary))
+        title,summary=completion_notice(boundary+'x')
+        self.assertEqual(title,'Exported')
+        self.assertEqual(summary,boundary[:142]+'\u2026')
+        self.assertEqual(summary.encode('utf-8')[-3:],b'\xe2\x80\xa6')
+
     def test_success_hides_label_and_notifies_without_losing_feedback(self):
         host=QWidget();host.notify_action=Mock()
         layout=QVBoxLayout(host);label=ActionStatusLabel();layout.addWidget(label)

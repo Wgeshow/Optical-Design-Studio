@@ -194,8 +194,12 @@ class PcselSetupTests(unittest.TestCase):
             page.load_settings(settings)
             self.assertEqual(page.tabs.currentIndex(), page.sections['design'], model)
             self.assertEqual(page.options()['settings']['layers'], settings['layers'])
-            for index in range(page.tabs.count()):
-                page.study_flow.menu.actions()[index].trigger()
+            for index in sorted(page.journey_allowed_sections()):
+                if not page.tabs.isTabVisible(index):
+                    continue
+                action = next(action for action in page.study_flow.menu.actions()
+                    if action.isCheckable() and action.text() == page.tabs.tabText(index))
+                action.trigger()
                 self.assertNotEqual(page.tabs.currentIndex(), page.sections['study'], (model, index))
                 # Empty conditional sections must resolve to an actual setup;
                 # useful legacy raw editors remain reachable at stable indices.

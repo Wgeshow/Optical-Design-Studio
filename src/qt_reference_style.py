@@ -47,6 +47,9 @@ def reference_icon(name,color='#d4e7f7'):
     elif name in ('up','down'):
         y1,y2=(19,5) if name=='up' else (5,19)
         line(12,y1,12,y2);line(7,10 if name=='up' else 14,12,y2);line(17,10 if name=='up' else 14,12,y2)
+    elif name in ('back','next'):
+        tip,tail=(6,17) if name=='back' else (18,7)
+        line(tail,12,tip,12);line(12,6,tip,12);line(12,18,tip,12)
     elif name=='reset':
         p.drawArc(QRectF(4,4,16,16),25*16,295*16)
         line(20,3,20,9);line(14,9,20,9)

@@ -46,11 +46,27 @@ class StructuredValueEditor(QWidget):
         self.tree.itemChanged.connect(lambda *args: self.changed.emit())
         layout.addWidget(self.tree)
         row = QHBoxLayout()
+        self._actions = row
         row.addWidget(button('Add property or item', self.add_child))
         row.addWidget(button('Remove selected', self.remove_selected))
         row.addStretch()
         layout.addLayout(row)
         self.set_value(value)
+
+    def enable_flat_navigation(self):
+        """Use accessible group forms for the aperture tree-collapse workaround."""
+        if getattr(self, 'flat_form', None) is not None:
+            return self.flat_form
+        from qt_study_fields import FlatPropertyForm
+        self.flat_form = FlatPropertyForm(self, self)
+        self.layout().insertWidget(0, self.flat_form, 1)
+        self.tree.hide()
+        self.tree.setItemsExpandable(False)
+        for index in range(self._actions.count()):
+            widget = self._actions.itemAt(index).widget()
+            if widget is not None:
+                widget.hide()
+        return self.flat_form
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -78,6 +94,8 @@ class StructuredValueEditor(QWidget):
         self._append(self.tree, self.field, value)
         self.tree.expandToDepth(1)
         self.tree.blockSignals(False)
+        if getattr(self, 'flat_form', None) is not None:
+            self.flat_form.refresh()
 
     def set_template(self, value):
         """Display unspecified physical numbers as editable blanks, never zero defaults."""
@@ -141,6 +159,8 @@ class StructuredValueEditor(QWidget):
         append(self.tree, draft)
         self.tree.expandToDepth(1)
         self.tree.blockSignals(False)
+        if getattr(self, 'flat_form', None) is not None:
+            self.flat_form.refresh()
 
     def add_child(self):
         parent = self.tree.currentItem() or self.tree.topLevelItem(0)
@@ -150,6 +170,7 @@ class StructuredValueEditor(QWidget):
             return
         dialog = QDialog(self)
         dialog.setWindowTitle('Add editable property or item')
+        dialog.setMinimumWidth(440)
         layout = QFormLayout(dialog)
         name, kind = QLineEdit(), QComboBox()
         kind.addItems(['number', 'text', 'boolean', 'object', 'array'])
@@ -157,11 +178,42 @@ class StructuredValueEditor(QWidget):
         layout.addRow('Property name', name)
         layout.addRow('Value type', kind)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(dialog.accept); buttons.rejected.connect(dialog.reject)
+        error = label('')
+        layout.addRow(error)
+        is_array = parent.data(0, Qt.ItemDataRole.UserRole) == 'array'
+        name.setReadOnly(is_array)
+        def validate_name(*_):
+            proposed = name.text().strip()
+            duplicate = not is_array and any(parent.child(i).text(0).strip() == proposed for i in range(parent.childCount()))
+            self._property_add_error = ('Enter a nonempty property name.' if not proposed else
+                'This property already exists. Edit its existing value or choose a different name.' if duplicate else '')
+            error.setText(self._property_add_error)
+            error.setVisible(bool(self._property_add_error))
+            # A longer warning can arrive after the native dialog chose its
+            # initial size. Reserve its wrapped height instead of clipping it.
+            margins = layout.contentsMargins()
+            warning_width = dialog.minimumWidth() - margins.left() - margins.right()
+            error.setMinimumHeight(max(0, error.heightForWidth(warning_width)) if self._property_add_error else 0)
+            error.updateGeometry()
+            layout.invalidate()
+            dialog.adjustSize()
+            buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(not self._property_add_error)
+            return not self._property_add_error
+        def accept_valid():
+            if validate_name():
+                dialog.accept()
+        buttons.accepted.connect(accept_valid); buttons.rejected.connect(dialog.reject)
+        name.textChanged.connect(validate_name)
         layout.addRow(buttons)
-        if dialog.exec() == QDialog.DialogCode.Accepted and name.text().strip():
-            self._append(parent, name.text().strip(), {'number': 0., 'text': '', 'boolean': False, 'object': {}, 'array': []}[kind.currentText()])
-            parent.setExpanded(True); self.changed.emit()
+        validate_name()
+        if dialog.exec() == QDialog.DialogCode.Accepted and validate_name():
+            self._append(parent, str(parent.childCount()) if is_array else name.text().strip(),
+                         {'number': 0., 'text': '', 'boolean': False, 'object': {}, 'array': []}[kind.currentText()])
+            if getattr(self, 'flat_form', None) is None:
+                parent.setExpanded(True)
+            self.changed.emit()
+            return True
+        return False
 
     def remove_selected(self):
         selected = self.tree.currentItem()
@@ -206,11 +258,18 @@ class StructuredValueEditor(QWidget):
                     # Missing properties retain a real destination: the owning object.
                     break
                 item = child
+        return self.open_item(item)
+
+    def open_item(self, item):
+        if getattr(self, 'flat_form', None) is not None:
+            return self.flat_form.open_item(item)
         parent = item.parent()
         while parent:
             parent.setExpanded(True); parent = parent.parent()
         self.tree.setCurrentItem(item, 1)
+        item.setExpanded(True)
         self.tree.scrollToItem(item)
+        from qt_input_diagnostics import reveal_and_focus
         return reveal_and_focus(self.tree)
 
 
@@ -226,7 +285,7 @@ class PcselSweepEditor(QWidget):
         from qt_photonic_bands import _table
         self.workspace = workspace
         layout = QVBoxLayout(self); layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(label('Optional Cartesian sweep, at most 128 variants. Select a real input or stable layer/inclusion, '
+        layout.addWidget(label('Optional Cartesian sweep. Select a real input or stable layer/inclusion, '
             'add it, then enter explicit comma-separated values. All variants are checked before the first run.'))
         self.table = _table(['Quantity', 'Stable object ID', 'Object field', 'Explicit values'], 'PCSEL geometry and accuracy sweep')
         self.table.cellChanged.connect(lambda *args: self.changed.emit())
@@ -238,16 +297,39 @@ class PcselSweepEditor(QWidget):
         row.addWidget(button('Add target', self.add_target))
         row.addWidget(button('Remove selected', self.remove_selected))
         layout.addLayout(row)
+        layout.addWidget(label('Optional named structure variants. Rows with the same name form one variant; each listed override is applied together before the explicit sweep. Other device inputs remain shared. Values are inputs, never fitted results.'))
+        self.variant_table = _table(['Variant name', 'Quantity', 'Stable object ID', 'Object field', 'Value'], 'PCSEL named structure variant overrides')
+        self.variant_table.cellChanged.connect(lambda *args: self.changed.emit())
+        layout.addWidget(self.variant_table)
+        variant_row=QHBoxLayout()
+        variant_row.addWidget(button('Add variant override from target', self.add_variant_override))
+        variant_row.addWidget(button('Remove selected override', self.remove_variant_override))
+        layout.addLayout(variant_row)
+        settings = QFormLayout()
+        self.max_cases = QLineEdit('128'); self.max_cases.setAccessibleName('Maximum PCSEL sweep cases')
+        self.invalid_geometry = QComboBox(); self.invalid_geometry.addItem('Stop before running (default)', 'error'); self.invalid_geometry.addItem('Mask overlapping periodic geometry', 'mask')
+        self.invalid_geometry.setAccessibleName('Invalid sweep geometry policy')
+        settings.addRow('Maximum cases (1-4096)', self.max_cases)
+        settings.addRow('Invalid geometry', self.invalid_geometry)
+        layout.addLayout(settings)
+        self.max_cases.textChanged.connect(lambda *args: self.changed.emit())
+        self.invalid_geometry.currentIndexChanged.connect(lambda *args: self.changed.emit())
         self.refresh_targets()
+        workspace.fields['model'].currentIndexChanged.connect(self.refresh_targets)
 
     def refresh_targets(self):
+        from pcsel_research import active_input_paths
+        model = self.workspace.fields['model'].currentData()
+        active = active_input_paths(model) | {'fill_fraction'}
+        if model != 'vertical':active.add('center_scale')
         self.targets.clear()
         for key in self.scalar_paths:
+            if key not in active:continue
             title = {'fill_fraction': 'Total inclusion area fraction (scales each shape about its center)',
                      'center_scale': 'Inclusion center-position scale (dimensionless)'}.get(key, key.replace('_', ' '))
             self.targets.addItem(title, dict(path=key))
-        for field in ('width', 'height'):
-            self.targets.addItem('Aperture '+field+' (µm)', dict(path='aperture_um', field=field))
+        for field in (('width', 'height', 'side') if 'aperture_um' in active else ()):
+            self.targets.addItem(('Square cavity side (sets width and height)' if field == 'side' else 'Aperture '+field)+' (µm)', dict(path='aperture_um', field=field))
         for group in ('layers', 'shapes'):
             editor = self.workspace.structured.get(group)
             if editor is None:
@@ -259,9 +341,10 @@ class PcselSweepEditor(QWidget):
             for obj in objects:
                 if not isinstance(obj, dict) or not obj.get('id'):
                     continue
-                fields = ('thickness_nm', 'index') if group == 'layers' else ('radius', 'center_x', 'center_y') if obj.get('shape') == 'circle' else ()
+                fields = ('thickness_nm', 'index') if group == 'layers' else ('radius', 'center_x', 'center_y') if obj.get('shape') == 'circle' else ('base_length', 'base_angle_deg', 'rotation_deg', 'center_x', 'center_y') if obj.get('shape') == 'triangle' else ()
                 for field in fields:
-                    title = field.replace('_', ' ')+(' / a' if field in ('radius', 'center_x', 'center_y') else '')
+                    if model == 'vertical' and field in ('center_x', 'center_y'):continue
+                    title = {'base_length': 'Base length b / a', 'base_angle_deg': 'Base angle theta (degrees)', 'rotation_deg': 'Rotation (degrees)'}.get(field, field.replace('_', ' ')+(' / a' if field in ('radius', 'center_x', 'center_y') else ''))
                     self.targets.addItem(str(obj.get('name', obj['id']))+' · '+title,
                         dict(path=group, object_id=obj['id'], field=field))
 
@@ -288,6 +371,31 @@ class PcselSweepEditor(QWidget):
         if self.table.currentRow() >= 0:
             self.table.removeRow(self.table.currentRow()); self.changed.emit()
 
+    def add_variant_override(self):
+        from qt_photonic_bands import _fill, _rows
+        target=self.targets.currentData()
+        if not target:return
+        rows=_rows(self.variant_table)
+        current=self.variant_table.currentRow()
+        name=rows[current][0] if 0<=current<len(rows) else 'Variant '+str(len({r[0] for r in rows})+1)
+        rows.append([name,target['path'],target.get('object_id',''),target.get('field',''),''])
+        _fill(self.variant_table,rows);self.changed.emit()
+
+    def remove_variant_override(self):
+        if self.variant_table.currentRow()>=0:
+            self.variant_table.removeRow(self.variant_table.currentRow());self.changed.emit()
+
+    def _variants(self):
+        from qt_photonic_bands import _rows
+        groups={}
+        for row_index,(name,path,identity,field,value) in enumerate(_rows(self.variant_table)):
+            if not name.strip():raise FieldError('parameter_sweep.variants.'+str(row_index), 'Give this structure variant a name.')
+            override=dict(path=path,value=number(value,'parameter_sweep.variants.'+str(row_index)+'.value'))
+            if identity:override['object_id']=identity
+            if field:override['field']=field
+            groups.setdefault(name.strip(),[]).append(override)
+        return [dict(name=name,overrides=rows) for name,rows in groups.items()]
+
     def value(self):
         parameters = []
         for index, (path, identity, field, values) in enumerate(self._rows()):
@@ -300,22 +408,50 @@ class PcselSweepEditor(QWidget):
             if field:
                 row['field'] = field
             parameters.append(row)
-        return dict(parameters=parameters) if parameters else {}
+        variants=self._variants()
+        if not parameters:
+            if variants:raise FieldError('parameter_sweep','Add an explicit sweep parameter or remove the named variant overrides.')
+            return {}
+        maximum = number(self.max_cases.text(), 'parameter_sweep.max_cases', integer=True)
+        if not 1 <= maximum <= 4096: raise FieldError('parameter_sweep.max_cases', 'Maximum cases must be from 1 to 4096.')
+        result = dict(parameters=parameters)
+        if maximum != 128: result['max_cases'] = maximum
+        if self.invalid_geometry.currentData() != 'error': result['invalid_geometry'] = self.invalid_geometry.currentData()
+        if variants:result['variants']=variants
+        return result
 
     def set_value(self, value):
+        from qt_photonic_bands import _fill
+        self.max_cases.setText(str(value.get('max_cases', 128)))
+        self.invalid_geometry.setCurrentIndex(self.invalid_geometry.findData(value.get('invalid_geometry', 'error')))
         self._fill([[row['path'], row.get('object_id', ''), row.get('field', ''), ', '.join(map(str, row['values']))]
                     for row in value.get('parameters', [])])
+        _fill(self.variant_table,[[variant['name'],row['path'],row.get('object_id',''),row.get('field',''),str(row['value'])] for variant in value.get('variants',[]) for row in variant.get('overrides',[])])
         self.refresh_targets()
 
     def draft(self):
-        return {'rows': self._rows()}
+        from qt_photonic_bands import _rows
+        return {'rows': self._rows(), 'variant_rows':_rows(self.variant_table), 'max_cases': self.max_cases.text(), 'invalid_geometry': self.invalid_geometry.currentData()}
 
     def restore_draft(self, draft):
+        from qt_photonic_bands import _fill
+        self.max_cases.setText(draft.get('max_cases', '128'))
+        self.invalid_geometry.setCurrentIndex(self.invalid_geometry.findData(draft.get('invalid_geometry', 'error')))
         self._fill(draft.get('rows', []))
+        _fill(self.variant_table,draft.get('variant_rows',[]))
+        self.refresh_targets()
 
     def open_field(self, path, object_id=''):
         from qt_input_diagnostics import reveal_and_focus
         parts = path.split('.')
+        if 'variants' in parts:
+            row=0
+            index=parts.index('variants')
+            if len(parts)>index+1 and parts[index+1].isdigit():row=min(int(parts[index+1]),self.variant_table.rowCount()-1)
+            if row>=0:self.variant_table.setCurrentCell(row,4)
+            return reveal_and_focus(self.variant_table)
+        if parts[-1] == 'max_cases': return reveal_and_focus(self.max_cases)
+        if parts[-1] == 'invalid_geometry': return reveal_and_focus(self.invalid_geometry)
         row = next((i for i, values in enumerate(self._rows()) if object_id and values[1] == object_id), 0)
         if len(parts) > 1 and parts[1].isdigit():
             row = int(parts[1])
@@ -436,7 +572,7 @@ class StructuredStudyWorkspace(ResearchWorkspaceBase):
     def _add_pcsel_controls(self):
         _, layout = self.add_section('Editable starting structures')
         layout.addWidget(label('Recovered PCSEL example · an explicit starting structure, not a validated result. '
-            'Loading an example replaces this study draft only. All dimensions, layers and inclusions remain editable.'))
+            'Loading an example replaces only this study’s crystal geometry. The simulation model, solver and calibration inputs are retained. All dimensions, layers and inclusions remain editable.'))
         form = QFormLayout()
         self.example_kind = QComboBox(); self.example_kind.addItems(['hole', 'pillar'])
         self.example_shape = QComboBox(); self.example_shape.addItems(['CC', 'RIT'])
@@ -506,8 +642,26 @@ class StructuredStudyWorkspace(ResearchWorkspaceBase):
         try:
             from pcsel_research import paper_example
             fill = number(self.example_fill.text(), 'example_fill', positive=True)
-            self.load_settings(paper_example(self.example_kind.currentText(), self.example_shape.currentText(), fill))
+            example = paper_example(self.example_kind.currentText(), self.example_shape.currentText(), fill)
+            # This action imports a crystal geometry, not another model's full
+            # study. Keep the bound model, solver settings, source calibration,
+            # and unfinished nongeometry draft text in this owning document.
+            self._loading = True
+            try:
+                for key in ('lattice_nm', 'layers', 'shapes', 'top_index', 'bottom_index', 'inclusion_index'):
+                    editor = self.fields[key]
+                    if key in self.structured:
+                        editor.set_value(example[key])
+                    else:
+                        editor.setText(str(example[key]))
+                # Rebind friendly inspectors after replacing canonical tree items.
+                self.restore_draft(self.draft())
+            finally:
+                self._loading = False
+            self._edited()
             self.select_section('geometry')
+            self.save_draft()
+            self.status.setText('Recovered crystal geometry loaded. This simulation model and its solver/calibration inputs are unchanged.')
         except ValueError as exc:
             self.status.setText(str(exc))
 
@@ -551,21 +705,34 @@ class StructuredStudyWorkspace(ResearchWorkspaceBase):
 
     def options(self):
         settings = {}
+        active = None
+        if self.engine == 'pcsel':
+            from pcsel_research import active_input_paths
+            active = active_input_paths(self.fields['model'].currentData())
         for spec in self.schema:
             key, kind = spec['path'], spec.get('type', 'text')
             editor = self.fields[key]
-            if key in self.structured:
-                value = editor.value()
-                if value in ({}, []) and not spec.get('required') and 'default' not in spec:
+            try:
+                if key in self.structured:
+                    value = editor.value()
+                    if value in ({}, []) and not spec.get('required') and 'default' not in spec:
+                        continue
+                elif isinstance(editor, QComboBox):
+                    value = editor.currentData()
+                elif kind in ('number', 'integer'):
+                    if not editor.text().strip() and not spec.get('required'):
+                        continue
+                    value = number(editor.text(), key, integer=kind == 'integer', units=spec.get('unit', ''))
+                else:
+                    value = editor.text()
+            except ValueError:
+                if self.engine == 'pcsel' and key == 'reference_wavelength_nm' and self.fields['vertical_formulation'].currentData() != 'reference_wavelength':
+                    continue  # Retain unfinished inactive text in the draft, not the solver request.
+                if self.engine == 'pcsel' and key == 'vertical_mode_index' and self.fields['vertical_mode_selection'].currentData() != 'mode_index':
                     continue
-            elif isinstance(editor, QComboBox):
-                value = editor.currentData()
-            elif kind in ('number', 'integer'):
-                if not editor.text().strip() and not spec.get('required'):
-                    continue
-                value = number(editor.text(), key, integer=kind == 'integer', units=spec.get('unit', ''))
-            else:
-                value = editor.text()
+                if active is not None and key not in active:
+                    continue  # Keep inactive raw text in the draft, outside this request.
+                raise
             target = settings
             parts = key.split('.')
             for part in parts[:-1]:
@@ -574,6 +741,8 @@ class StructuredStudyWorkspace(ResearchWorkspaceBase):
         return dict(engine=self.engine, study=self.study, settings=settings)
 
     def load_settings(self, settings):
+        if not isinstance(settings,dict):
+            raise ValueError('Editable settings must be a JSON object.')
         for key,value in getattr(self,'_document_fields',{}).items():
             if key in settings and settings[key]!=value:
                 raise ValueError('These settings belong to a different simulation type. Choose that simulation before importing them.')
@@ -615,7 +784,13 @@ class StructuredStudyWorkspace(ResearchWorkspaceBase):
             try:
                 with open(path, encoding='utf-8') as stream:
                     value = json.load(stream)
-                self.load_settings(value.get('settings', value))
+                if not isinstance(value,dict):
+                    raise ValueError('The setup file must contain a JSON object.')
+                if 'settings' in value:
+                    if value.get('engine',self.engine)!=self.engine or value.get('study',self.study)!=self.study:
+                        raise ValueError('This setup belongs to a different simulation type. Open that simulation before importing it.')
+                    value=value['settings']
+                self.load_settings(value)
                 self.validate_inputs()
             except (ValueError, OSError) as exc:
                 self.status.setText('Import failed: '+str(exc))
@@ -693,7 +868,7 @@ class ResearchStudiesWorkspace(QWidget):
         self._capabilities = {row['engine']: row for row in list_capabilities() if row['engine'] != 'photonic_bands'}
         for engine, row in self._capabilities.items():
             self.selector.addItem(names.get(engine,row['label']), engine)
-        self.selector.addItem('Lumped laser model', 'lumped_laser')
+        self.selector.addItem('Steady-state laser estimate', 'lumped_laser')
         if 'reference_result' in self._pages:
             self.selector.addItem('Saved reference result', 'reference_result')
         self.selector.setCurrentIndex(max(0, self.selector.findData(previous)))

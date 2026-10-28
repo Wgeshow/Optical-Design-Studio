@@ -47,6 +47,15 @@ def validate_options(options):
     mode = str(options.get('charge_model', 'semiconductor'))
     if mode not in ('semiconductor', 'dielectric'):
         raise ValueError('charge_model must be semiconductor or dielectric')
+    if mode == 'semiconductor':
+        from electrical_material_library import require_carrier_properties
+        layers = {row['id'] for row in layer_bounds(device)}
+        used_materials = {row['material_id'] for row in device['layers'] if row['id'] in layers}
+        used_materials.update(row['material_id'] for row in device['shapes']
+            if row['enabled'] and row['layer_id'] in layers and row['operation'] == 'material')
+        for material in library:
+            if material['id'] in used_materials:
+                require_carrier_properties(material, 'The semiconductor charge model')
     from electrical_transport import validate_transport
     transport=validate_transport(options.get('transport'))
     required={'semiconductor_dd':'semiconductor','dielectric_leakage':'dielectric'}.get(transport['mode'])

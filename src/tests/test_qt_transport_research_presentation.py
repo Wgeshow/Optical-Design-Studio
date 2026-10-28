@@ -45,8 +45,9 @@ class TransportPresentationTests(unittest.TestCase):
             self.assertTrue(panel.select_object(identity))
             destinations = []; page.diagnosticRequested.connect(destinations.append)
             panel.edit_selected()
-            self.assertEqual(destinations[-1]['object_id'], identity)
-            self.assertEqual(destinations[-1]['workspace'], 'structure')
+            self.assertEqual(destinations, [])
+            self.assertEqual(page.device_editor.editor.selected_id, identity)
+            self.assertEqual(page.tabs.currentIndex(), page.sections['device_editor'])
             for mode in ('3d', 'top', 'section'):
                 panel.view_choice.setCurrentIndex(panel.view_choice.findData(mode))
                 APP.processEvents()

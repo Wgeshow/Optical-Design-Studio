@@ -5,12 +5,13 @@ from copy import deepcopy
 import csv
 from pathlib import Path
 from html import escape
+from zipfile import BadZipFile
 
 import numpy as np
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt, QSignalBlocker, QTimer
 from PyQt6.QtWidgets import (QComboBox, QFileDialog, QFormLayout, QHBoxLayout, QSpinBox,
-    QTableWidgetItem, QWidget, QVBoxLayout, QCheckBox, QSplitter, QTextBrowser, QScrollArea)
+    QTableWidgetItem, QWidget, QVBoxLayout, QCheckBox, QSplitter, QTextBrowser, QScrollArea, QGridLayout)
 
 from qt_common import PlotWidget
 from qt_input_diagnostics import reveal_and_focus
@@ -37,7 +38,8 @@ class ThermalResultsPanel(ResearchResultsPanel):
         controls.addWidget(self.quantity, 1)
         controls.addWidget(label('Depth slice'))
         controls.addWidget(self.slice)
-        controls.addWidget(button('Export slice CSV…', self.export_slice))
+        self.slice_export = button('Export slice CSV…', self.export_slice)
+        controls.addWidget(self.slice_export)
         layout.addLayout(controls)
         self.volume_plot = PlotWidget()
         layout.addWidget(self.volume_plot, 1)
@@ -48,19 +50,47 @@ class ThermalResultsPanel(ResearchResultsPanel):
         self.slice.valueChanged.connect(self.draw_volume)
         self.tabs.insertTab(0, page, 'Temperature map')
         install_result_picker(self, {})
+        self._clear_volume()
+
+    def _clear_volume(self):
+        self.volume = None
+        self.volume_plot.clear()
+        self.volume_note.setText('No saved thermal volume is available for this run.')
+        with QSignalBlocker(self.slice):
+            self.slice.setRange(0, 0)
+        for control in (self.quantity, self.slice, self.slice_export):
+            control.setEnabled(False)
 
     def load_directory(self, path):
+        self._clear_volume()
         loaded = super().load_directory(path)
-        self.volume = None
         file = Path(path)/'thermal_volume.npz'
         if loaded and file.is_file():
             try:
                 with np.load(file, allow_pickle=False) as data:
-                    self.volume = {key: data[key].copy() for key in ('temperature_K', 'temperature_rise_K', 'heat_density_W_m3', 'x', 'y', 'z')}
-                self.slice.setRange(0, self.volume['temperature_K'].shape[2]-1)
+                    volume = {key: data[key].copy() for key in ('temperature_K', 'temperature_rise_K', 'heat_density_W_m3', 'x', 'y', 'z')}
+                for key in ('x', 'y', 'z'):
+                    values = volume[key]
+                    if (not np.issubdtype(values.dtype, np.number) or not np.isrealobj(values)
+                            or values.ndim != 1 or not len(values) or not np.isfinite(values).all()
+                            or np.any(np.diff(values) <= 0)):
+                        raise ValueError(key+' coordinates must be finite, increasing, one-dimensional values.')
+                shape = tuple(len(volume[key]) for key in ('x', 'y', 'z'))
+                for key in ('temperature_K', 'temperature_rise_K', 'heat_density_W_m3'):
+                    values = volume[key]
+                    if (values.shape != shape or not np.issubdtype(values.dtype, np.number)
+                            or not np.isrealobj(values) or not np.isfinite(values).all()):
+                        raise ValueError(key+' must contain finite real values matching the saved coordinates.')
+                self.volume = volume
+                with QSignalBlocker(self.slice):
+                    self.slice.setRange(0, shape[2]-1)
+                self.quantity.setEnabled(True)
+                self.slice.setEnabled(shape[2] > 1)
+                self.slice_export.setEnabled(True)
                 self.tabs.setCurrentIndex(0)
                 self.draw_volume()
-            except (OSError, ValueError, KeyError) as exc:
+            except (OSError, ValueError, KeyError, EOFError, BadZipFile) as exc:
+                self._clear_volume()
                 self.volume_note.setText('Could not load the saved thermal volume: '+str(exc))
         return loaded
 
@@ -104,6 +134,7 @@ class ThermalSetupWorkspace(ResearchWorkspaceBase):
     def __init__(self, store, parent=None, *, document_id=None):
         super().__init__(store, parent, document_id=document_id)
         self._layer_ids, self._material_ids = [], []
+        self._power_drafts, self._conductivity_drafts = {}, {}
         self.heading.setText('Steady heat flow')
         self.description.setText('Prescribed layer power on the current editable device and mesh. '
             'This computes heat conduction with fixed material properties; it does not infer electrical heating or electrothermal feedback.')
@@ -153,12 +184,56 @@ class ThermalSetupWorkspace(ResearchWorkspaceBase):
         self.boundaries.cellChanged.connect(self._edited)
         self.sync_device()
         self._build_guided_setup()
+        from qt_study_device_editor import StudyDeviceEditor
+        _, editor_layout = self.add_section('Edit thermal domain', 'device_editor')
+        self.device_editor = StudyDeviceEditor(self)
+        self.device_editor.continue_requested.connect(lambda: self.study_flow.show_stage(1))
+        editor_layout.addWidget(self.device_editor, 1)
         self.finish_build()
         from qt_study_flow import install_study_flow
-        self.study_flow = install_study_flow(self, [('Device & power', [0]), ('Materials & cooling', [1, 2]), ('Calculate', [4])],
+        self.study_flow = install_study_flow(self, [('Device & power', [0, 'device_editor']), ('Conductivity', [1]), ('Cooling faces', [2]), ('Numerics & validity', [4])],
             subtitle='Use the current device, prescribe its heat, then define how that heat leaves the device.',
             details='Steady heat conduction with constant material properties. Electrical heating and temperature feedback are separate Advanced Transport models.')
+        for table in (self.powers, self.conductivities, self.boundaries):
+            table.cellChanged.connect(self.journey_execution.invalidate)
+        for row in range(self.boundaries.rowCount()):
+            self.boundaries.cellWidget(row, 1).currentIndexChanged.connect(self.journey_execution.invalidate)
         self._refresh_clean_ui()
+
+    def journey_review_fields(self):
+        """Review raw thermal drafts without parsing them or changing the device."""
+        device = getattr(self.store, 'device', None) or {}
+        layers = [row for row in device.get('layers', []) if row.get('enabled', True)]
+        shapes = [row for row in device.get('shapes', []) if row.get('enabled', True)]
+        mesh = device.get('mesh', {})
+        materials = {row['id']: row.get('name', row['id']) for row in getattr(self.store, 'electrical_materials', [])}
+        rows = [('', 'Input state', 'Draft values are shown as entered; Check inputs validates them. Geometry and mesh below are the applied device values.'),
+            ('device', 'Applied device geometry',
+             str(device.get('width_um', 'Not supplied'))+' × '+str(device.get('depth_um', 'Not supplied'))+
+             ' µm in x × y; '+str(len(layers))+' active layers; '+str(len(shapes))+' active patterns', 'device_editor'),
+            ('device.mesh', 'Applied mesh', ', '.join(str(key)+' = '+str(mesh[key])
+             for key in ('nx', 'ny', 'nz_per_layer', 'max_nodes') if key in mesh) or 'Not supplied', 'device_editor')]
+        for layer in layers:
+            rows.append(('device', 'Applied layer · '+str(layer.get('name', layer['id'])),
+                str(layer.get('thickness_um', 'Not supplied'))+' µm; material '+
+                str(materials.get(layer.get('material_id'), layer.get('material_id', 'Not supplied'))), 'device_editor'))
+        for row in _rows(self.powers):
+            rows.append(('power_by_layer_W', 'Layer power · '+row[0], (row[1] or 'Not supplied')+' W', 'heat_sources'))
+        for row in _rows(self.conductivities):
+            rows.append(('conductivity', 'Conductivity · '+row[0], (row[1] or 'Not supplied')+
+                ' W/(m K); source: '+(row[2] or 'Not supplied'), 'materials'))
+        for index, row in enumerate(_rows(self.boundaries)):
+            kind = self.boundaries.cellWidget(index, 1).currentText()
+            text = 'Insulated · no heat flux' if kind == 'insulated' else (
+                'Fixed temperature' if kind == 'fixed_temperature' else 'Convection')+'; reservoir '+(row[2] or 'Not supplied')+' K'
+            if kind == 'convection':
+                text += '; heat-transfer coefficient '+(row[3] or 'Not supplied')+' W/(m² K)'
+            rows.append(('boundaries.'+row[0]+'.kind', 'Cooling · '+self.face_names.get(row[0], row[0]), text, 'boundaries'))
+        rows.extend([
+            ('ambient_temperature_K', 'Reference temperature', (self.ambient.text() or 'Not supplied')+' K', 'review'),
+            ('temperature_limit_K', 'Material validity limit', self.limit.text()+' K' if self.limit.text() else 'Not supplied', 'review'),
+            ('void_conductivity_W_mK', 'Void conductivity', self.void_k.text()+' W/(m K)' if self.void_k.text() else 'Not supplied', 'materials')])
+        return rows
 
     def _build_guided_setup(self):
         self.heading.setText('Steady heat flow'); self.heading.setObjectName('studyPageTitle')
@@ -170,6 +245,9 @@ class ThermalSetupWorkspace(ResearchWorkspaceBase):
             [('material', 'Material', None), ('conductivity', 'Thermal conductivity (W / m K)', None),
              ('source', 'Source / reference', None)], 'Selected thermal material')
         self.material_inspector.note.setText('A positive conductivity and its source are required for every material in the mesh. No thermal conductivity is inferred from the optical index.')
+        conductivity_label=self.material_inspector.form.labelForField(self.material_inspector.editors['conductivity'])
+        conductivity_label.setWordWrap(False)
+        conductivity_label.setMinimumWidth(conductivity_label.fontMetrics().horizontalAdvance(conductivity_label.text())+10)
         self.boundary_inspector = TableRowInspector(self.boundaries,
             [('face', 'Device face', None), ('kind', 'Heat boundary', [('Insulated · no heat flux', 'insulated'),
               ('Fixed temperature', 'fixed_temperature'), ('Convection to a reservoir', 'convection')]),
@@ -190,6 +268,7 @@ class ThermalSetupWorkspace(ResearchWorkspaceBase):
         self.device_splitter=QSplitter(Qt.Orientation.Horizontal)
         context=QWidget(); left=QVBoxLayout(context); left.setContentsMargins(0,0,0,0)
         self.layer_preview=PlotWidget(); self.layer_preview.setMinimumSize(260,300); self.layer_preview.toolbar.hide()
+        self.layer_preview.canvas.mpl_connect('button_press_event', self._select_heated_layer)
         left.addWidget(self.layer_preview,1)
         self.layer_preview_note=label('Layer-stack schematic; patterned shapes are included in the saved device, not drawn in this section view.')
         left.addWidget(self.layer_preview_note)
@@ -198,7 +277,23 @@ class ThermalSetupWorkspace(ResearchWorkspaceBase):
         self.device_splitter.addWidget(context); self.device_splitter.addWidget(self.power_scroll)
         self.device_splitter.setStretchFactor(0,3); self.device_splitter.setStretchFactor(1,2)
         box.addWidget(self.device_splitter,1); replace_section(self,0,body)
-        body=QWidget(); box=QVBoxLayout(body); box.addWidget(self.material_inspector)
+        body=QWidget(); box=QVBoxLayout(body)
+        from qt_custom_device import DeviceCanvas
+        self.material_splitter = QSplitter(Qt.Orientation.Horizontal)
+        context = QWidget(); context_layout = QVBoxLayout(context)
+        context_layout.addWidget(label('Thermal material assignments', 'setupHeading'))
+        self.material_canvas = DeviceCanvas('3d'); self.material_canvas.setMinimumSize(220, 280)
+        self.material_canvas.object_selected.connect(self._select_thermal_material)
+        context_layout.addWidget(self.material_canvas, 1)
+        self.material_context = label('Select a device layer to edit its thermal conductivity and source.')
+        context_layout.addWidget(self.material_context)
+        self.material_splitter.addWidget(context)
+        self.material_scroll = QScrollArea(); self.material_scroll.setWidgetResizable(True)
+        self.material_scroll.setWidget(self.material_inspector); self.material_scroll.setMinimumWidth(290)
+        self.material_scroll.setMaximumWidth(480)
+        self.material_splitter.addWidget(self.material_scroll)
+        self.material_splitter.setStretchFactor(0, 3); self.material_splitter.setStretchFactor(1, 2)
+        box.addWidget(self.material_splitter, 1)
         self.void_toggle=QCheckBox('Void / ambient material conductivity'); box.addWidget(self.void_toggle)
         self.void_body=QWidget(); form=native_form(self.void_body)
         form.addRow('Void conductivity (W / m K)',self.void_k)
@@ -207,7 +302,26 @@ class ThermalSetupWorkspace(ResearchWorkspaceBase):
         replace_section(self,1,body)
         body=QWidget(); box=QVBoxLayout(body)
         self.boundary_summary=label(''); box.addWidget(self.boundary_summary)
-        box.addWidget(self.boundary_inspector)
+        from qt_custom_device import DeviceCanvas
+        self.cooling_splitter = QSplitter(Qt.Orientation.Horizontal)
+        face_body = QWidget(); face_layout = QVBoxLayout(face_body)
+        self.cooling_canvas = DeviceCanvas('3d')
+        self.cooling_canvas.setMinimumSize(220, 260)
+        self.cooling_canvas.pick_surface = True
+        self.cooling_canvas.surface_picked.connect(self._pick_cooling_surface)
+        face_layout.addWidget(self.cooling_canvas, 1)
+        self.cooling_note = label('Select an exterior face in the actual device, or use the six face buttons. Top is z_min; bottom is z_max.')
+        face_layout.addWidget(self.cooling_note)
+        buttons = QGridLayout(); self.cooling_face_buttons = {}
+        for i, (face, caption) in enumerate(self.face_names.items()):
+            action = button(caption, lambda checked=False, value=face: self.select_cooling_face(value))
+            action.setAccessibleName('Edit cooling boundary '+caption)
+            buttons.addWidget(action, i//2, i%2); self.cooling_face_buttons[face] = action
+        face_layout.addLayout(buttons)
+        self.cooling_splitter.addWidget(face_body)
+        self.cooling_splitter.addWidget(self.boundary_inspector)
+        self.cooling_splitter.setStretchFactor(0, 3); self.cooling_splitter.setStretchFactor(1, 2)
+        box.addWidget(self.cooling_splitter, 1)
         replace_section(self,2,body)
         # Keep original Results index 3; append the new review page at index 4.
         _, box=self.add_section('Review & calculate', 'review')
@@ -233,8 +347,43 @@ class ThermalSetupWorkspace(ResearchWorkspaceBase):
         restyle_inspectors(self)
 
     def edit_device(self):
-        self.diagnosticRequested.emit(dict(workspace='structure',section='device',field='device',
-            message='Edit the existing geometry, mesh or material assignments used by this heat calculation.'))
+        if not self._is_active_document():
+            return False
+        self.select_section('device_editor')
+        return self.device_editor.open_editor('device')
+
+    def select_cooling_face(self, face):
+        if not self._is_active_document() or face not in self.face_names:
+            return False
+        return self.open_diagnostic(dict(field='boundaries.'+face+'.kind'))
+
+    def _pick_cooling_surface(self, identity, surface):
+        device = self.store.device or {}
+        layers = [row for row in device.get('layers', []) if row.get('enabled', True)]
+        if not layers:
+            return
+        attached = next((row.get('layer_id', row['id']) for group in ('layers','shapes') for row in device.get(group, []) if row['id'] == identity), '')
+        if surface == 'top' and attached != layers[0]['id'] or surface == 'bottom' and attached != layers[-1]['id']:
+            self.cooling_note.setText('That is an internal layer surface. Select an exterior domain face or use its face button.')
+            return
+        face = {'top':'z_min','bottom':'z_max','side_x_min':'x_min','side_x_max':'x_max','side_y_min':'y_min','side_y_max':'y_max'}.get(surface)
+        if face:
+            self.select_cooling_face(face)
+
+    def _select_heated_layer(self, event):
+        if event.ydata is None or not self._is_active_document():
+            return
+        from device_model import layer_bounds
+        for layer in layer_bounds(self.store.device or {}):
+            if layer['z_min_um'] <= event.ydata <= layer['z_max_um'] and layer['id'] in self._layer_ids:
+                self.open_diagnostic(dict(field='power_by_layer_W', object_id=layer['id']))
+                return
+
+    def _select_thermal_material(self, identity):
+        row = next((row for group in ('layers','shapes') for row in (self.store.device or {}).get(group,[]) if row['id']==identity), None)
+        if row and row.get('material_id') in self._material_ids:
+            self.material_canvas.set_device(self.store.device, identity)
+            self.open_diagnostic(dict(field='conductivity', object_id=row['material_id']))
 
     def _queue_clean_refresh(self,*args):
         if hasattr(self,'_preview_timer'): self._preview_timer.start()
@@ -242,6 +391,15 @@ class ThermalSetupWorkspace(ResearchWorkspaceBase):
 
     def _refresh_clean_ui(self,*args):
         if not hasattr(self,'power_inspector'): return
+        if hasattr(self, 'cooling_canvas'):
+            self.cooling_canvas.set_device(self.store.device or {})
+        if hasattr(self, 'material_canvas'):
+            device=self.store.device or {}
+            self.material_canvas.set_device(device, self.material_canvas.selected)
+            index=self.conductivities.currentRow()
+            material=self._material_ids[index] if 0<=index<len(self._material_ids) else ''
+            used=[row['name'] for row in device.get('layers',[]) if row.get('material_id')==material and row.get('enabled',True)]
+            self.material_context.setText('Selected material: '+material+'\nUsed by layers: '+(', '.join(used) or 'patterned material / void')+'\nSupply positive constant isotropic conductivity and its source. No electrical heat is inferred.')
         for inspector in (self.power_inspector,self.material_inspector,self.boundary_inspector): inspector.refresh()
         row=self.boundaries.currentRow()
         kind=self.boundaries.cellWidget(row,1).currentText() if row>=0 else 'insulated'
@@ -293,21 +451,35 @@ class ThermalSetupWorkspace(ResearchWorkspaceBase):
             self.device_splitter.setMinimumHeight(330)
             self.device_splitter.setMaximumHeight(390 if self.width()<1000 else 550)
             self.device_splitter.setSizes([max(280,self.width()-370),320])
+        if hasattr(self, 'cooling_splitter'):
+            self.cooling_splitter.setOrientation(Qt.Orientation.Vertical if self.width()<900 else Qt.Orientation.Horizontal)
+        if hasattr(self, 'material_splitter'):
+            self.material_splitter.setOrientation(Qt.Orientation.Vertical if self.width()<900 else Qt.Orientation.Horizontal)
+            self.material_scroll.setMaximumWidth(16777215 if self.width()<900 else 480)
 
     def _store_changed(self, reason=''):
         super()._store_changed(reason)
-        if hasattr(self,'power_inspector') and reason in ('device','structure','electrical_materials','project','load','reset','all'):
+        if not self._is_active_document():
+            return
+        if hasattr(self,'power_inspector') and reason in ('device','structure','electrical_materials','project','study','load','reset','all'):
             # Reconcile by stable IDs so returning from Structure never shows an old device.
             self.sync_device()
 
+    def _capture_assignments(self):
+        # Keep raw, unfinished values for disabled objects and geometry undo.
+        # Only active rows are parsed by options(); the cache is document-local.
+        self._power_drafts.update({identity: row[1] for identity, row in zip(self._layer_ids, _rows(self.powers))})
+        self._conductivity_drafts.update({identity: row[1:] for identity, row in zip(self._material_ids, _rows(self.conductivities))})
+
     def sync_device(self):
+        if not self._is_active_document():
+            return
         device = getattr(self.store, 'device', None) or {}
         mesh=device.get('mesh',{})
         self.device_note.setText(str(device.get('name', 'No editable device. Create one in Structure.'))+
             ' · '+str(len([row for row in device.get('layers',[]) if row.get('enabled',True)]))+' active layers'+
             ' · mesh '+', '.join(str(key)+' '+str(value) for key,value in mesh.items() if key in ('nx','ny','nz','nz_per_layer')))
-        previous_power = {identity: row[1] for identity, row in zip(self._layer_ids, _rows(self.powers))}
-        previous_k = {identity: row[1:] for identity, row in zip(self._material_ids, _rows(self.conductivities))}
+        self._capture_assignments()
         layers = [row for row in device.get('layers', []) if row.get('enabled', True)]
         materials = list(getattr(self.store, 'electrical_materials', []))
         used = {row.get('material_id') for row in layers}
@@ -315,8 +487,8 @@ class ThermalSetupWorkspace(ResearchWorkspaceBase):
         names = {row['id']: row.get('name', row['id']) for row in materials}
         self._layer_ids = [row['id'] for row in layers]
         self._material_ids = sorted(used-{None, ''})
-        _fill(self.powers, [[row['name'], previous_power.get(row['id'], '0')] for row in layers])
-        _fill(self.conductivities, [[names.get(identity, identity)]+previous_k.get(identity, ['', '']) for identity in self._material_ids])
+        _fill(self.powers, [[row['name'], self._power_drafts.get(row['id'], '0')] for row in layers])
+        _fill(self.conductivities, [[names.get(identity, identity)]+self._conductivity_drafts.get(identity, ['', '']) for identity in self._material_ids])
         for table in (self.powers, self.conductivities):
             for row in range(table.rowCount()):
                 table.item(row, 0).setFlags(table.item(row, 0).flags() & ~Qt.ItemFlag.ItemIsEditable)
@@ -324,14 +496,19 @@ class ThermalSetupWorkspace(ResearchWorkspaceBase):
         self._queue_clean_refresh()
 
     def draft(self):
+        self._capture_assignments()
         state = super().draft()
-        state.update(layer_ids=list(self._layer_ids), material_ids=list(self._material_ids), powers=_rows(self.powers),
+        state.update(power_drafts=deepcopy(self._power_drafts), conductivity_drafts=deepcopy(self._conductivity_drafts),
+            layer_ids=list(self._layer_ids), material_ids=list(self._material_ids), powers=_rows(self.powers),
             conductivities=_rows(self.conductivities), boundaries=_rows(self.boundaries),
             boundary_kinds=[self.boundaries.cellWidget(i, 1).currentText() for i in range(6)])
         return state
 
     def restore_draft(self, state):
         super().restore_draft(state)
+        # Reset on document replacement; older drafts are seeded from their rows.
+        self._power_drafts = deepcopy(state.get('power_drafts', {}))
+        self._conductivity_drafts = deepcopy(state.get('conductivity_drafts', {}))
         self._layer_ids = list(state.get('layer_ids', self._layer_ids))
         self._material_ids = list(state.get('material_ids', self._material_ids))
         for key, table in [('powers', self.powers), ('conductivities', self.conductivities)]:
@@ -346,6 +523,7 @@ class ThermalSetupWorkspace(ResearchWorkspaceBase):
         for table in (self.powers,self.conductivities):
             for row in range(table.rowCount()):
                 table.item(row,0).setFlags(table.item(row,0).flags() & ~Qt.ItemFlag.ItemIsEditable)
+        self._capture_assignments()
         self._queue_clean_refresh()
 
     def options(self):
@@ -384,8 +562,7 @@ class ThermalSetupWorkspace(ResearchWorkspaceBase):
 
     def open_diagnostic(self, target):
         if target.get('field') == 'device':
-            self.diagnosticRequested.emit(dict(target, workspace='structure'))
-            return False
+            return self.edit_device()
         identity, field = target.get('object_id'), target.get('field', '').removeprefix('settings.')
         if identity and (field.startswith('power') or field.startswith('conductivity')):
             ids, table = (self._layer_ids, self.powers) if field.startswith('power') else (self._material_ids, self.conductivities)

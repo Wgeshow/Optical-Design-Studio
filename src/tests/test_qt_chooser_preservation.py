@@ -132,14 +132,17 @@ class ChooserPreservationTests(unittest.TestCase):
                 window._open_simulation_choice('papers')
                 self.assertEqual(store.active_study,active)
                 self.assertEqual(chooser.library_page.tabs.currentIndex(),1)
-                # On a compact window the paper details and both launch
-                # actions remain reachable through the outer page scroll.
+                # The new reference journey separates browsing, scope review
+                # and opening the editable setup. All actions remain reachable.
                 window._open_simulation_choice('papers')
                 window.resize(800,760);window.show();window.adapt_interface();QTest.qWait(80)
                 library=chooser.library_page;library.adapt_layout();APP.processEvents()
                 self.assertEqual(library.paper_scroll.horizontalScrollBar().maximum(),0)
+                library._show_paper_stage(1);APP.processEvents()
                 self.assertGreaterEqual(library.paper_splitter.widget(1).height(),180)
+                library._show_paper_stage(2);APP.processEvents()
                 for action in (library.edit_button,library.reference_button):
+                    self.assertTrue(action.isVisible())
                     library.paper_scroll.ensureWidgetVisible(action);APP.processEvents()
                     center=action.mapTo(library.paper_scroll.viewport(),action.rect().center())
                     self.assertTrue(library.paper_scroll.viewport().rect().contains(center))

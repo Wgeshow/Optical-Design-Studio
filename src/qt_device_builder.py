@@ -674,7 +674,7 @@ class DeviceBuilderPage(StructurePage):
         self.look_selector.hide();splitter.addWidget(inspector);splitter.setSizes([350,720,370]);splitter.setStretchFactor(0,0);splitter.setStretchFactor(1,1);splitter.setStretchFactor(2,0)
         root.addWidget(self.status);self.status.hide();self._refresh_look()
         self.layer_material.setMinimumContentsLength(8)
-        for field in (self.layer_thickness,self.quick_radius,self.quick_radius_y):field.setDecimals(1)
+        for field in (self.quick_radius,self.quick_radius_y):field.setDecimals(1)
         self.layer_color_button.setText('Layer color…')
         self.cells.setCurrentIndex(1);self.set_geometry_view('3D Stack');self._lattice_mode_changed(True)
 
