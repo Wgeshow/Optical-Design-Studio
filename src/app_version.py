@@ -6,8 +6,8 @@ import struct
 
 from desktop_runtime import application_root
 
-APP_VERSION = '1.3.3'
-BUILD_DATE = '2026-10-26'
+APP_VERSION = '1.3.4'
+BUILD_DATE = '2026-10-28'
 
 
 def installation_info():

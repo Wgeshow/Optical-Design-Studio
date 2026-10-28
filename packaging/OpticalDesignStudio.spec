@@ -17,7 +17,10 @@ for path in reversed([source, *dependency_paths]):
 official_runtime = Path(os.environ['ODS_OFFICIAL_RUNTIME'])
 env_bin = official_runtime
 
-data = [(str(root/'seed_library.zip'), '.'), (str(source/'S4_Studio.ico'), '.'),
+import ssl
+ssl_policy = Path(ssl.__file__).with_name('codex-rejected-cas.pem')
+
+data = ([(str(ssl_policy), '.')] if ssl_policy.is_file() else []) + [(str(root/'seed_library.zip'), '.'), (str(source/'S4_Studio.ico'), '.'),
         (str(source/'meep_runner.py'), '.'),
         (str(source/'simulation_setup_plan.json'), '.'),
         (str(source/'pcs_s4_runtime'/'s4_runtime.py'), 'pcs_s4_runtime'),
@@ -68,7 +71,8 @@ binaries += [(str(source/'pcs_s4_runtime'/'S4.cp312-win_amd64.pyd'), 'pcs_s4_run
 binaries += collect_dynamic_libs('devsim')
 data += collect_data_files('devsim')
 
-hidden = ['matplotlib.backends.backend_agg', 'PyQt6.sip', 'yaml',
+hidden = ['matplotlib.backends.backend_agg', 'matplotlib.backends.backend_pdf',
+          'matplotlib.backends.backend_svg', 'PyQt6.sip', 'yaml',
           'qt_native_plot', 'qt_native_figure', 'qt_native_field_volume',
           'qt_field_volume', 'qt_structure_3d', 'qt_lattice_diagram', 'qt_windows_glass',
           'qt_pcsel', 'qt_multi_hole', 'qt_design_materials', 'circle_geometry', 'optical_objective',
