@@ -1,9 +1,7 @@
-# Optical Design Studio 1.3.4
+# Optical Design Studio 1.3.5
 
-Fixes two packaging errors in 1.3.3:
-- Material search (including GaAs) failed with a missing-file error while creating an HTTPS context. The required Python certificate policy file is now included.
-- PDF and SVG phase/figure exports failed because export backends and font dependencies were missing. These are now included.
+Long simulations no longer stop after an elapsed-time limit. Saved timeout settings are migrated to unlimited execution. The desktop watchdog, S4 and GPU workers, field sampling, optimization searches, and Meep simulation stream no longer enforce wall-clock cutoffs. Saving completed results can also take longer than five minutes.
 
-The portable Windows ZIP supports the in-app software updater and includes a complete SHA-256 payload manifest. Existing 1.3.3 installations missing the certificate policy file need the small HTTPS repair before their update check can connect; the local installation used for verification has been repaired.
+Stop/cancel remains available. User-selected sample/design budgets, physical FDTD stopping conditions, numerical convergence checks, and setup/download timeouts remain in effect.
 
-Preserves the 1.3.3 Absolute Phase Fix simulation code. This release changes packaging and release identity only; it does not add physics validation or resolve prior paper-comparison limitations.
+Includes the 1.3.4 material-search HTTPS and PDF/SVG export repairs. Delivered as a full manifest-verified portable Windows ZIP for Help > Updates > Update restart.

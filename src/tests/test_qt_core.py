@@ -126,7 +126,7 @@ class QtCoreTests(unittest.TestCase):
                 self.assertEqual(len(completed),0 if cancel else 1)
                 self.assertEqual(read_json(worker.directory/'library_record.json')['status'],'cancelled' if cancel else 'complete')
 
-    def test_repeated_finalization_events_cannot_extend_the_five_minute_save_limit(self):
+    def test_finalization_can_finish_after_the_old_five_minute_limit(self):
         worker=BackendWorker('simulation',self.small_project(),{},self.library)
         self.workers.append(worker)
         completed,failed=[],[]
@@ -147,9 +147,8 @@ class QtCoreTests(unittest.TestCase):
         with patch('qt_core.subprocess.Popen',side_effect=lambda *a,**kw:FinishedProcess()),patch('qt_core.time.monotonic',side_effect=lambda:clock[0]):
             worker.run()
         self.assertEqual(len(finalizations),2)
-        self.assertEqual(completed,[])
-        self.assertEqual(len(failed),1)
-        self.assertIn('exceeded five minutes',failed[0])
+        self.assertEqual(len(completed),1)
+        self.assertEqual(failed,[])
 
     def test_autosave_restore_and_undo_preserve_one_shared_structure(self):
         changes = []
@@ -230,7 +229,7 @@ class QtCoreTests(unittest.TestCase):
                 self.store.update_settings(change)
             self.assertEqual(self.store.project(), original)
         for change in ({'threads': True}, {'workers': float('nan')}, {'require_gpu': 1},
-                       {'gpu_block': 'invalid'}, {'mode': 'unknown'}, {'timeout_seconds': 2**40}):
+                       {'gpu_block': 'invalid'}, {'mode': 'unknown'}):
             with self.subTest(change=change), self.assertRaises(ValueError):
                 self.store.update_performance(change)
             self.assertEqual(self.store.project(), original)

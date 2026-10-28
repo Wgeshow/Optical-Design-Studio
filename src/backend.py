@@ -259,8 +259,6 @@ def execute(model, p, emit=lambda event: None, cancelled=lambda: False, checkpoi
         while completed < len(points) or busy:
             if cancelled():
                 raise Cancelled("Cancelled by user; worker processes stopped")
-            if time.monotonic() - started > p["timeout_seconds"]:
-                raise TimeoutError(f"Run exceeded {p['timeout_seconds']} seconds; worker processes stopped")
             ready = wait(list(connections), timeout=0.15)
             for connection in ready:
                 try:

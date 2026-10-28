@@ -166,9 +166,6 @@ class ManagedProcess:
         started, requested = time.monotonic(), None
         while True:
             now = time.monotonic()
-            if now-started > timeout:
-                self.terminate(force=True)
-                raise TimeoutError('The Meep operation exceeded its time limit.')
             if cancelled.is_set():
                 if requested is None:
                     requested = now

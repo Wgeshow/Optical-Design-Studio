@@ -12,7 +12,7 @@ MODES = ("CPU only", "CPU + GPU", "GPU-assisted (one worker)")
 SOLVER_BACKENDS = ('native', 'eigenfree-gpu')
 DEFAULT_PERFORMANCE = dict(mode=MODES[0], workers=0, threads=1, gpu_device=0,
                            gpu_min_n=1024, gpu_block=256, chunk_size=8,
-                           timeout_seconds=3600, require_gpu=False,
+                           timeout_seconds=0, require_gpu=False,
                            solver_backend='native', mirror_symmetry=True,
                            eigenfree_symmetry=True, eigenfree_batch_size=32)
 # Sweeps are evaluated in performance-sized chunks by the compute layer.  Keep
@@ -288,6 +288,7 @@ def prepare(materials, layers, patterns, files, settings, compact_points=False):
 
 def performance(values, point_count, cpu_count):
     p = dict(DEFAULT_PERFORMANCE, **values)
+    p["timeout_seconds"] = 0  # Legacy saved limits no longer stop calculations.
     if p['solver_backend'] not in SOLVER_BACKENDS:
         raise ValueError('Invalid solver backend')
     for name in ('mirror_symmetry', 'eigenfree_symmetry'):
@@ -304,7 +305,7 @@ def performance(values, point_count, cpu_count):
         raise ValueError("Require GPU work must be true or false")
     if p["mode"] not in MODES:
         raise ValueError("Invalid CPU/GPU mode")
-    for name, minimum in (("workers", 0), ("threads", 1), ("gpu_device", 0), ("gpu_min_n", 1), ("gpu_block", 64), ("chunk_size", 1), ("timeout_seconds", 1)):
+    for name, minimum in (("workers", 0), ("threads", 1), ("gpu_device", 0), ("gpu_min_n", 1), ("gpu_block", 64), ("chunk_size", 1), ("timeout_seconds", 0)):
         p[name] = integer(p[name], name.replace("_", " "), minimum)
     if p["gpu_block"] not in (64, 128, 256, 512, 1024):
         raise ValueError("GPU tile size must be 64, 128, 256, 512 or 1024")

@@ -1869,12 +1869,13 @@ class SettingsPage(_RunPage):
             'mode': _combo(MODES), 'workers': integer(0, 0, cpus), 'threads': integer(1, 1, cpus),
             'gpu_device': integer(0, 0, 1024), 'gpu_min_n': integer(1024, 1, 2147483647),
             'gpu_block': _combo([(str(value), value) for value in (64, 128, 256, 512, 1024)], 256),
-            'chunk_size': integer(8, 1, 10000), 'timeout_seconds': integer(3600, 1, 2147483647),
+            'chunk_size': integer(8, 1, 10000), 'timeout_seconds': integer(0, 0, 2147483647),
             'require_gpu': _check('Require successful GPU work', False),
         }
         runtime, form = self._card('CPU resources', [(label, self.controls[key]) for label, key in
             [('Execution mode', 'mode'), ('CPU workers (0 = automatic)', 'workers'), ('Threads per worker', 'threads'),
-             ('Wavelengths per work chunk', 'chunk_size'),('Run timeout (seconds)', 'timeout_seconds')]])
+             ('Wavelengths per work chunk', 'chunk_size')]])
+        self.controls['timeout_seconds'].hide()
         controls.addWidget(runtime)
         controls.addWidget(self._note(f'{cpus} logical CPUs available. Worker count × threads per worker cannot exceed this count.'))
         self.execution_note=self._note('Changes remain a draft until you apply them to the current setup or save defaults for new projects.')

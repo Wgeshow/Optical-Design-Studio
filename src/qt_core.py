@@ -117,6 +117,7 @@ def desktop_performance(values):
     supplied = _mapping(values, 'Performance settings')
     result = dict(DEFAULT_PERFORMANCE)
     result.update({key: value for key, value in supplied.items() if key in result})
+    result['timeout_seconds'] = 0
     if result['solver_backend'] not in SOLVER_BACKENDS:
         raise ValueError('Invalid solver backend.')
     for key in ('mirror_symmetry', 'eigenfree_symmetry'):
@@ -132,7 +133,7 @@ def desktop_performance(values):
         raise ValueError('Require GPU work must be true or false.')
     for key, minimum, maximum in (('workers', 0, 2147483647), ('threads', 1, 2147483647),
             ('gpu_device', 0, 1024), ('gpu_min_n', 1, 2147483647), ('gpu_block', 64, 1024),
-            ('chunk_size', 1, 10000), ('timeout_seconds', 1, 2147483647)):
+            ('chunk_size', 1, 10000), ('timeout_seconds', 0, 2147483647)):
         result[key] = _desktop_number(result[key], key, integral=True, minimum=minimum, maximum=maximum)
     if result['gpu_block'] not in (64, 128, 256, 512, 1024):
         raise ValueError('GPU tile size must be 64, 128, 256, 512 or 1024.')
@@ -437,7 +438,6 @@ class BackendWorker(QThread):
                 reader=threading.Thread(target=read_output,daemon=True)
                 reader.start()
                 started=time.monotonic()
-                deadline=started+float(spec['performance']['timeout_seconds'])+15
                 cancel_started=None
                 finalization_deadline=None
                 while True:
@@ -445,12 +445,9 @@ class BackendWorker(QThread):
                         (directory/'cancel.flag').touch()
                         cancel_started=cancel_started or time.monotonic()
                     now=time.monotonic()
-                    active_deadline=finalization_deadline if finalization_deadline is not None else deadline
-                    if now>active_deadline or (cancel_started and finalization_deadline is None and now-cancel_started>10):
+                    if cancel_started and finalization_deadline is None and now-cancel_started>10:
                         self._stop_process()
-                        if finalization_deadline is not None:
-                            raise RuntimeError('Saving completed results exceeded five minutes; committed samples remain in the run folder.')
-                        raise RuntimeError('Calculation cancelled.' if cancel_started else 'Calculation exceeded its time limit.')
+                        raise RuntimeError('Calculation cancelled.')
                     try:
                         event=messages.get(timeout=.2)
                     except queue.Empty:
@@ -460,10 +457,8 @@ class BackendWorker(QThread):
                     if event is None:
                         break
                     if event.get('kind')=='finalizing' and finalization_deadline is None:
-                        # Native workers have stopped. Large exact CSV/index
-                        # exports need a separate bounded saving window, including
-                        # after Stop; further events cannot extend that window.
-                        finalization_deadline=time.monotonic()+300
+                        # Preserve all completed samples, however long saving takes.
+                        finalization_deadline=True
                         self.event.emit(dict(kind='log',directory=str(directory),run_kind=self.kind,
                                              text=event.get('text','Saving completed samples…')))
                     event.update(directory=str(directory),run_kind=self.kind)

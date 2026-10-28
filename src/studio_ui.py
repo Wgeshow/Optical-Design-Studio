@@ -105,7 +105,7 @@ def build_studio_ui(app):
         threshold=number(1024,'Minimum GPU matrix size',precision=0,minimum=1,
                          info='All matrix dimensions must meet this threshold. 1 allows small products onto the GPU.')
         block=gr.Dropdown([64,128,256,512,1024],value=256,label='GPU tile size',render=False)
-        timeout=number(3600,'Time limit per run (seconds)',precision=0,minimum=1)
+        timeout=number(0,'Elapsed-time limit disabled',precision=0,minimum=0,visible=False)
         strict=gr.Checkbox(False,label='Require GPU work to succeed',render=False)
         settings=[ax,ay,numg,mode,w0,w1,ws,fixed,theta,phi,a0,a1,astep,pol]
         perf=[hardware,workers,threads,device,threshold,block,chunk,timeout,strict]

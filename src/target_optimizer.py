@@ -224,8 +224,7 @@ def execute_target_search(base,perf,cfg,directory,executor,emit,cancelled,field_
 
     def guard():
         if cancelled(): raise Cancelled('Target search cancelled; completed spectra and fields retained')
-        remaining=perf['timeout_seconds']-(time.monotonic()-started)
-        if remaining<1: raise TimeoutError('Whole-search time budget reached')
+        remaining = 0  # No elapsed-time limit.
         return remaining
 
     def track(record,folder):
@@ -273,7 +272,7 @@ def execute_target_search(base,perf,cfg,directory,executor,emit,cancelled,field_
                 if not wavelengths: break
                 if spent+len(wavelengths)>cfg['point_budget']: raise TimeoutError('Spectral-point budget reached')
                 evaluation=dict(model,points=[[i,w,base['points'][0][2]] for i,w in enumerate(wavelengths)])
-                rows,_=executor(evaluation,dict(perf,timeout_seconds=max(1,int(guard()))),lambda event:None,cancelled)
+                rows,_=executor(evaluation,dict(perf,timeout_seconds=guard()),lambda event:None,cancelled)
                 spent+=len(rows)
                 if not valid_spectrum(rows):
                     raise ValueError('Nonphysical spectral observation')
@@ -285,7 +284,7 @@ def execute_target_search(base,perf,cfg,directory,executor,emit,cancelled,field_
             write_csv(folder/'spectrum.csv',[dict(zip(['wavelength_nm','angle_deg','R','T','A'],r[1:])) for r in rows])
             if cfg['use_fields']:
                 try:
-                    record['fields']=field_executor(model,dict(perf,timeout_seconds=max(1,int(guard()))),
+                    record['fields']=field_executor(model,dict(perf,timeout_seconds=guard()),
                         dict(wavelength_nm=cfg['target_nm'],grid=cfg['field_grid'],maps=False,sampling_mode='fixed_target'),folder/'fields',cancelled)
                     peak=record['targets']['selected_peak']
                     if cfg.get('track_resonance',True) and peak:
@@ -301,7 +300,7 @@ def execute_target_search(base,perf,cfg,directory,executor,emit,cancelled,field_
                                 write_json(alias/'field_model.json',snapshot)
                                 write_json(alias/'field_features.json',record['resonance_fields'])
                         else:
-                            record['resonance_fields']=field_executor(model,dict(perf,timeout_seconds=max(1,int(guard()))),
+                            record['resonance_fields']=field_executor(model,dict(perf,timeout_seconds=guard()),
                                 dict(wavelength_nm=peak['wavelength_nm'],grid=cfg['field_grid'],maps=False,
                                      sampling_mode='selected_resonance'),folder/'resonance_fields',cancelled)
                     track(record,folder)
@@ -379,7 +378,7 @@ def execute_target_search(base,perf,cfg,directory,executor,emit,cancelled,field_
                 previous=new
         if recommendation and cfg['use_fields']:
             best=directory/'recommended_fields'
-            field_executor(recommendation['model'],dict(perf,timeout_seconds=max(1,int(guard()))),
+            field_executor(recommendation['model'],dict(perf,timeout_seconds=guard()),
                 dict(wavelength_nm=cfg['target_nm'] if amplitude else recommendation['targets']['q_wavelength'],grid=cfg['map_grid'],maps=True,
                      sampling_mode='fixed_target' if amplitude else 'selected_resonance'),best,cancelled)
     except (Cancelled,TimeoutError) as exc:

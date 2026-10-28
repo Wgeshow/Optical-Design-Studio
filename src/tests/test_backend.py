@@ -161,14 +161,12 @@ class NativeTests(unittest.TestCase):
             self.assert_rows_close(reused, fresh)
             self.assertTrue(all(row[5] > 0 for row in reused))
 
-    def test_cancel_and_timeout_cleanup(self):
+    def test_cancel_cleanup(self):
         model = sample(NumG=101, wl_start_nm=1200, wl_stop_nm=1600, wl_step_nm=1)
         started = time.monotonic()
         with self.assertRaises(Cancelled):
             execute(model, dict(DEFAULT_PERFORMANCE, workers=2), cancelled=lambda: time.monotonic()-started > .5)
         self.assertLess(time.monotonic()-started, 8)
-        with self.assertRaises(TimeoutError):
-            execute(model, dict(DEFAULT_PERFORMANCE, workers=2, timeout_seconds=1))
 
     def test_native_error_cleanup(self):
         model = sample()

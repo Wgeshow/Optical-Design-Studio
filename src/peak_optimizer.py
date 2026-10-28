@@ -305,8 +305,6 @@ def execute_search(base, perf, cfg, directory, executor, emit, cancelled):
             for design_id, model in enumerate(designs(base, cfg), 1):
                 if cancelled():
                     raise Cancelled('Search cancelled by user')
-                if time.monotonic()-started >= perf['timeout_seconds']:
-                    raise TimeoutError('Whole-search timeout reached')
                 record = dict(design_id=design_id, **conditions(model))
                 models.write(json.dumps(dict(design_id=design_id, model=model), allow_nan=False)+'\n')
                 models.flush()
@@ -326,15 +324,13 @@ def execute_search(base, perf, cfg, directory, executor, emit, cancelled):
                             break
                         if total_points+len(wavelengths) > cfg['point_budget']:
                             raise TimeoutError('Spectral point budget reached; increase it to finish the grid')
-                        remaining = perf['timeout_seconds']-(time.monotonic()-started)
-                        if remaining < 1:
-                            raise TimeoutError('Whole-search timeout reached')
+                        remaining = 0  # No elapsed-time limit.
                         evaluation = dict(model, points=[[i, wl, base['points'][0][2]] for i, wl in enumerate(wavelengths)])
                         def progress(event):
                             if event['kind'] in ('started', 'progress'):
                                 emit(dict(kind='search_progress', design=design_id, total=cfg['design_count'], points=total_points,
                                           text=f"Refinement {round_id}/{cfg['refinement_rounds']}; {event.get('done', 0)}/{len(wavelengths)} spectral points"))
-                        rows, info = executor(evaluation, dict(perf, timeout_seconds=max(1, int(remaining))), progress, cancelled)
+                        rows, info = executor(evaluation, dict(perf, timeout_seconds=0), progress, cancelled)
                         total_points += len(rows)
                         if any(not all(math.isfinite(float(v)) for v in row) or row[5] < -1e-8 or row[5] > 1 for row in rows):
                             raise ValueError('Nonphysical absorptance; check material loss and Fourier convergence. Values were not clipped.')
