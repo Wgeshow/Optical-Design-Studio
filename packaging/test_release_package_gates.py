@@ -22,7 +22,7 @@ class ReleaseVerificationGates(unittest.TestCase):
             (self.app/name).write_bytes(name.encode())
         guide = self.app/'_internal'/'source'/'USER_GUIDE.html'
         guide.parent.mkdir(parents=True)
-        guide.write_text('Public guide 1.4.0-alpha.3', encoding='utf-8')
+        guide.write_text('Public guide 1.4.0-alpha.4', encoding='utf-8')
         setup_source=Path(__file__).resolve().parent/'source'/'simulation_setup_plan.json'
         if not setup_source.is_file():
             setup_source=Path(__file__).resolve().parents[1]/'src'/'simulation_setup_plan.json'
@@ -35,7 +35,7 @@ class ReleaseVerificationGates(unittest.TestCase):
             'files': {'USER_GUIDE.html': self.files['_internal/source/USER_GUIDE.html'],
                       'simulation_setup_plan.json':self.files['_internal/source/simulation_setup_plan.json']}})
         package.write_json(self.app/'PAYLOAD-MANIFEST.json', {
-            'version': '1.4.0-alpha.3', 'delivery_profile': 'public',
+            'version': '1.4.0-alpha.4', 'delivery_profile': 'public',
             'source_tree_sha256': 'approved-source', 'files': self.files})
         controls = dict(physical_model_unchanged=True, shared_settings_preview=True,
                         native_2d_canvases=True, native_3d_canvases=True,
@@ -44,7 +44,7 @@ class ReleaseVerificationGates(unittest.TestCase):
                       native_orbit_and_zoom=True, actual_phase_vectors_verified=True,
                       saved_xyz_and_complex_fields_preserved=True,
                       live_publication_artists_created=False)
-        self.report = dict(passed=True, version='1.4.0-alpha.3', frozen=True,
+        self.report = dict(passed=True, version='1.4.0-alpha.4', frozen=True,
             executable=str(self.app/'Optical Design Studio.exe'), checks={
                 'native_reference_controls_and_graphs': dict(passed=True, detail=controls),
                 'native_electric_field_maps_and_features': dict(passed=True, detail=fields),
@@ -62,7 +62,7 @@ class ReleaseVerificationGates(unittest.TestCase):
             source_tree_sha256='approved-source', readable_source_files_verified=2,
             user_guide_sha256=package.digest(guide))
         package.write_json(self.verification/'payload-audit.json', self.audit)
-        self.native_report=dict(passed=True,version='1.4.0-alpha.3',frozen=True,platform='windows',
+        self.native_report=dict(passed=True,version='1.4.0-alpha.4',frozen=True,platform='windows',
             executable=str(self.app/'Optical Design Studio.exe'),checks={
                 name:dict(passed=True,detail=dict(
                     qt_surface_alpha_preserved=True, transparent_background_verified=True,
@@ -73,7 +73,7 @@ class ReleaseVerificationGates(unittest.TestCase):
                     'system_restore_state','system_maximize_native_surface')})
         native_report_path=self.verification/'native-startup-report.json'
         package.write_json(native_report_path,self.native_report)
-        self.independent = dict(status='passed', version='1.4.0-alpha.3',
+        self.independent = dict(status='passed', version='1.4.0-alpha.4',
             application=str(self.app/'Optical Design Studio.exe'),
             report=str(self.verification/'report.json'),
             payload_audit=str(self.verification/'payload-audit.json'),

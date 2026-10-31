@@ -1,8 +1,8 @@
-# Optical Design Studio 1.4.0-alpha.3
+# Optical Design Studio 1.4.0-alpha.4
 
 Experimental portable application for Windows x64.
 
-1. Download OpticalDesignStudio-Portable-1.4.0-alpha.3-Windows-x64.7z.
+1. Download OpticalDesignStudio-Portable-1.4.0-alpha.4-Windows-x64.7z.
 2. Use 7-Zip to extract the complete archive to a new writable folder.
 3. Open the extracted Optical Design Studio folder and run Optical Design Studio.exe. Keep the backend executable and _internal folder together with it.
 4. Choose a workspace and create your structure through its editor. Optional solver setup is available in the relevant study.

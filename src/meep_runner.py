@@ -78,7 +78,10 @@ def run(job, directory, mp=None):
             raise InterruptedError('FDTD calculation cancelled.')
     def execute(sim, phase):
         cancelled()
-        event('progress', phase=phase, message=phase + ' run')
+        started = time.monotonic()
+        phase_index = 1 if phase == 'Reference' else 2
+        event('progress', phase=phase, phase_index=phase_index, phase_count=2,
+              message=f'Initializing {phase} ({phase_index}/2)…')
         last_event = [0.]
         decay = mp.stop_when_fields_decayed(20, component, v(z=tran_z), options['decay_by'])
         decay_reached = [False]
@@ -87,7 +90,13 @@ def run(job, directory, mp=None):
             now = time.monotonic()
             if now-last_event[0] > .5:
                 last_event[0] = now
-                event('progress', phase=phase, time=float(sim.meep_time()), message=f'{phase}: t = {sim.meep_time():.1f} µm/c')
+                budget = float(sim.fields.last_source_time())+options['run_after_sources']
+                current = float(sim.meep_time())
+                event('progress', phase=phase, phase_index=phase_index, phase_count=2,
+                      time=current, phase_budget_time=budget,
+                      phase_elapsed_seconds=now-started,
+                      phase_progress=min(1., current/budget) if budget > 0 else 0.,
+                      message=f'{phase} ({phase_index}/2): t = {current:.1f} µm/c')
         def stop(sim):
             # Meep calls this only after sources end. The source stop time is
             # provided by the native fields object, avoiding pulse estimates.
@@ -98,6 +107,9 @@ def run(job, directory, mp=None):
         convergence[phase] = decay_reached[0]
         if not decay_reached[0]:
             warnings.append(phase + ': maximum post-source runtime reached before the field-decay target. Increase runtime and check convergence.')
+        event('phase_complete', phase=phase, phase_index=phase_index, phase_count=2,
+              phase_elapsed_seconds=time.monotonic()-started, decay_reached=decay_reached[0],
+              message=phase+' time stepping finished; '+('decay target reached.' if decay_reached[0] else 'time limit reached before decay target.'))
     def monitors(sim):
         reflection = sim.add_flux(fcen, df, options['frequency_points'], mp.FluxRegion(center=v(z=refl_z), size=v(job['ax'], job['ay'], 0), direction=direction))
         transmission = sim.add_flux(fcen, df, options['frequency_points'], mp.FluxRegion(center=v(z=tran_z), size=v(job['ax'], job['ay'], 0), direction=direction))
@@ -117,6 +129,7 @@ def run(job, directory, mp=None):
     if options['save_fields']:
         fields = sim.add_dft_fields([component], fcen, 0, 1, center=v(), size=field_size)
     execute(sim, 'Device')
+    event('progress', message='Finalizing Meep spectrum and saved outputs…')
     valid = incident > max(float(np.max(abs(incident)))*1e-8, 1e-20)
     if not np.all(valid):
         raise RuntimeError('Reference power is too small at one or more frequencies. Narrow the wavelength band or increase runtime.')

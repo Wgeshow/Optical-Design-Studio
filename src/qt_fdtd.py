@@ -11,15 +11,16 @@ import uuid
 
 import numpy as np
 import pandas as pd
-from PyQt6.QtCore import QThread, Qt, QUrl, QSignalBlocker, pyqtSignal
+from PyQt6.QtCore import QThread, QTimer, Qt, QUrl, QSignalBlocker, pyqtSignal
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox,
     QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QProgressBar, QPushButton,
-    QMessageBox, QScrollArea, QSplitter, QTabWidget, QVBoxLayout, QWidget, QListWidget, QListWidgetItem)
+    QMessageBox, QScrollArea, QSplitter, QTabWidget, QVBoxLayout, QWidget, QListWidget, QListWidgetItem, QApplication)
 
 from data_library import write_json
 from fdtd_model import DEFAULTS, build_job, validate_options
 import meep_runtime
+from fdtd_progress import SCHEMA as TIMING_SCHEMA, PhaseEstimate, cached_estimate, duration, timing_key
 from qt_common import PlotWidget, number, integer, table, fill_table
 from qt_surfaces import WorkspacePanel
 
@@ -44,8 +45,12 @@ class MeepWorker(QThread):
     def run(self):
         terminal = None
         managed = None
+        started = time.monotonic()
+        phase_estimate = PhaseEstimate()
+        phase_budgets, phase_elapsed = {}, {}
         try:
             config = meep_runtime.load_config()
+            self.progress_event.emit(dict(run_kind='fdtd', message='Preparing Meep runtime and inputs…', elapsed_seconds=0.))
             ready = meep_runtime.probe(config)
             if not ready['available']:
                 raise RuntimeError('Set up the MEEP FDTD add-on in Settings. '+ready['message'])
@@ -73,6 +78,16 @@ class MeepWorker(QThread):
                         if message['kind'] in ('complete', 'error', 'cancelled'):
                             terminal = message
                         else:
+                            elapsed = time.monotonic()-started
+                            if message.get('phase'):
+                                if message['kind'] == 'phase_complete':
+                                    phase_budgets[message['phase']] = phase_estimate.budget_seconds()
+                                    phase_elapsed[message['phase']] = message.get('phase_elapsed_seconds', 0.)
+                                else:
+                                    phase_estimate.update(message, time.monotonic())
+                                if message.get('time') is not None:
+                                    message['message'] += ' · elapsed '+duration(elapsed)+' · '+phase_estimate.text(time.monotonic())
+                            message['elapsed_seconds'] = elapsed
                             self.progress_event.emit(dict(message, run_kind='fdtd', directory=str(self.directory)))
                 code = self.process.wait(timeout=10)
             if self._cancelled.is_set():
@@ -80,6 +95,19 @@ class MeepWorker(QThread):
             if terminal is None or terminal['kind']=='error' or (code and terminal['kind']!='cancelled'):
                 raise RuntimeError((terminal or {}).get('message') or f'Meep exited with code {code}. See {self.directory / "meep.log"}.')
             status = 'cancelled' if terminal['kind']=='cancelled' else 'complete'
+            if status == 'complete':
+                info = terminal.setdefault('info', {})
+                info['elapsed_seconds'] = time.monotonic()-started
+                if set(phase_budgets) == {'Reference', 'Device'} and all(value is not None for value in phase_budgets.values()):
+                    overhead = max(0., info['elapsed_seconds']-sum(phase_elapsed.values()))
+                    try:
+                        write_json(self.directory/'runtime_timing.json', dict(schema=TIMING_SCHEMA,
+                            input_key=timing_key(self.project, self.options, config),
+                            estimated_budget_seconds=overhead+sum(phase_budgets.values()),
+                            actual_elapsed_seconds=info['elapsed_seconds'],
+                            convergence=info.get('convergence', {})))
+                    except (OSError, ValueError, TypeError) as exc:
+                        info.setdefault('warnings', []).append('Could not save runtime estimate data: '+str(exc))
             self.library.record(self.directory, status=status, summary=terminal.get('info', {}))
             self.completed.emit(dict(run_kind='fdtd', status=status, directory=str(self.directory),
                 output=str(self.directory/'results.csv'), info=terminal.get('info', {})))
@@ -96,6 +124,26 @@ class MeepWorker(QThread):
                 except Exception as record_exc:
                     errors.append('Could not save the failed run status: '+str(record_exc))
             self.failed.emit('\n'.join(errors))
+
+
+class RuntimeEstimateWorker(QThread):
+    """Cached timing lookup only; no probe, input builder or solver execution."""
+    result = pyqtSignal(dict)
+
+    def __init__(self, runs, project, options, generation):
+        # Application ownership prevents destruction while a page is closed.
+        super().__init__(QApplication.instance())
+        self.runs, self.project, self.options, self.generation = runs, project, options, generation
+
+    def run(self):
+        try:
+            key = timing_key(self.project, self.options, meep_runtime.load_config())
+            if self.isInterruptionRequested():
+                return
+            estimate = cached_estimate(self.runs, key, cancelled=self.isInterruptionRequested)
+            self.result.emit(dict(generation=self.generation, estimate=estimate))
+        except Exception as exc:
+            self.result.emit(dict(generation=self.generation, error=str(exc)))
 
 
 class _RuntimeTask(QThread):
@@ -378,6 +426,13 @@ class FDTDPage(QWidget):
         super().__init__(parent)
         self.store, self.directory, self._active = store, None, False
         self._runtime_available = None
+        self._estimate_worker = None
+        self._estimate_generation = 0
+        self._run_started = None
+        self._live_estimate = PhaseEstimate()
+        self._timing_timer = QTimer(self)
+        self._timing_timer.setInterval(1000)
+        self._timing_timer.timeout.connect(self._update_timing)
         layout = QVBoxLayout(self)
         title = QLabel('MEEP · FDTD')
         title.setObjectName('pageTitle')
@@ -397,6 +452,10 @@ class FDTDPage(QWidget):
             fit_materials=QCheckBox('Fit material dispersion'), fit_tolerance=number(.05, .000001, .1, 6),
             save_fields=QCheckBox('Save XZ field map'))
         self.controls['save_fields'].setToolTip('Save the centre-frequency XZ field map.')
+        self.controls['decay_by'].setToolTip(
+            'Meep stop_when_fields_decayed checks the selected electric-field component’s squared amplitude '
+            'at the transmission plane over a 20 µm/c decay window. '
+            'The target is relative to the monitored peak; it is not domain-integrated energy.')
         self.controls['dimensions'].addItem('2D · XZ section (extruded along Y)', 2)
         self.controls['dimensions'].addItem('3D · full periodic structure', 3)
         self.controls['polarization'].addItem('s · Ey', 's')
@@ -423,7 +482,7 @@ class FDTDPage(QWidget):
         for group_title, rows in [
             ('Domain & excitation', [('View', 'dimensions'), ('Resolution (cells/µm)', 'resolution'), ('Section Y (µm)', 'section_y_um'), ('Polarization', 'polarization')]),
             ('Spectrum', [('First wavelength (nm)', 'wavelength_min_nm'), ('Last wavelength (nm)', 'wavelength_max_nm'), ('Frequency samples', 'frequency_points')]),
-            ('Boundaries & stopping', [('PML thickness (µm)', 'pml_um'), ('Air/medium padding (µm)', 'padding_um'), ('Maximum time after pulse (µm/c)', 'run_after_sources'), ('Courant factor', 'courant'), ('Field energy decay target', 'decay_by')])]:
+            ('Boundaries & stopping', [('PML thickness (µm)', 'pml_um'), ('Air/medium padding (µm)', 'padding_um'), ('Maximum time after pulse (µm/c)', 'run_after_sources'), ('Courant factor', 'courant'), ('Monitor field decay target', 'decay_by')])]:
             group = QGroupBox(group_title)
             form = QFormLayout(group)
             form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
@@ -512,6 +571,12 @@ class FDTDPage(QWidget):
         self.progress = QProgressBar()
         self.progress.hide()
         layout.addWidget(self.progress)
+        self.timing_status = QLabel('Runtime estimates use measured timing from matching saved runs.')
+        self.timing_status.setWordWrap(True)
+        layout.addWidget(self.timing_status)
+        self.estimate_button = QPushButton('Estimate runtime')
+        self.estimate_button.clicked.connect(self.estimate_runtime)
+        layout.addWidget(self.estimate_button)
         from qt_common import ActionStatusLabel
         self.status = ActionStatusLabel()
         self.status.setToolTip('Configure MEEP in Settings → Add-ons before your first run. 2D represents an extruded cross section; use 3D for holes.')
@@ -536,6 +601,15 @@ class FDTDPage(QWidget):
         store.run_failed.connect(self._failed)
         self._busy(store.busy)
         self._restore()
+        for control in self.controls.values():
+            for signal_name in ('valueChanged', 'currentIndexChanged', 'toggled'):
+                signal = getattr(control, signal_name, None)
+                if signal is not None:
+                    signal.connect(self._invalidate_estimate)
+                    break
+        if hasattr(store, 'changed'):
+            store.changed.connect(self._invalidate_estimate)
+
         if hasattr(store,'changed'):store.changed.connect(self._project_changed)
         for control in self.controls.values():
             signal=control.currentIndexChanged if isinstance(control,QComboBox) else control.toggled if isinstance(control,QCheckBox) else control.valueChanged
@@ -556,6 +630,80 @@ class FDTDPage(QWidget):
         layout.insertWidget(0, self.workbench, 1)
         splitter.hide()
         self._clear_result()
+
+    def _invalidate_estimate(self, *_):
+        self._estimate_generation += 1
+        if not self._active:
+            self.timing_status.setText('Inputs changed. Estimate runtime again using matching measured data.')
+
+    def estimate_runtime(self):
+        if self._active:
+            self._update_timing()
+            return
+        if self._estimate_worker is not None:
+            return
+        try:
+            options = self.options()
+            # Capture only the active payload, not every independent study bank.
+            snapshot = getattr(self.store, '_project_payload', self.store.project)
+            project = snapshot()
+            self._estimate_generation += 1
+            worker = RuntimeEstimateWorker(self.store.library.runs, project, options, self._estimate_generation)
+            self._estimate_worker = worker
+            worker.result.connect(self._estimated_runtime)
+            worker.finished.connect(self._estimate_cleanup)
+            worker.finished.connect(worker.deleteLater)
+            self.estimate_button.setEnabled(False)
+            self.timing_status.setText('Checking saved timing data…')
+            worker.start()
+        except Exception as exc:
+            self.timing_status.setText('Could not estimate runtime: '+str(exc))
+
+    def _estimated_runtime(self, result):
+        if result.get('generation') != self._estimate_generation or self._active:
+            return
+        estimate = result.get('estimate')
+        if result.get('error'):
+            self.timing_status.setText('Could not read saved timing data: '+result['error'])
+        elif estimate:
+            self.timing_status.setText('Estimated configured runtime budget ~'+duration(estimate['seconds'])+
+                ' from matching measured data. Decay may finish sooner; speed and setup overhead can vary.')
+        else:
+            self.timing_status.setText('No matching measured timing data yet. Run once to calibrate; live estimates appear after time stepping begins.')
+
+    def _estimate_cleanup(self):
+        self._estimate_worker = None
+        self.estimate_button.setEnabled(True)
+
+    def stop_runtime_estimate(self):
+        """Nonblocking close guard; the caller retries after the thread exits."""
+        if self._estimate_worker is not None and self._estimate_worker.isRunning():
+            self._estimate_worker.requestInterruption()
+            return False
+        return True
+
+    def _update_timing(self):
+        if not self._active or self._run_started is None:
+            return
+        now = time.monotonic()
+        estimate = self._live_estimate
+        phase = estimate.phase
+        label = (f'{phase} ({1 if phase == "Reference" else 2}/2)' if phase else 'Preparing / finalizing')
+        self.timing_status.setText(label+' · elapsed '+duration(now-self._run_started)+' · '+estimate.text(now)+
+            (' Device time will be estimated when it starts.' if phase == 'Reference' else ''))
+        if estimate.fraction is not None and estimate.last_received is not None and now-estimate.last_received <= 10:
+            self.progress.setRange(0, 100)
+            self.progress.setValue(min(99, int(estimate.fraction*100)))
+            self.progress.setFormat(label+' · %p% of phase time budget')
+        else:
+            self.progress.setRange(0, 0)
+
+    def _stop_timing(self):
+        self._timing_timer.stop()
+        self._estimate_generation += 1
+        if self._run_started is not None:
+            self.timing_status.setText('Elapsed '+duration(time.monotonic()-self._run_started)+'. See result warnings for convergence status.')
+        self._run_started = None
 
     def _restore(self):
         self._restoring=True
@@ -619,6 +767,11 @@ class FDTDPage(QWidget):
     def run(self):
         try:
             self._active = True
+            self._estimate_generation += 1
+            self._run_started = time.monotonic()
+            self._live_estimate = PhaseEstimate()
+            self._timing_timer.start()
+            self._update_timing()
             self.store.start_run('fdtd', self.options())
             self.progress.setRange(0, 0)
             self.progress.show()
@@ -662,6 +815,7 @@ class FDTDPage(QWidget):
 
     def refresh_runtime(self, result):
         """Receive verified setup results without importing Meep in the GUI."""
+        self._invalidate_estimate()
         self._runtime_available = bool(result.get('available'))
         if not self._active:
             self.status.setText(result.get('message') or ('MEEP is ready.' if self._runtime_available else 'Install or configure the FDTD engine in Settings → Add-ons.'))
@@ -669,12 +823,19 @@ class FDTDPage(QWidget):
 
     def _progress(self, info):
         if info.get('run_kind') == 'fdtd':
+            if self._active:
+                if info.get('phase') and info.get('kind') != 'phase_complete':
+                    self._live_estimate.update(info, time.monotonic())
+                else:
+                    self._live_estimate = PhaseEstimate()
+                self._update_timing()
             message = info.get('message', 'Running Meep…')
             self.status.setText(message)
             self.log.appendPlainText(message)
 
     def _failed(self, message):
         if self._active:
+            self._stop_timing()
             self._active = False
             self.progress.hide()
             self.status.setText(message)
@@ -683,6 +844,7 @@ class FDTDPage(QWidget):
     def _finished(self, event):
         if event.get('run_kind') != 'fdtd':
             return
+        self._stop_timing()
         self._active = False
         self.progress.hide()
         if event.get('status') == 'cancelled':

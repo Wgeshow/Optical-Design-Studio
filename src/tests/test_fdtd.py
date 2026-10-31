@@ -191,9 +191,17 @@ class RunnerContractTests(unittest.TestCase):
             Simulation=Sim, at_every=lambda dt, tick: tick,
             stop_when_fields_decayed=lambda *args: lambda sim: True,
             get_fluxes=values, get_flux_freqs=lambda f: np.linspace(f.fcen-f.df/2, f.fcen+f.df/2, f.count))
-        with tempfile.TemporaryDirectory() as tmp, patch('meep_runner.event'):
+        with tempfile.TemporaryDirectory() as tmp, patch('meep_runner.event') as events:
             meep_runner.run(job, tmp, mp)
             rows = np.genfromtxt(Path(tmp)/'results.csv', names=True, delimiter=',')
+        progress = [call.kwargs for call in events.call_args_list if call.args[0]=='progress' and 'time' in call.kwargs]
+        self.assertEqual([item['phase_index'] for item in progress], [1, 2])
+        self.assertTrue(all(item['phase_budget_time']==20.+job['options']['run_after_sources'] for item in progress))
+        self.assertTrue(all(item['phase_elapsed_seconds']>=0 for item in progress))
+        self.assertTrue(all(0 <= item['phase_progress'] <= 1 for item in progress))
+        finished = [call.kwargs for call in events.call_args_list if call.args[0]=='phase_complete']
+        self.assertEqual([item['phase'] for item in finished], ['Reference', 'Device'])
+        self.assertTrue(all(item['decay_reached'] for item in finished))
         self.assertEqual(simulations[0].arguments['geometry'], [])
         self.assertEqual(simulations[1].subtracted, 'saved-reference-fields')
         self.assertTrue(np.allclose(rows['R'], .25))

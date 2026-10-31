@@ -50,6 +50,8 @@ class DeviceDocumentTests(unittest.TestCase):
             dict(Name='Exit',Material='Air',Thickness_um=0.)],patterns=[
             dict(Layer='Top',Material='Air',Shape='circle',SizeX_um=.046,SizeY_um=0.,CenterX_um=.1,CenterY_um=0.,Angle_deg=0.)])
         d=from_optical_project(project)
+        self.assertEqual(d['name'],'Optical device')
+        self.assertEqual(d['shapes'][0]['name'],'Circle 1')
         self.assertEqual([r['name'] for r in d['layers']],['Top','Bottom'])
         self.assertEqual(d['layers'][1]['material_id'],'')
         self.assertEqual(d['layers'][1]['optical_material_name'],'Unknown user sample')
@@ -57,6 +59,16 @@ class DeviceDocumentTests(unittest.TestCase):
         self.assertEqual(d['shapes'][0]['operation'],'void')
         with self.assertRaisesRegex(ValueError,'missing material'):
             validate_device(d,builtin_materials(),require_contacts=True)
+
+    def test_optical_conversion_uses_plain_shape_names_without_mutating_source(self):
+        project=dict(layers=[dict(Name='Authored slab',Material='GaAs',Thickness_um=.25)],
+            patterns=[dict(Layer='Authored slab',Material='Air',Shape=shape,
+                SizeX_um=.1,SizeY_um=.2) for shape in ('circle','ellipse','rectangle')])
+        before=copy.deepcopy(project)
+        device=from_optical_project(project)
+        self.assertEqual([row['name'] for row in device['shapes']],['Circle 1','Ellipse 2','Rectangle 3'])
+        self.assertEqual(device['layers'][0]['name'],'Authored slab')
+        self.assertEqual(project,before)
 
     def test_disabled_layers_keep_children_and_remove_cascades(self):
         d=default_device(); d['layers'][0]['enabled']=False

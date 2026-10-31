@@ -54,7 +54,7 @@ def main():
     assert "names = ['sqlite3.dll'" in spec
     assert 'compatible SQLite' in readme and '**Library/bin**' in readme and '**ODS_OFFICIAL_RUNTIME**' in readme
     report = {
-        'passed': True, 'version': '1.4.0-alpha.3', 'packaging_files': sorted(packaged),
+        'passed': True, 'version': '1.4.0-alpha.4', 'packaging_files': sorted(packaged),
         'source_tree_sha256': json.loads((BUILD/'stage-manifest.json').read_text())['source_tree_sha256'],
         'local_python_imports': local_imports,
         'corresponding_native_source_fallback': 'native/S4-source',

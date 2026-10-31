@@ -1863,6 +1863,12 @@ class OpticalStudio(QMainWindow):
             self.status.setText('Ready')
 
     def closeEvent(self,event):
+        timing_page = getattr(self, 'fdtd_page', None)
+        if timing_page is not None and not timing_page.stop_runtime_estimate():
+            self.status.setText('Finishing cached runtime lookup before closing…')
+            QTimer.singleShot(200, self.close)
+            event.ignore()
+            return
         from qt_solver_environment import setup_in_progress,cancel_all_setups
         if setup_in_progress():
             cancel_all_setups()

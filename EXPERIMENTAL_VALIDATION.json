@@ -1,11 +1,11 @@
 {
-  "version": "1.4.0-alpha.3",
-  "build_date": "2026-10-28",
+  "version": "1.4.0-alpha.4",
+  "build_date": "2026-10-30",
   "signed": false,
-  "source_tests_run": 175,
+  "source_tests_run": 42,
   "source_tests_skipped": 0,
-  "source_tests_passed": 175,
-  "source_tree_sha256": "bc21642a7125ada36f78fca360db260c1217c80628778fff169410c7174cf738",
+  "source_tests_passed": 42,
+  "source_tree_sha256": "2c4f5adda8d3a22b13ca1f443535b11de973d8354feb1b942c57f7a93153db15",
   "frozen_verification": "partial",
   "native_startup_verification": "passed",
   "packaged_checks": {
@@ -30,7 +30,7 @@
   "archive_integrity": "pending",
   "published": false,
   "release_channel": "highly_experimental",
-  "validation_scope": "175 targeted source tests (0 failures/errors/skips), 34 packaging checks, exact compiled-code match for 200 staged modules per executable, critical frozen profile 8/8 checks across all 29 launcher choices and 28 independent setups, real Windows startup 7/7 checks, and GPT-6.1 Terra manual navigation of chooser/S4/blank material/C-V/2D bands/version with normal close. Full installer matrix and new scientific acceptance were not performed; campaign remains 7/28 UI-executed routes with 5 scoped reference agreements.",
+  "validation_scope": "42 targeted staged-source tests and 34 packaging/privacy/license tests, zero failures/errors/skips; exact code match for 201 modules in each executable plus standalone Meep runner; critical frozen profile 8/8 and Windows startup 7/7; fresh Terra packaged controls, live phase timing, cached estimate, input invalidation, Stop/cancel and normal close. Full installer matrix not rerun. Scientific campaign 8/28 UI executions, 5 earlier scoped agreements; new cavity-array pilot remains unconverged.",
   "packaged_self_tests_passed": false,
   "compiled_validation_profile": "critical_release",
   "critical_packaged_checks_passed": true,
@@ -47,63 +47,33 @@
   "package_gate_tests": 34,
   "incomplete_verification_reason": "Independent verification must finish successfully for this exact application.",
   "source_test_targets": [
-    "test_fixed_conductor_material",
-    "test_laser_zero_recombination",
-    "test_native_figure",
-    "test_qt_editor_feature_parity",
-    "test_qt_electrical_materials",
+    "test_fdtd_progress",
+    "test_fdtd.RunnerContractTests",
+    "test_qt_fdtd",
     "test_qt_fdtd_exterior_editing",
     "test_qt_fdtd_result_reset",
-    "test_qt_field_color_roundoff",
-    "test_qt_fixed_conductor_material",
-    "test_qt_global_catalog_settings",
-    "test_qt_laser_zero_recombination",
-    "test_qt_optical_exterior_editing",
-    "test_qt_pcsel_repeat_layers",
-    "test_qt_photonic_band_results",
-    "test_qt_photonic_bands_usability",
-    "test_qt_results_workspace",
-    "test_qt_s4_input_review",
-    "test_qt_setup_choice_recovery",
-    "test_qt_simulation_flow",
-    "test_qt_simulation_setup",
-    "test_qt_thermal_result_reset",
-    "test_qt_thermal_review",
-    "test_solver_discovery_priority",
+    "test_custom_electrical_device.DeviceDocumentTests",
     "test_app_version",
     "test_installer_chrome_smoke",
     "test_qt_solver_environment_ownership"
   ],
-  "source_test_scope": "23 campaign regression modules plus version receipt, migrated harness chrome, and launcher ownership regressions; offscreen Qt, no full suite or paper physics rerun",
-  "executable_sha256": "61152d7738130f793741d01c6a5dd45b8e9b9f501db646d84aa38504f24d840e",
-  "backend_executable_sha256": "fd93c024cbc779a4b1acc30770b3dd132925ef121210aab3874be978b1d4a7f4",
+  "source_test_scope": "Selected campaign regressions and release gates; offscreen/unit checks are not native scientific acceptance.",
+  "executable_sha256": "565415546be4ae477a0906a2505498e34a7764733e19e32bd3d6d4f1807a7a93",
+  "backend_executable_sha256": "60f25a0e9185d1c5f82d328486c2fc594eda56e9a0f4e89bb3bb971bc8fc9b0f",
   "frozen_module_inventory": {
     "Optical Design Studio.exe": {
-      "sha256": "61152d7738130f793741d01c6a5dd45b8e9b9f501db646d84aa38504f24d840e",
+      "sha256": "565415546be4ae477a0906a2505498e34a7764733e19e32bd3d6d4f1807a7a93",
       "required_modules": 117,
       "numpy_version": "1.26.4"
     },
     "OpticalDesignBackend.exe": {
-      "sha256": "fd93c024cbc779a4b1acc30770b3dd132925ef121210aab3874be978b1d4a7f4",
+      "sha256": "60f25a0e9185d1c5f82d328486c2fc594eda56e9a0f4e89bb3bb971bc8fc9b0f",
       "required_modules": 117,
       "numpy_version": "1.26.4"
     }
   },
   "dependency_license_files": 14,
-  "documentation_amendments": [
-    {
-      "kind": "portable_archive_extraction_documentation",
-      "added": [],
-      "changed": [
-        "BUILD_VERIFICATION.json",
-        "RELEASE_NOTES.md",
-        "START_HERE.md"
-      ],
-      "gui_rerun": false,
-      "prior_gui_and_native_results_reused": true,
-      "scope": "Only extraction instructions changed from ZIP to 7z plus generated archive-verification metadata. All other payload files, executable code, runtime, and readable source exactly match the original independently verified baseline."
-    }
-  ],
+  "documentation_amendments": [],
   "limitations": [
     "Highly Experimental prerelease.",
     "Completed calculations do not establish convergence or agreement for arbitrary edited devices.",

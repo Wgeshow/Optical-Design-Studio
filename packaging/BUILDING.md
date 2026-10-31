@@ -1,6 +1,6 @@
-# Build Optical Design Studio 1.4.0-alpha.3 â€” Highly Experimental
+# Build Optical Design Studio 1.4.0-alpha.4 â€” Highly Experimental
 
-Build with Windows x64 CPython 3.12 and PyInstaller 6.16.0. The application version is 1.4.0-alpha.3, the build date is 2026-10-28, and Windows version metadata is 1.4.0.3 with the prerelease flag. Build and audit in a fresh directory; preserve existing releases.
+Build with Windows x64 CPython 3.12 and PyInstaller 6.16.0. The application version is 1.4.0-alpha.4, the build date is 2026-10-28, and Windows version metadata is 1.4.0.3 with the prerelease flag. Build and audit in a fresh directory; preserve existing releases.
 
 ## Native and optional dependency inputs
 

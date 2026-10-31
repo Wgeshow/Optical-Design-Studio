@@ -1,7 +1,7 @@
 {
-  "version": "1.4.0-alpha.3",
-  "build_date": "2026-10-28",
-  "tree_sha256": "bc21642a7125ada36f78fca360db260c1217c80628778fff169410c7174cf738",
+  "version": "1.4.0-alpha.4",
+  "build_date": "2026-10-30",
+  "tree_sha256": "2c4f5adda8d3a22b13ca1f443535b11de973d8354feb1b942c57f7a93153db15",
   "files": {
     "addon_runtime.py": {
       "size": 22124,
@@ -45,7 +45,7 @@
     },
     "app_version.py": {
       "size": 1756,
-      "sha256": "84754d7fb3b97d4744e5d4bf839515e15073cbb02807dfefdd8cade26751e01c"
+      "sha256": "874dae1583d6c54fbd354bc6ae899f319acc8bb88b57f4a86420acf93b6c8c02"
     },
     "application_restart.py": {
       "size": 7182,
@@ -332,8 +332,8 @@
       "sha256": "124cc36760560b360d78837af8c86850b02f10a34ed57abed9545d35ce118f6a"
     },
     "device_model.py": {
-      "size": 19145,
-      "sha256": "12760909b709f227412b14f5714b7a436c63c62b1c11303b355e7a1d28d08a1b"
+      "size": 19180,
+      "sha256": "2e88084fc350c9d8c809478031824c535c37637a0972afa82c98ae57a6c7f560"
     },
     "device_project_bridge.py": {
       "size": 11516,
@@ -466,6 +466,10 @@
     "fdtd_model.py": {
       "size": 12667,
       "sha256": "d89da05b244b6591590690435faab716dba757d6b3b4d69c570e0d6bce22d646"
+    },
+    "fdtd_progress.py": {
+      "size": 4586,
+      "sha256": "90c42e7135816b7861138371a1fe1552c31a720e4fc98ff9f9be1a340f6ce5c3"
     },
     "field_ml.py": {
       "size": 8352,
@@ -869,7 +873,7 @@
     },
     "help_assets/silicon-reference-run/bundle.json": {
       "size": 18719,
-      "sha256": "cdd30d430ffbda06b7d82c8a247521ed9aaf78a7f560b8b05ae03ec73d6dd4ee"
+      "sha256": "7d2cbc933fabaeea2aca6d1a28889e0ee82dfa62eca1c5344fdd316c7d4b78a4"
     },
     "help_assets/silicon-reference-run/desktop_request.json": {
       "size": 185,
@@ -913,7 +917,7 @@
     },
     "help_assets/silicon-reference-run/provenance.json": {
       "size": 52664,
-      "sha256": "5d25947a4088e6a6ed3b0eb6d0e4b84d747ba046a965ef223ca91e9c89942566"
+      "sha256": "a34192d3ad0c4f51e4f5c7ca28439b0d2aadbb34739b838446c3441503ca89e5"
     },
     "help_assets/silicon-reference-run/results.csv": {
       "size": 3326,
@@ -1064,8 +1068,8 @@
       "sha256": "6a01a15e1264e3e626b8c5386597178e4196610e8b5669b689ecc1515830ed0d"
     },
     "meep_runner.py": {
-      "size": 9118,
-      "sha256": "5915294e45cb9ad9ce012fdaa34ac14a78d45b2244960520a4efb53054eb3d8b"
+      "size": 10099,
+      "sha256": "7cce0c2f05cedc2cc7a8197475b5a761e9296a8ac674ea85d841ed0e9d47af3d"
     },
     "meep_runtime.py": {
       "size": 11057,
@@ -1212,8 +1216,8 @@
       "sha256": "14fb679332a28f75d451a6bda7147b7d00e3ab8e1764524ad615695b1176c40f"
     },
     "qt_app.py": {
-      "size": 118261,
-      "sha256": "76f2152a89210aa865076ae213fd2ede45fddb040c4b12f713ad5f242e45a9b2"
+      "size": 118574,
+      "sha256": "62bebe8fe635f399346f1eb80ea2528a7e8fca3607db6836583c7d3ec9f08315"
     },
     "qt_appearance.py": {
       "size": 19314,
@@ -1280,8 +1284,8 @@
       "sha256": "4b33b360a0d6396a688d0ad08de342cbee93bd7cab5e4fd6456611c14d9af91a"
     },
     "qt_fdtd.py": {
-      "size": 41580,
-      "sha256": "20c4422d2674272562715335a763d8f69e2fd568ca8d2d6183091ed4cbe4fe6d"
+      "size": 50499,
+      "sha256": "72464f2d6b77523a6be91609f141c6d294ae255b0ef90b7d3dfb961740f980f6"
     },
     "qt_field_compare.py": {
       "size": 10754,
@@ -1356,8 +1360,8 @@
       "sha256": "8d24e0300c1b64ed4975226d824aee4ee3b0b12ea84b96f8e02b9312a04dcefb"
     },
     "qt_optical_journey.py": {
-      "size": 27308,
-      "sha256": "43f6731add89b4e026b7c4d838b9bb6fd6a47658ef0a2e1d0f9ebe17ea1fae7e"
+      "size": 27631,
+      "sha256": "2e12469e45c7b2d1d98575c610c5a4848f8c5b4057244c6d7fb0788cfb489848"
     },
     "qt_optical_results.py": {
       "size": 18104,
@@ -1784,8 +1788,8 @@
       "sha256": "c0744069fbfde01b1717b68cdbbaa6db40597fb573c331d4fc696f4ba84e0ec1"
     },
     "tests/test_custom_electrical_device.py": {
-      "size": 11130,
-      "sha256": "5cbc064d6ac3f4910c47aa0099d619497474961d4e51c9526d70b15d4b5a9c7b"
+      "size": 11888,
+      "sha256": "312a7d2846813b7704bbabc58c0c601c558c893ee8fc6e74b68e22eec09164b5"
     },
     "tests/test_data_library.py": {
       "size": 14239,
@@ -1872,8 +1876,12 @@
       "sha256": "63ca4dd6933b26ff2bda6d221f047ff07af3c2f9f61de39ae6731bcacb4059b7"
     },
     "tests/test_fdtd.py": {
-      "size": 12182,
-      "sha256": "e936d92db70abe445925421095d129c187bdb06eb7f751fb4ceac348305df2ac"
+      "size": 12938,
+      "sha256": "258baeb25396784293bee67bfb9eb3fba48f0fb916c238e063261ec5e4e46e63"
+    },
+    "tests/test_fdtd_progress.py": {
+      "size": 3340,
+      "sha256": "86b7fb43523a5a7a4a89016142a8976e895fc58cbe25dc4d257b82fcd6dd43e5"
     },
     "tests/test_field_array_edge_cases.py": {
       "size": 7500,
@@ -2280,12 +2288,12 @@
       "sha256": "5c1a789a3afc2480e348ee9f0cdf537007af2d31e3e395725039a814288c75f0"
     },
     "tests/test_qt_fdtd.py": {
-      "size": 6615,
-      "sha256": "9fd043e31b63319f85946f847468e5907803e6eb8c61ebab06d32d05fa670dc3"
+      "size": 16001,
+      "sha256": "11e18e6263d79da11a0a08baf2f73759b48ec5cb3d3f22fe949365900e110d84"
     },
     "tests/test_qt_fdtd_exterior_editing.py": {
-      "size": 4642,
-      "sha256": "0c25b4f3bd8a80dc086e4527960a53dd34a384a223d138d29c93cd335c6fd84a"
+      "size": 5626,
+      "sha256": "c98cfe136ff20e92748022a7d90018ec4be5957b21206707c74022cf65bc26f1"
     },
     "tests/test_qt_fdtd_result_reset.py": {
       "size": 5112,

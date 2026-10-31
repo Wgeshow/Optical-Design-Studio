@@ -305,7 +305,7 @@ def remove_object(device, object_id):
 
 
 def from_optical_project(project, material_library=None):
-    """Import finite optical layers/patterns without reversing depth order."""
+    """Convert finite optical layers/patterns without reversing depth order."""
     from electrical_material_library import builtin_materials
     library = material_library if material_library is not None else builtin_materials()
     names = {}
@@ -315,7 +315,7 @@ def from_optical_project(project, material_library=None):
                 names[str(name).strip().casefold()] = row['id']
     names.update({'si': 'silicon', 'algaas_50': 'algaas', 'al0.5ga0.5as': 'algaas'})
     settings = project.get('settings', {})
-    result = dict(schema_version=1, name='Imported optical device',
+    result = dict(schema_version=1, name='Optical device',
                   width_um=max(1e-6, float(settings.get('ax_um', 2.))),
                   depth_um=max(1e-6, float(settings.get('ay_um', 2.))), temperature_K=300.,
                   mesh=dict(nx=16, ny=16, nz_per_layer=8, max_nodes=0),
@@ -347,7 +347,7 @@ def from_optical_project(project, material_library=None):
         # Optical S4 circle/ellipse sizes are radii; editor sizes are diameters.
         if shape in ('circle', 'ellipse'):
             sx *= 2; sy = sx if shape == 'circle' else sy*2
-        result['shapes'].append(dict(id=new_id('shape'), name='Imported ' + shape,
+        result['shapes'].append(dict(id=new_id('shape'), name=f'{shape.replace("_", " ").title()} {len(result["shapes"])+1}',
             layer_id=layer_id, material_id=material_id or '', optical_material_name=material, operation=operation,
             shape=shape, cx_um=float(pattern.get('CenterX_um', 0.)),
             cy_um=float(pattern.get('CenterY_um', 0.)), size_x_um=sx, size_y_um=max(sy,1e-6),

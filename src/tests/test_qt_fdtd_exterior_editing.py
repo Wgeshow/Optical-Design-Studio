@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from PyQt6 import sip
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QLabel
 from data_library import DataLibrary
 from fdtd_model import build_job
 from qt_core import ProjectStore
@@ -50,6 +50,27 @@ class FDTDExteriorEditingTests(unittest.TestCase):
         self.assertGreaterEqual(index, 0)
         control.setCurrentIndex(index)
         self.app.processEvents()
+
+    def test_journey_monitor_decay_label_and_tooltip_retain_options(self):
+        before = copy.deepcopy(self.page.options())
+        self.page.optical_journey.select_stage('stopping')
+        labels = [label.text() for label in self.page.findChildren(QLabel)]
+        self.assertIn('Monitor field decay target', labels)
+        self.assertNotIn('Field energy decay target', labels)
+        self.assertIn('20 µm/c', self.page.controls['decay_by'].toolTip())
+        self.assertEqual(self.page.options(), before)
+
+    def test_runtime_estimate_controls_are_on_visible_run_stage(self):
+        self.page.optical_journey.select_stage('run')
+        self.app.processEvents()
+        self.assertTrue(self.page.estimate_button.isVisible())
+        self.assertTrue(self.page.timing_status.isVisible())
+        self.page._active = True
+        self.page._run_started = 100.
+        with patch('qt_fdtd.time.monotonic', return_value=105.):
+            self.page._update_timing()
+        self.assertIn('elapsed 5s', self.page.timing_status.text())
+        self.page._active = False
 
     def test_visible_selectors_reach_real_job_and_undo_without_other_changes(self):
         before = copy.deepcopy(self.store.study_project('fdtd'))

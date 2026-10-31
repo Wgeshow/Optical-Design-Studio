@@ -394,7 +394,7 @@
   "public_release_copy": {
     "metadata_paths_rebased": true,
     "scientific_csv_bytes_unchanged": true,
-    "original_provenance_sha256": "22eb994f51848a25fde3359cc1d4c037380f30231867ecfc0dcb18e379453a97",
+    "original_provenance_sha256": "5d25947a4088e6a6ed3b0eb6d0e4b84d747ba046a965ef223ca91e9c89942566",
     "original_capture_hashes": "source_code_sha256 and capture_refresh retain the original capture evidence",
     "original_metadata_sha256": {}
   }

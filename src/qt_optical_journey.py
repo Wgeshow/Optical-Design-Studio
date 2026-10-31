@@ -237,6 +237,11 @@ def _checks(page,store,route,host):
 def _operation(page,store,route,host):
     body=QWidget(); layout=QVBoxLayout(body); state=QLabel(page.status.text()); state.setWordWrap(True); layout.addWidget(state)
     page.journey_run_state=state
+    if route=='fdtd':
+        # Keep timing and its action in the visible journey, not the hidden legacy panel.
+        for widget in (page.estimate_button, page.timing_status, page.progress):
+            widget.setParent(body); layout.addWidget(widget)
+        page.estimate_button.show(); page.timing_status.show()
     kinds={'fdtd'} if route=='fdtd' else set(getattr(page,'kinds',()))
     owner={'running':bool(getattr(page,'_active',False)) and getattr(store,'active_study',route)==route}
     def owns(): return owner['running'] and getattr(store,'active_study',route)==route
@@ -315,7 +320,7 @@ def install_optical_journey(page,store,route):
             ('Polarization', 'polarization'), ('Minimum wavelength (nm)', 'wavelength_min_nm'),
             ('Maximum wavelength (nm)', 'wavelength_max_nm'), ('Frequency samples', 'frequency_points')]])
         stopping = _fields('Time stepping and stopping', [(label, page.controls[key]) for label, key in [
-            ('Maximum time after pulse (µm/c)', 'run_after_sources'), ('Courant factor', 'courant'), ('Field energy decay target', 'decay_by'), ('Dispersion fit tolerance', 'fit_tolerance')] if key in page.controls])
+            ('Maximum time after pulse (µm/c)', 'run_after_sources'), ('Courant factor', 'courant'), ('Monitor field decay target', 'decay_by'), ('Dispersion fit tolerance', 'fit_tolerance')] if key in page.controls])
         presets = QWidget(); preset_row = QHBoxLayout(presets); preset_row.setContentsMargins(0, 0, 0, 0)
         page.journey_load_preset = QPushButton('Load Meep setup…')
         page.journey_save_preset = QPushButton('Save Meep setup…')
