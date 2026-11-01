@@ -12,7 +12,7 @@ import shutil
 import zipfile
 
 ROOT = Path(__file__).resolve().parent
-VERSION = '1.4.0-alpha.10'
+VERSION = '1.4.0-alpha.11'
 BUILD_DATE = '2026-11-01'
 PINNED_INPUTS = Path(os.environ.get('ODS_NATIVE_INPUTS', ROOT.parent/'local-windows-review-1.2.5-ui-review2'/'build_input'))
 SOURCE_SUFFIXES = {'.py', '.md', '.txt', '.yml', '.yaml', '.cmd', '.sh', '.ps1', '.ico', '.html'}

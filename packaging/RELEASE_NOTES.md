@@ -1,15 +1,28 @@
-# Optical Design Studio 1.4.0-alpha.10 — Submitted run snapshot consistency
+# Optical Design Studio 1.4.0-alpha.11 — Material assignment help
 
 Experimental Windows x64 usability update · 1 November 2026
 
-The captured project now records current submitted execution options consistently in its top-level state and active simulation-document copy. Earlier run files could retain the previous run's options in that redundant nested copy while the actual job, editor draft and top-level options were current. This correction preserves authored drafts, geometry, inactive studies and existing Save behavior. Scientific equations, simulation settings, physical/design budgets and cancellation are unchanged.
+The full-device inspector now explains the existing optical/electrical assignment rule in the Optical material assignment group, below Background material: layers and material regions can override optical n/k; changing their electrical material clears that separate override. An Optical material link in the electrical material record keeps the pair associated for Automatic assignment. Void regions remain air. The help follows the layer/region assignment group; it is not contact-metal guidance.
 
-This candidate passed 163 distinct staged-source checks, 34 packaging/privacy/license checks and exact comparison of 201 compiled modules in each executable plus the standalone Meep runner. Eight frozen critical checks, seven Windows startup checks and fresh Terra manual checks are mandatory. The manual check uses a tiny case authored through the actual UI, changes its options and inspects the resulting saved job for snapshot consistency. It is a provenance diagnostic, not a convergence or paper-agreement result. Fresh operational Stop is not part of this scope.
+This is a visible-copy update only. It does not change assignment behavior, physics, geometry, state, solver settings or budgets. An earlier native observation of assignment loss after an apparently unchanged electrical selection was not reproduced; this text does not claim to repair it. Alpha10's submitted-snapshot consistency correction and earlier UI/runtime improvements are inherited.
 
-Extract the entire portable `.7z` and retain the backend and `_internal` directory. Stable v1.3.5 remains the stable channel. The authored aggregate below records 20/28 routes and five earlier scoped agreements at their actual versions. Historical results are not relabelled as alpha10 calculations. Raw projects, user libraries, logs and paper PDFs are excluded.
+The candidate passed 163 distinct staged-source checks, 34 packaging/privacy/license checks and exact comparison of 201 compiled modules in each executable plus the standalone Meep runner. Eight critical frozen checks, seven actual Windows startup checks and fresh Terra readability/visibility checks with observed normal exit of that same feature process are mandatory. No scientific solver or fresh operational Stop is part of alpha11's manual scope; no new convergence or paper agreement follows.
+
+Extract the complete portable `.7z` and retain the backend and `_internal` directory. Stable v1.3.5 remains the stable channel. The authored aggregate below records 21/28 routes and five earlier scoped agreements at their actual application versions. Historical results are not relabelled as alpha11 calculations. Raw projects, user libraries, logs and paper PDFs are excluded.
 
 ---
 
+# Optical Design Studio campaign — alpha.11 dated prepublication aggregate
+
+**Scientific checkpoint — 2026-11-01T15:33:33.367280+00:00.** This checkpoint records 21 of 28 routes with native UI execution evidence; seven routes remain unexecuted and the five prior scoped reference agreements are unchanged. Alpha.10 is the latest public experimental download, source commit `679012d989c2c27a6206fd1e4136ba34878de2bb` ([release](https://github.com/Wgeshow/Optical-Design-Studio/releases/tag/v1.4.0-alpha.10)). Seven uploaded assets passed digest/size checks and anonymous HEAD access; a full anonymous redownload hash pass is not claimed. Stable v1.3.5 is unchanged.
+
+Alpha.10 gates passed: 163 distinct source checks, 34 packaging checks, build, 201 exact compiled modules per executable plus the standalone Meep runner, 18 focused offscreen regressions in the private source payload, critical 8/8 and Windows startup 7/7. Its notes are a frozen 20/28-route, five-agreement checkpoint; the current 21st route is separate. Manual UI scope was a corrected pair of explicitly authored constant-material diagnostic runs that verified submitted/top-level/nested option snapshots. The initial factory-material attempt was excluded. A separate fresh no-solve chooser exited 0; the feature-window exit was not captured. Stop, long-duration behavior and tooltip visuals were not tested. Those diagnostics do not establish material calibration, convergence or paper agreement; the full installer matrix was not rerun. The authored alpha.10 continuity follow-up has since merged and its five remote files were byte-verified; this does not change the public assets or frozen route notes.
+
+Alpha.11 remains an unpublished candidate: 163 source checks, 34 packaging checks, build and 201 exact compiled modules per executable. Its critical profile passed 8/8 and native Windows startup passed 7/7. The fresh packaged manual check passed all six bounded material-help observations, including inspection of a distinct doping object, and the same feature process closed with captured exit code 0. This is a UI-only check: no scientific solver, Stop, convergence, paper agreement, tooltip or long-duration behavior was tested. Publication is not claimed.
+
+The most recent root-owned Meep telemetry snapshot available for this draft is dated 1 November 2026 09:20:21 CST: 22 cells per underlying 0.49 µm pitch, 44.89795918 cells/µm, integrated source, 401 samples over 1400–1800 nm, p polarization, 1 µm PML/padding, 4000 µm/c phase cap and 10⁻⁷ decay target. Reference decay passed; Device was at t=2165.911/4063 µm/c (53.31% of phase allowance), with latest sampled field-squared ratio 1.283325×10⁻⁶ at t=2160.098 µm/c, above target. The approximately 97-minute remaining phase-allowance estimate is time-budget context only, not a completion or convergence forecast. The completed cap4000 temporal result and its spectral/grid/PML limits remain as recorded in the dated alpha.10 checkpoint below.
+
+The section below preserves the full reviewed alpha.10 20-route checkpoint as historical material. Its route table and dated statuses are not rewritten by this live update. Route 21 is added afterward with its own alpha.8 source provenance.
 # Optical Design Studio campaign — alpha.10 dated prepublication aggregate
 
 **Scientific snapshot — 1 November 2026, 14:27:05 UTC.** This aggregate records 20/28 UI-executed routes and eight unexecuted routes. Five earlier scoped reference agreements remain; no new paper agreement is added. Execution, numerical convergence, assumptions and paper agreement are separate judgments. The earlier [alpha.9 release](https://github.com/Wgeshow/Optical-Design-Studio/releases/tag/v1.4.0-alpha.9), source commit `7f038f6271b12f18758f08e29a5ff111c9d2b65d`, retains its immutable eighteen-route checkpoint. The alpha.10 software gates below were completed after this scientific snapshot. Stable v1.3.5 remains unchanged; each scientific result retains its actual application/source provenance.
@@ -151,3 +164,162 @@ Primary comparisons available for this work include [Johnson et al. (1999), DOI 
 ## Campaign interpretation
 
 This dated alpha.10 aggregate accompanies the submitted-snapshot correction. Source, packaging, compiled-code, frozen critical, actual Windows startup and fresh manual checks passed as detailed above; subsequent archive/source/publication verification is recorded in the release metadata. Alpha.9 public notes remain an immutable 18/28 checkpoint, while the live ledger now records 20/28 route executions and eight unexecuted routes. Five earlier scoped paper agreements remain unchanged; no new agreement is credited for these routes. Meep's completed temporal decay criteria, numerical identities, exact exports, a one-held-out AI result, and analyst-defined capacitor/transport checks are not substitutes for spectral/grid convergence or a matched primary-paper observable. The alpha.5-r2 22-cells-per-0.49-µm-pitch Meep run (132 cells across its 2.94 µm supercell) was active at the dated 2026-11-01T14:25:19.959713Z snapshot: 44.89795918 cells/µm, 4000 µm/c cap, Device t=1137.5795/4063 µm/c (28.0% of the phase time allowance) after 3529.49 s; Reference decay had passed, and no Device spectrum was complete. The time allowance is not a completion, decay, or convergence estimate. Static report links were checked, but private-browser visual report QA remains incomplete after native-app access approval timed out; that tooling status is separate from the scientific results.
+
+
+
+## Route 21 — Sesame1D illuminated short-circuit and bias sweep
+
+### Setup and assumptions
+
+This native UI route ran in Optical Design Studio 1.4.0-alpha.8, source commit `ea6bb3dd0be90e1e9a1fac9f8f43df3a79dde4a5`. The manually authored 1D CdS/CdTe domain spans 0 to 4.025 µm, with a 0.025 µm interface. The first region uses CdS, donor density 1×10¹⁷ cm⁻³; the second uses CdTe, acceptor density 1×10¹⁵ cm⁻³. Uniform generation is 3.3×10²⁰ cm⁻³s⁻¹, temperature 300 K, and the defect list is empty.
+
+The entered material values were CdS: affinity 4.0 eV, gap 2.4 eV, relative permittivity 10, `Nc=2.2×10¹⁸ cm⁻³`, `Nv=1.8×10¹⁹ cm⁻³`, mobilities 100/25 cm²V⁻¹s⁻¹ and electron/hole lifetimes 10⁻⁸/10⁻¹³ s; CdTe: affinity 3.9 eV, gap 1.5 eV, relative permittivity 9.4, `Nc=8×10¹⁷ cm⁻³`, `Nv=1.8×10¹⁹ cm⁻³`, mobilities 320/40 cm²V⁻¹s⁻¹ and lifetimes 5×10⁻⁹/5×10⁻⁹ s. `Et=0`, radiative `B=0`, Auger `Cn=Cp=0`; these are explicit analyst assumptions, not fully specified Fig. 2 inputs.
+
+Both ends are Ohmic. Selective surface velocities are left electron/hole `1×10⁷/0 cm s⁻¹`, right `0/1×10⁷ cm s⁻¹`. The paper does not fully specify these contacts; the values follow the manual recipe/tutorial interpretation, not an established exact reconstruction of the paper’s contacts. The corrected short-circuit baseline uses 51 nodes, includes the interface exactly, and requests 0 V. The first attempt with right hole velocity zero is retained as an incomplete 0/1 run and excluded from the corrected result.
+
+### Governing equations and units
+
+The steady 1D model solves electron and hole continuity with conventional current densities `Jn,Jp` in A cm⁻²:
+
+```text
+dJn/dx = q(R − G)
+dJp/dx = q(G − R)
+Jn = −q μn n dφ/dx + q Dn dn/dx
+Jp = −q μp p dφ/dx − q Dp dp/dx
+D(n,p) = μ(n,p) kBT/q
+−d/dx(ε0 εr dφ/dx) = ρ,    ρ = q(p − n + ND − NA)
+```
+
+Here `x` is in cm for the transport unit system, `q=1.602176634×10⁻¹⁹ C`, number densities are cm⁻³, `μ` is cm²V⁻¹s⁻¹, `D` is cm²s⁻¹, `φ` is volts, and `G,R` are cm⁻³s⁻¹. For this form, use `ε0=8.8541878×10⁻¹⁴ F/cm`, the SI vacuum permittivity converted by dividing by 100; `εr` is dimensionless, making the Poisson equation dimensionally consistent with `ρ` in C/cm³. `ND` and `NA` are the entered donor and acceptor densities. Einstein’s relation uses the fixed 300 K temperature. The app’s plotted convention is `diode_current = −mean(Jx)`; the underlying `Jx` is conventional current along +x.
+
+At the two Ohmic endpoints the selected contact model sets the applied contact potentials and uses the entered electron/hole surface velocities to define carrier exchange. The signed bias convention increases the right-contact electrostatic potential for positive voltage; no doping-dependent sign flip is applied. This contact closure is part of the analyst-selected boundary model and is not claimed to reproduce an unspecified paper boundary exactly.
+
+### Implementation-tied derivation
+
+This supplement explains the existing steady, nondegenerate, fixed-temperature model and numerical checks. It adds no simulation, fitted parameter, convergence result or paper-agreement credit. Energies below are in joules unless explicitly marked eV; q is positive elementary charge, θ=kBT and VT=θ/q.
+
+#### 1. Physical equations and unit conversion
+
+For this case without explicit charged defects, let φ be electrostatic potential, E=−dφ/dx, and ρ=q(p−n+ND−NA), with fully ionized entered dopants. In a homogeneous material, conventional charge currents and steady balances are
+
+    Jn = −q μn n φ′ + q Dn n′,       Jp = −q μp p φ′ − q Dp p′,
+    Dn,p = μn,p VT,
+    Jn′ = q(R−G),                   Jp′ = q(G−R),
+    −(ε0 εr φ′)′ = ρ.
+
+Thus total current obeys (Jn+Jp)′=0 even when electron/hole currents vary through generation and recombination. SI units are x in m, densities in m⁻³, J in A/m², G,R in m⁻³s⁻¹ and ε0 in F/m. Spatial changes of affinity, gap and density of states require the generalized formulation in section 4; the homogeneous drift/diffusion expressions alone omit those material-gradient terms.
+
+The wrapper chooses the backend's cm convention. Convert consistently:
+
+| Quantity | SI value → numerical backend value |
+|---|---|
+| x; surface velocity S | m ×100 → cm; m/s ×100 → cm/s |
+| n,p,ND,NA,Nc,Nv; G,R | m⁻³ ÷10⁶ → cm⁻³; m⁻³s⁻¹ ÷10⁶ → cm⁻³s⁻¹ |
+| μ; D | m²/(V·s) ×10⁴ → cm²/(V·s); m²/s ×10⁴ → cm²/s |
+| ε0; J | F/m ÷100 → F/cm; A/m² ÷10⁴ → A/cm² |
+| Energy; B; Cn,p | J ÷q → eV numerically; m³/s ×10⁶ → cm³/s; m⁶/s ×10¹² → cm⁶/s |
+
+In particular, ε0≈8.8541878×10⁻¹⁴ F/cm in the cm-based Poisson equation, and 1 A/m²=0.1 mA/cm². The wrapper converts its entered micrometre nodes to cm by ×10⁻⁴ before constructing Sesame. [Application wrapper, function sesame_transport, lines 54–79](https://github.com/Wgeshow/Optical-Design-Studio/blob/ea6bb3dd0be90e1e9a1fac9f8f43df3a79dde4a5/src/research_physics_worker.py#L54-L79).
+
+Sesame then nondimensionalizes: N0=10¹⁹ cm⁻³, μ0=1 cm²/(V·s), L0²=ε0VT/(qN0), t0=L0²/(μ0VT), J0=qμ0N0VT/L0 and G0=N0/t0. Here ε0 must use F/cm when N0 uses cm⁻³. The unknowns are v=φ/VT and ηn,p=EFn,p/θ. The code's thermal energy in eV has the same numerical value as VT in volts. Saved densities, potentials and currents are multiplied by their scales again. [Scaling.__init__, lines 57–85](https://github.com/usnistgov/sesame/blob/e2769a9d15c64415a87a5cfb566cbf2f3dac309f/sesame/builder.py#L57-L85), [wrapper output conversion, lines 118–148](https://github.com/Wgeshow/Optical-Design-Studio/blob/ea6bb3dd0be90e1e9a1fac9f8f43df3a79dde4a5/src/research_physics_worker.py#L118-L148).
+
+#### 2. Poisson and continuity on a control volume
+
+For consecutive nodes define h−=xi−xi−1, h+=xi+1−xi and ℓi=(h−+h+)/2. Integrating a derivative across the node-centred control volume gives the right-face flux minus the left-face flux. With displacement flux Di+1/2=−εi+1/2(φi+1−φi)/h+, the interior equations are
+
+    (Di+1/2 − Di−1/2)/ℓi − ρi = 0,
+    (Jn,i+1/2 − Jn,i−1/2)/ℓi + q(Gi−Ri) = 0,
+    (Jp,i+1/2 − Jp,i−1/2)/ℓi + q(Ri−Gi) = 0.
+
+A shared face current enters its two neighbouring volumes with opposite signs. Adding the two continuity equations cancels G−R. The installed implementation uses the arithmetic face average εi+1/2=ε0(εr,i+εr,i+1)/2, not a separately assumed harmonic average. Its dimensionless residuals absorb q and the unit scales. Contact rows replace the interior balances: potential is held at the chosen endpoint value, while entered surface velocities set carrier exchange relative to equilibrium densities. [getF, densities and interior residuals, lines 35–114](https://github.com/usnistgov/sesame/blob/e2769a9d15c64415a87a5cfb566cbf2f3dac309f/sesame/getF.py#L35-L114); [contact residuals, lines 121–155](https://github.com/usnistgov/sesame/blob/e2769a9d15c64415a87a5cfb566cbf2f3dac309f/sesame/getF.py#L121-L155).
+
+#### 3. SRH recombination from steady trap occupancy
+
+For a single effective trap population NT, let f be its electron occupancy, cn,cp the capture coefficients and en,ep the emission rates. Capturing an electron or emitting a hole fills the trap; electron emission or hole capture empties it:
+
+    df/dt = (cn n + ep)(1−f) − (en + cp p)f.
+
+Setting this to zero and using detailed balance en=cn n1 and ep=cp p1 gives
+
+    f = (cn n + cp p1)/[cn(n+n1)+cp(p+p1)].
+
+The net electron removal rate equals the steady net hole removal rate:
+
+    RSRH = NT[cn n(1−f) − en f]
+         = NT cn cp (np−n1p1)/[cn(n+n1)+cp(p+p1)]
+         = (np−ni²)/[τp(n+n1)+τn(p+p1)],
+    τn=1/(NT cn),     τp=1/(NT cp).
+
+For the effective Boltzmann trap convention used here, ni²=NcNv exp(−Eg/θ), n1=ni exp(Et/θ), p1=ni exp(−Et/θ), so n1p1=ni²; Et is relative to intrinsic energy. At np=ni² the net rate is zero, while np<ni² gives net thermal generation. The implemented bulk rate also permits B(np−ni²)+(Cn n+Cp p)(np−ni²); the authored case sets these added coefficients to zero. Empty explicit-defect lists do not remove bulk SRH lifetimes. NT here explains the entered lifetimes; it is not an additional charge density inserted into this model, nor an inferred measured trap density or capture cross section. [Builder.add_material, lines 249–266](https://github.com/usnistgov/sesame/blob/e2769a9d15c64415a87a5cfb566cbf2f3dac309f/sesame/builder.py#L249-L266); [get_bulk_rr, lines 60–68](https://github.com/usnistgov/sesame/blob/e2769a9d15c64415a87a5cfb566cbf2f3dac309f/sesame/observables.py#L60-L68).
+
+#### 4. Generalized Scharfetter–Gummel link flux
+
+Use the energy reference Ec=−qφ−χ and Ev=Ec−Eg. Boltzmann statistics imply
+
+    wn = qφ/θ + χ/θ + ln(Nc/N0),
+    wp = qφ/θ + χ/θ + Eg/θ − ln(Nv/N0),
+    n = N0 exp(wn+ηn),        p = N0 exp(−wp−ηp).
+
+Nc/N0 and Nv/N0 are dimensionless logarithm arguments. Affinity, gap and density-of-states variations therefore enter wn,wp explicitly. Differentiating these relations in the quasi-Fermi current laws yields
+
+    Jn = qDn n ηn′ = qDn(n′−n wn′),
+    Jp = qDp p ηp′ = −qDp(p′+p wp′).
+
+On a link i→j of length h, freeze D and approximate w linearly; the link-fit approximation treats its current as constant. Multiplication by integrating factors gives
+
+    (n exp(−wn))′ = [Jn/(qDn)] exp(−wn),
+    (p exp(+wp))′ = −[Jp/(qDp)] exp(+wp).
+
+For Δw=wj−wi, the required integrals are
+
+    ∫i→j exp(−w) dx = h exp(−wi)(1−exp(−Δw))/Δw,
+    ∫i→j exp(+w) dx = h exp(+wi)(exp(Δw)−1)/Δw.
+
+Insert the endpoint densities and solve for current. With B(z)=z/[exp(z)−1] and B(0)=1,
+
+    Jn,i→j = (qDn/h)[B(Δwn) nj − B(−Δwn) ni],
+    Jp,i→j = (qDp/h)[B(Δwp) pi − B(−Δwp) pj].
+
+Three analytic sign checks follow directly:
+
+1. B(−z)=exp(z)B(z). Constant ηn,ηp gives nj=ni exp(Δwn), pj=pi exp(−Δwp), making both currents exactly zero in the algebra.
+2. For Δw→0, B→1: Jn=qDn(nj−ni)/h and Jp=−qDp(pj−pi)/h, the correct diffusion signs.
+3. In a homogeneous material with constant density and small potential step, B(z)=1−z/2+O(z²) gives Jn≈−qμn n Δφ/h and Jp≈−qμp p Δφ/h, both conventional drift currents along E=−Δφ/h.
+
+Crucially, installed get_jn/get_jp use the mobility at the left site i: Dn,p=μn,p,i VT. They do not use the two-site mean suggested by the online derivation. Regular code branches are algebraically equivalent to the fluxes above; small-difference branches use Taylor expansions to reduce cancellation, rather than evaluating the displayed quotient literally at zero. This is an implementation observation, not an explanation assigned to the paper discrepancy. [get_n/get_p, lines 10–57](https://github.com/usnistgov/sesame/blob/e2769a9d15c64415a87a5cfb566cbf2f3dac309f/sesame/observables.py#L10-L57); [get_jn, lines 118–143](https://github.com/usnistgov/sesame/blob/e2769a9d15c64415a87a5cfb566cbf2f3dac309f/sesame/observables.py#L118-L143); [get_jp, lines 171–192](https://github.com/usnistgov/sesame/blob/e2769a9d15c64415a87a5cfb566cbf2f3dac309f/sesame/observables.py#L171-L192).
+
+#### 5. Initialization and the Newton stopping rule
+
+The wrapper seeds local neutrality and mass action: n0−p0=C, n0p0=ni², where C=ND−NA. Solving the quadratic gives n0=(C+√(C²+4ni²))/2 for C≥0. For C<0 it uses the equivalent, cancellation-resistant n0=2ni²/[√(C²+4ni²)−C]. The potential seed is v0=ln(n0/Nc)−χ/θ, with zero initial quasi-Fermi energies. This seed is not the final junction solution.
+
+An equilibrium Poisson solve comes first. For each illuminated bias, the wrapper raises the right boundary by Vapp/VT relative to equilibrium, then starts the coupled solve from the preceding state. Thus illuminated 0 V is short circuit, not dark equilibrium. [Wrapper initialization and bias continuation, lines 86–118](https://github.com/Wgeshow/Optical-Design-Studio/blob/ea6bb3dd0be90e1e9a1fac9f8f43df3a79dde4a5/src/research_physics_worker.py#L86-L118).
+
+For dimensionless u=(ηn,ηp,v), linearization F(u+δu)≈F(u)+Aδu gives Aδu=−F(u), A=∂F/∂u. The sparse linear solve supplies δu. Components exceeding magnitude one are damped to sign(δu)ln[1+1.72|δu|], then added to u. The installed solver stops when the maximum absolute undamped update is below tolerance, before applying that final small update. The entered tolerance 10⁻⁹ and maximum 300 iterations are numerical choices, not a physical-error tolerance or a proof of a small normalized residual. Failure stops the bias loop: earlier completed states are retained, and the failed bias is not counted as complete. [Solver.solve, lines 149–193](https://github.com/usnistgov/sesame/blob/e2769a9d15c64415a87a5cfb566cbf2f3dac309f/sesame/solvers.py#L149-L193); [damping, lines 198–203](https://github.com/usnistgov/sesame/blob/e2769a9d15c64415a87a5cfb566cbf2f3dac309f/sesame/solvers.py#L198-L203); [_get_system/_newton, lines 216–298](https://github.com/usnistgov/sesame/blob/e2769a9d15c64415a87a5cfb566cbf2f3dac309f/sesame/solvers.py#L216-L298).
+
+#### 6. What the reported errors measure
+
+The wrapper exports Jdiode=−mean(Jx) and section spread=max(Jx)−min(Jx). Their ratio spread/|mean(Jx)| measures within-state current consistency. The separate mesh sensitivity is |J101−J51|/|J51|. Neither is a bound on physical or spatial error. [Wrapper section reduction and export, lines 119–148](https://github.com/Wgeshow/Optical-Design-Studio/blob/ea6bb3dd0be90e1e9a1fac9f8f43df3a79dde4a5/src/research_physics_worker.py#L119-L148).
+
+For paired author/native current-density samples in the same units, ΔJi=JUI,i−Jauthor,i, MAE=mean(|ΔJ|), RMSE=√mean(ΔJ²), and pointwise symmetric relative difference=2|ΔJ|/(|JUI|+|Jauthor|), when that denominator is nonzero. These are descriptive discrepancies, not acceptance tolerances. Exact export reproduction tests serialization; qGL is only an input-generation scale. No trap derivation, link equilibrium identity, Newton termination, small current spread, or two-grid comparison supplies missing paper inputs, validates interface physics or establishes paper agreement.
+
+The [official numerical-method documentation](https://sesame.readthedocs.io/en/latest/physics/discretization.html) provides context. The equations here were derived independently using the executed source, rather than transcribing its displayed formulas. Installed Sesame2.0 source was traced to immutable revision e2769a9d15c64415a87a5cfb566cbf2f3dac309f; the cited source files were byte-verified against that revision. In particular, observables.py SHA-256 is 7a5cf4ade2790f61ad729ee006ebc05f9a4c16ac863f668f68cf72b69ae379ea. Application citations are pinned to the actual alpha.8 corresponding-source commit. No solver or substitute calculation was executed to create this supplement.
+
+### Numerical method and checks
+
+The baseline used Newton update tolerance 10⁻⁹ and maximum 300 iterations. It completed one state. The 19-point sweep then used the same 51-node mesh and all identical non-voltage inputs, varying only bias from 0 to 0.9 V in 0.05 V steps. The UI-exported 19-row, six-column CSV is byte-identical to the saved transport table (SHA256 `3422AB724023E79B97F8A30F3FBDCE7DB615EB9675906E4B166077641C348018`). The sampled diode current rises monotonically in the entered voltage order and changes sign between the last negative and positive samples; no fitted Voc is asserted. Largest within-state section spread divided by `|mean Jx|` is 7.27×10⁻⁷ at 0.05 V.
+
+A separate 101-node 0 V run subdivides each of the 50 baseline intervals once. Audit of saved engine inputs shows the same non-mesh inputs; all 51 original nodes and x=0.025 µm are retained. The one-row selected UI export matches saved CSV byte-for-byte (SHA256 `ED925C50CF262D738D3CA8458EE96A903D178DD62F768DE638D692E585D15FD6`). Current is −15.0997109162 mA cm⁻² at 51 nodes and −15.0027154197 mA cm⁻² at 101 nodes, a 0.64237% two-grid sensitivity. Section-current spread/mean ratios are 2.72×10⁻⁹ and 8.84×10⁻⁹. These are within-state conservation checks, not estimates of spatial error. A two-grid pair does not establish asymptotic order or convergence.
+
+An input-scale check gives `GL = (3.3×10²⁰ cm⁻³s⁻¹)(4.025×10⁻⁴ cm) = 1.32825×10¹⁷ cm⁻²s⁻¹`, so `qGL=21.2809 mA cm⁻²`. This is the charge-flux scale of uniform generation, not a predicted or validated collection efficiency. The observed current-to-`qGL` ratio is descriptive only. At the heterointerface, sampled band offsets after subtracting the local 1 nm electrostatic potential drop are +0.100 eV for the conduction edge and +1.000 eV for the valence edge, consistent with the entered affinities and band gaps. This checks the model against its own inputs, not independent physics.
+
+### Primary-reference comparison and limits
+
+The primary [Gaury et al. (2018) Sesame paper](https://arxiv.org/abs/1806.06919) Fig. 2(a) shows the illuminated 1D CdS/CdTe J–V curve; the authored case takes its Table I material values and uniform generation. A historical raster-only estimate from the cited 1160×1500 PNG (embedded resolution metadata 136.3472 dpi; no separate 400 dpi raster retained) put the Sesame 0 V current near −12.1±0.4 mA cm⁻². That earlier estimate is retained as historical, not used for the new numeric metrics.
+
+A public author numeric vector is now available in Paul Haney’s CC0 Mendeley dataset ([DOI 10.17632/34gb6xjt4g.1](https://data.mendeley.com/datasets/34gb6xjt4g/1), published 28 April 2019). Its `jsesame` array in A/m² was parsed as literal data without executing the MATLAB file; the first 19 of 21 values exactly share the native 0–0.9 V bias samples. Conversion is `J_author(mA cm⁻²)=A m⁻²/10`; UI `diode_current_A_cm2` is multiplied by 1000. Both original current signs are retained. Across 19 paired points, MAE is 2.774021 mA cm⁻², RMSE 2.779462 mA cm⁻², maximum absolute difference 3.243478 mA cm⁻² at 0.90 V, and mean pointwise symmetric relative difference 24.32%, using `100|J_UI−J_author|/[(|J_UI|+|J_author|)/2]`. At 0 V, author −12.178013807 versus native −15.099710916 mA cm⁻² (difference −2.921697109 mA cm⁻²; 23.99% relative to author magnitude). No fit, interpolation or acceptance tolerance is applied. These are descriptive sampled-curve discrepancies, not an acceptance score.
+
+Exact paper contact conditions, temperature, trap level, recombination coefficients, mesh, bias sampling and solver tolerances are not all specified. The recipe’s selective contact velocities, 300 K, `Et=0`, and zero `B/Cn/Cp` remain assumptions. Thus precise author data improves reference precision but does not establish exact reproduction or add agreement credit. Fig. 2(b) band profile was compared qualitatively only; no pixel residual was calculated. The small within-state current spread and 51→101 two-grid change do not establish convergence; a third grid and finer voltage spacing would be separate numerical checks.
+
+The 2019 author 2D data file is identified as `heteroJunctionWithGB`, while the planned 2018 Fig. 3 route is a homojunction with a grain boundary. The 2019 full article describes a CdS/CdTe heterojunction with a grain boundary. That 2D curve is therefore not used as a numeric target for the planned 2018 case until setup/version and observable are matched.
+
+The initial wrong-contact zero-row attempt, corrected baseline, full sweep and mesh comparison remain preserved as separate dated evidence. The dated alpha.10 aggregate remains frozen at 20 routes; this alpha.11 scientific checkpoint records 21/28. Later native results are reported separately and do not alter this checkpoint.

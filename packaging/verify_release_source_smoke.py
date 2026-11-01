@@ -57,7 +57,7 @@ def main():
     speed = report.get('checks',{}).get('simulation_speed_and_scan_storage',{})
     maximize = report.get('checks',{}).get('maximize_restore_painting',{})
     passed = bool(exit_code == 0 and report.get('passed') is True and report.get('frozen') is False
-                  and report.get('version') == '1.4.0-alpha.10'
+                  and report.get('version') == '1.4.0-alpha.11'
                   and len(report.get('checks',{})) >= 9 and fields.get('passed') is True
                   and fields['detail'].get('selected_csv_verified') is True
                   and fields['detail'].get('volume_depths') == 5

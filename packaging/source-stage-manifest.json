@@ -1,7 +1,7 @@
 {
-  "version": "1.4.0-alpha.10",
+  "version": "1.4.0-alpha.11",
   "build_date": "2026-11-01",
-  "tree_sha256": "1bc81ba0b5621f8740ae1f47540f2b94ac76865f70d6bf743ca02d5219488605",
+  "tree_sha256": "43b2ca95b846cc4b5ecfd839ae297407efe6a1b172b7f6b2ff8735747ce54357",
   "files": {
     "addon_runtime.py": {
       "size": 22124,
@@ -45,7 +45,7 @@
     },
     "app_version.py": {
       "size": 1757,
-      "sha256": "32aadc84e886632480f6551d611af4cbcb25df3444267ac6b420bec0bf945ed4"
+      "sha256": "66fac2e113dd9863a4a1e8933b36b8ac15d10f02f9be3f375c2006c55e73a781"
     },
     "application_restart.py": {
       "size": 7182,
@@ -1248,8 +1248,8 @@
       "sha256": "e345e690dce16d5cd6e33773bf25175dbaf887e9f579dd011b0a34b651ea5689"
     },
     "qt_custom_device.py": {
-      "size": 176043,
-      "sha256": "70125d106c5c71d9194ce8d81e9bc28ea579bdcf0be9a60ede30b3eeffc5cdd6"
+      "size": 176184,
+      "sha256": "1abfcba23c8b9768a7acdc4deaa94b1790da322595012b8efbefbe298f6084e9"
     },
     "qt_design_materials.py": {
       "size": 5612,

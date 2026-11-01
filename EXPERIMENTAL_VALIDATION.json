@@ -1,11 +1,11 @@
 {
-  "version": "1.4.0-alpha.10",
+  "version": "1.4.0-alpha.11",
   "build_date": "2026-11-01",
   "signed": false,
   "source_tests_run": 163,
   "source_tests_skipped": 0,
   "source_tests_passed": 163,
-  "source_tree_sha256": "1bc81ba0b5621f8740ae1f47540f2b94ac76865f70d6bf743ca02d5219488605",
+  "source_tree_sha256": "43b2ca95b846cc4b5ecfd839ae297407efe6a1b172b7f6b2ff8735747ce54357",
   "frozen_verification": "partial",
   "native_startup_verification": "passed",
   "packaged_checks": {
@@ -85,16 +85,16 @@
     "test_simulation_documents.DocumentStoreTests"
   ],
   "source_test_scope": "Selected campaign regressions and release gates; offscreen/unit checks are not native scientific acceptance.",
-  "executable_sha256": "de988933a2f9d6ec6e8bc41d475c27602f953ee55731d50e681d1c08f54feced",
-  "backend_executable_sha256": "8d4228edab5b2bcb528f318f4b70c08c38dde328e9365ae084e496ee9ded4891",
+  "executable_sha256": "071c90bd10d507e7e81075c24cd45902885ff2cd4b9b157f285d2790a37dc4ac",
+  "backend_executable_sha256": "328912d2eb72d2d208f52f298175e4e8c42cbe81e01a76fb55946b912ba1a923",
   "frozen_module_inventory": {
     "Optical Design Studio.exe": {
-      "sha256": "de988933a2f9d6ec6e8bc41d475c27602f953ee55731d50e681d1c08f54feced",
+      "sha256": "071c90bd10d507e7e81075c24cd45902885ff2cd4b9b157f285d2790a37dc4ac",
       "required_modules": 117,
       "numpy_version": "1.26.4"
     },
     "OpticalDesignBackend.exe": {
-      "sha256": "8d4228edab5b2bcb528f318f4b70c08c38dde328e9365ae084e496ee9ded4891",
+      "sha256": "328912d2eb72d2d208f52f298175e4e8c42cbe81e01a76fb55946b912ba1a923",
       "required_modules": 117,
       "numpy_version": "1.26.4"
     }
