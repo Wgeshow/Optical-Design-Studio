@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0-alpha.9",
+  "version": "1.4.0-alpha.10",
   "build_date": "2026-11-01",
   "profile": "public",
   "production_bytes_preserved": true,
@@ -551,8 +551,8 @@
       "sha256": "fc2c73cc97431c3da12d78191c24ec71e47d72cc035969c7fed56c15a2663b2c"
     },
     "app_version.py": {
-      "size": 1756,
-      "sha256": "1934c92c05ae4efe6ceb847f616e7c0b6f1971c5acaf5bfbac2386b9736666d9"
+      "size": 1757,
+      "sha256": "32aadc84e886632480f6551d611af4cbcb25df3444267ac6b420bec0bf945ed4"
     },
     "application_restart.py": {
       "size": 7182,
@@ -1751,8 +1751,8 @@
       "sha256": "df97aab2e7d02d6782c21e2c1c476a56a39a85b069df5cda2c560bec4cf9fabe"
     },
     "qt_core.py": {
-      "size": 54692,
-      "sha256": "439b0bca03dd477b612d9739b22896763462cf92f16cade2ecd49b0f4c06e68a"
+      "size": 55048,
+      "sha256": "e345e690dce16d5cd6e33773bf25175dbaf887e9f579dd011b0a34b651ea5689"
     },
     "qt_custom_device.py": {
       "size": 176043,
@@ -3018,6 +3018,10 @@
       "size": 25830,
       "sha256": "a4b449ccac82987bf0b9e77bc36b722e2e69003d67b7212e6bc66e0d752f53ee"
     },
+    "tests/test_qt_run_snapshot_consistency.py": {
+      "size": 5767,
+      "sha256": "e6cf5fcd6b331eee4eb46ddea4be45ac65b9022f53e9cd680ea157d473d8ddae"
+    },
     "tests/test_qt_s4_input_review.py": {
       "size": 5304,
       "sha256": "fcdadd26ef4075cc0d845dc66493b5c4d4c6a4020129c05a9558981f222657d9"
@@ -3355,5 +3359,5 @@
       "sha256": "376162b4a329e6cc8fa45c8c70fdc1372a67c5a0366c0a76bb3c8b131076ac7c"
     }
   },
-  "source_tree_sha256": "8690024b25ae5cbdbc153d27453ee0d1231f51ff9b55d7c83f969e18f80d3d1e"
+  "source_tree_sha256": "1bc81ba0b5621f8740ae1f47540f2b94ac76865f70d6bf743ca02d5219488605"
 }

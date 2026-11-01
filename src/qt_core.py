@@ -910,6 +910,12 @@ class ProjectStore(QObject):
             # A spectrum→field sequence resolves both stages from the same
             # immutable structure even if the user edits the visible project.
             project.setdefault('desktop_search',{})[kind]=copy.deepcopy(options)
+        # Keep the submitted active document consistent with its top-level
+        # execution options; inactive documents and authored drafts stay intact.
+        bank=project.get('simulation_documents')
+        if bank is not None:
+            from simulation_documents import payload
+            bank['documents'][bank['active']]=payload(project)
         if kind == 'fdtd':
             from qt_fdtd import MeepWorker
             worker=MeepWorker(kind,project,options,self.library,self)
