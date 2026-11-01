@@ -105,6 +105,13 @@ class SavedBeamDispatchTests(unittest.TestCase):
         source_mode = dict(mode=0, balance_relative=.03, eigen_residual=1e-9, total_loss_cm1=1.)
         fields = dict(x=np.array([0., 1.]), fields=np.zeros((1, 4, 2, 2)),
                       aperture_um=np.asarray(self.cfg['aperture_um']))
+        source = Path(self.cfg['beam_saved_run'])
+        source.mkdir()
+        # The saved-mode contract reads its source summary before mode checks.
+        # This synthetic source has a failed balance gate, hence unconverged.
+        (source / 'pcsel_summary.json').write_text(json.dumps(dict(
+            status='unconverged', engine='pcsel', model='finite',
+            convergence_established=False)), encoding='utf-8')
         with patch.object(pc, '_saved_finite', return_value=([source_mode], fields)):
             with self.assertRaises(pc.InputValidationError) as caught:
                 pc.execute(self.cfg, self.root / 'output')

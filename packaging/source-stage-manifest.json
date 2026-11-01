@@ -1,7 +1,7 @@
 {
-  "version": "1.4.0-alpha.13",
+  "version": "1.4.0-alpha.14",
   "build_date": "2026-11-01",
-  "tree_sha256": "8f0b9403964ef42459503873f0c00f9b6736a7e74a1b1f641cc9299621005535",
+  "tree_sha256": "883ea917d5d34e360a96906b4c89cacc736d80c7356643fd3225e5912bcaaa13",
   "files": {
     "addon_runtime.py": {
       "size": 22124,
@@ -45,7 +45,7 @@
     },
     "app_version.py": {
       "size": 1757,
-      "sha256": "2f3a57d741771d7a4ca6794f502c8fb5f51c5ca0d5b0a2ea8157c46f80f2e2b2"
+      "sha256": "d3b3eb7ed72fbbce0e60c1f576543bd67ed81f21f1798eec9d56d70e0848957c"
     },
     "application_restart.py": {
       "size": 7182,
@@ -336,8 +336,8 @@
       "sha256": "2e88084fc350c9d8c809478031824c535c37637a0972afa82c98ae57a6c7f560"
     },
     "device_project_bridge.py": {
-      "size": 11516,
-      "sha256": "4703245f4b9b4a8fb32855d4349cf4ef6461c26fb7cc4fdd605a9baf8ad94c3d"
+      "size": 12565,
+      "sha256": "466e12d4ff3e14c368c16358ceb8a72513c33b0efa2af3616913d134e8aa6dbe"
     },
     "DEVICE_STUDIO_GUIDE.md": {
       "size": 15774,
@@ -1156,8 +1156,8 @@
       "sha256": "fe0d48fa2cd3b06a988355e0e89fa552274dad07dcd667e32738a51227a00258"
     },
     "pcsel_research.py": {
-      "size": 80173,
-      "sha256": "57adee9410b14028e7d7599e210fefb30868f2c80e93dc289b665c91ee322383"
+      "size": 80702,
+      "sha256": "0bbaed33db59778477f7bae75460b7b050c2784fd3eadfb92eafd421181e5079"
     },
     "pcsel_transport_study.py": {
       "size": 11704,
@@ -1376,8 +1376,8 @@
       "sha256": "578f858149b247c1e2a9583ca5e051a67ab7a0479c25c4fc3444a9c47fd12d50"
     },
     "qt_pcsel_research_setup.py": {
-      "size": 109933,
-      "sha256": "2f75a72d14f3ee87ff47251c69ae45c67adc2e7c879dd74c2c25bd809ce15151"
+      "size": 110260,
+      "sha256": "27d0f23976ac442a376de9abde755bad87572abdacfea7fd907df019a4af318b"
     },
     "qt_photonic_band_results.py": {
       "size": 12957,
@@ -1811,6 +1811,10 @@
       "size": 8992,
       "sha256": "cede7eafedb884aee7fea802b6870efeb0bb1196911240c9ea1714ea62f89eb0"
     },
+    "tests/test_device_bridge_disabled_shapes.py": {
+      "size": 9549,
+      "sha256": "a008e4a5603a2e1281327b6988b1992fcbf00c66c73b40283bdf417da7bcfe16"
+    },
     "tests/test_device_studio_help.py": {
       "size": 6836,
       "sha256": "7443bc8d70772a825ddf576c3c346b7f1112058c453206955e51a017792da879"
@@ -2118,6 +2122,10 @@
     "tests/test_pcsel_research.py": {
       "size": 9731,
       "sha256": "c9b81d797551e7d8d83e5bfaefe8aa9ed5545310965739dcb116d71099a31ddb"
+    },
+    "tests/test_pcsel_saved_finite_metadata.py": {
+      "size": 10239,
+      "sha256": "c75967435ca12034a96e758f410de0ff4867c361e3823ee14f7bfe10a35890b7"
     },
     "tests/test_pcsel_setup_import_safety.py": {
       "size": 5313,
@@ -2684,8 +2692,8 @@
       "sha256": "66716cb92cd1c2bc68aac95a2c8e4acb1594acfdf2288d3429d4d94d466f30c9"
     },
     "tests/test_research_progress_and_beam_reuse.py": {
-      "size": 5959,
-      "sha256": "22d1c8dbe5294e0df5b4307cdfe58203a41418b73ded4e360df002be6acd59ab"
+      "size": 6386,
+      "sha256": "ce2dc26e90f9545fe9ea3616bae90da4a1342988da98b9bc7715a450c3b13b97"
     },
     "tests/test_research_simulation.py": {
       "size": 5498,

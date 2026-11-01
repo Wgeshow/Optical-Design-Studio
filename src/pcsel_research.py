@@ -768,7 +768,16 @@ def _saved_finite(cfg):
     keys=('lattice_nm','layers','shapes','fill_fraction','inclusion_index','top_index','bottom_index',
           'grid_nm','pad_nm','harmonics','green_model','aperture_um','collocation_order','radiation_boundary','vertical_boundary','vertical_mode_selection','vertical_mode_candidates','vertical_mode_index','vertical_formulation','reference_wavelength_nm')
     defaults={r['path']:r['default'] for r in FIELD_SCHEMA if 'default' in r}
-    changed=[key for key in keys if original.get(key,defaults.get(key))!=cfg.get(key,defaults.get(key))]
+    def finite_input(source,key):
+        value=source.get(key,defaults.get(key))
+        if key in ('layers','shapes') and isinstance(value,list):
+            # IDs/names address editable rows; they do not enter the finite
+            # operator. Keep row order and every other (including unknown or
+            # nested) field exact: independent UI authoring generates new IDs.
+            return [{k:v for k,v in row.items() if k not in ('id','name')}
+                    if isinstance(row,dict) else row for row in value]
+        return value
+    changed=[key for key in keys if finite_input(original,key)!=finite_input(cfg,key)]
     if changed:_error('beam_saved_run','Saved modes belong to different inputs: '+', '.join(changed)+'. Run the current finite cavity first.')
     with (folder/'finite_modes.csv').open(newline='',encoding='utf-8') as stream:
         def restored(key,value):

@@ -327,7 +327,7 @@ def main():
             print((output / (name + '.log')).read_text(encoding='utf-8', errors='replace')[-7000:], flush=True)
             break
     check_source(inventory)
-    summary = dict(version='1.4.0-alpha.13', source_tree_sha256=source_tree_sha256,
+    summary = dict(version='1.4.0-alpha.14', source_tree_sha256=source_tree_sha256,
                    tests_run=sum(result['tests_run'] for result in results.values()),
                    failures=sum(result['failures'] for result in results.values()),
                    errors=sum(result['errors'] for result in results.values()),

@@ -141,7 +141,7 @@ def sync_from_optical(project, library, previous=None):
     ids={row['id'] for row in fresh['layers']}
     for key in ('contacts','doping_regions'):
         fresh[key]=[copy.deepcopy(row) for row in previous[key] if row['layer_id'] in ids]
-    fresh['shapes'] += [copy.deepcopy(row) for row in previous['shapes'] if row['shape']=='polygon' and row['layer_id'] in ids]
+    fresh['shapes'] += [copy.deepcopy(row) for row in previous['shapes'] if row['shape']=='polygon' and row['enabled'] and row['layer_id'] in ids]
     # Restore one editable ring when its four exported bars remain intact. A
     # legacy edit to an individual bar instead imports the edited rectangles,
     # so no old ring is silently drawn over changed geometry.
@@ -165,6 +165,23 @@ def sync_from_optical(project, library, previous=None):
                 if i==min(matched):restored.append(copy.deepcopy(ring))
                 if i not in matched:restored.append(row)
             fresh['shapes']=restored
+    # Disabled editor objects have no legacy optical row. Keep them only on
+    # surviving parents, independently of active geometry matching/deletion.
+    # Anchor them after surviving prior IDs without reordering fresh active
+    # rows; material-only round trips then preserve their original positions.
+    inactive={row['id']:copy.deepcopy(row) for row in previous['shapes']
+              if not row['enabled'] and row['layer_id'] in ids}
+    if inactive:
+        active_ids={row['id'] for row in fresh['shapes']}
+        following=defaultdict(list);anchor=None
+        for row in previous['shapes']:
+            if row['id'] in inactive:following[anchor].append(inactive[row['id']])
+            elif row['id'] in active_ids:anchor=row['id']
+        restored=list(following[None])
+        for row in fresh['shapes']:
+            restored.append(row);restored.extend(following[row['id']])
+        fresh['shapes']=restored
+        retained_array_members.update(row['id'] for row in inactive.values() if row.get('pc_array_id'))
     for key in ('name','temperature_K','mesh'):fresh[key]=copy.deepcopy(previous[key])
     if 'pc_arrays' in previous:
         array_members=defaultdict(set)

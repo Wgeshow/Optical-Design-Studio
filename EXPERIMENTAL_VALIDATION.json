@@ -1,11 +1,11 @@
 {
-  "version": "1.4.0-alpha.13",
+  "version": "1.4.0-alpha.14",
   "build_date": "2026-11-01",
   "signed": false,
-  "source_tests_run": 202,
+  "source_tests_run": 247,
   "source_tests_skipped": 0,
-  "source_tests_passed": 202,
-  "source_tree_sha256": "8f0b9403964ef42459503873f0c00f9b6736a7e74a1b1f641cc9299621005535",
+  "source_tests_passed": 247,
+  "source_tree_sha256": "883ea917d5d34e360a96906b4c89cacc736d80c7356643fd3225e5912bcaaa13",
   "frozen_verification": "partial",
   "native_startup_verification": "passed",
   "packaged_checks": {
@@ -30,7 +30,7 @@
   "archive_integrity": "pending",
   "published": false,
   "release_channel": "highly_experimental",
-  "validation_scope": "202 targeted staged-source tests and 34 packaging/privacy/license tests, zero failures/errors/skips; exact code match for 201 modules in each executable plus standalone Meep and research workers; critical frozen profile and actual Windows startup passed; fresh Terra packaged UI checks. Full installer matrix not rerun. See release notes for the dated aggregate scientific results; execution, numerical convergence and paper agreement remain distinct.",
+  "validation_scope": "247 targeted staged-source tests and 34 packaging/privacy/license tests, zero failures/errors/skips; exact code match for 201 modules in each executable plus standalone Meep and research workers; critical frozen profile and actual Windows startup passed; fresh Terra disabled-object checks and restart restoration, readable Beam guidance, completed compatible saved-source Beam reuse and physical-change rejection passed with explicit scope-to-process attribution and observed normal exit for every inspected process. Full installer matrix not rerun. See release notes for the dated aggregate scientific results; execution, numerical convergence and paper agreement remain distinct.",
   "packaged_self_tests_passed": false,
   "compiled_validation_profile": "critical_release",
   "critical_packaged_checks_passed": true,
@@ -86,19 +86,27 @@
     "test_sesame_generation_profile",
     "test_sesame_transport",
     "test_qt_sesame_region_diagnostics",
-    "test_qt_sesame_mesh_builder"
+    "test_qt_sesame_mesh_builder",
+    "test_device_bridge_disabled_shapes",
+    "test_pcsel_saved_finite_metadata",
+    "test_research_progress_and_beam_reuse",
+    "test_pcsel_summary_provenance",
+    "test_pcsel_research.PCSELResearchTests.test_invalid_geometry_returns_exact_field_address",
+    "test_pcsel_research.PCSELResearchTests.test_sweep_preflights_all_cases_and_rejects_crossing_polygon",
+    "test_pcsel_research.PCSELResearchTests.test_fill_and_offset_sweep_preserves_pattern_family",
+    "test_pcsel_research.PCSELResearchTests.test_bad_layer_targets_exact_property_and_poles_respect_bounds"
   ],
   "source_test_scope": "Selected campaign regressions and release gates; offscreen/unit checks are not native scientific acceptance.",
-  "executable_sha256": "c7a82d91e60b10670b4c7f75d3efbbfbc4f41cc680f9541f52e8b8365708282f",
-  "backend_executable_sha256": "9cdf9c127f94fe0e54de72924c99511874220d04012f2181d891a90ed818fe5c",
+  "executable_sha256": "d36748a043c26dbf56b710de1ea6fc31f16e30abb02a13489e44a91ed6257859",
+  "backend_executable_sha256": "a5eb2c3445c66e6b6f7d3a69a3ced27503001b3583919159bb63734e2634e5ac",
   "frozen_module_inventory": {
     "Optical Design Studio.exe": {
-      "sha256": "c7a82d91e60b10670b4c7f75d3efbbfbc4f41cc680f9541f52e8b8365708282f",
+      "sha256": "d36748a043c26dbf56b710de1ea6fc31f16e30abb02a13489e44a91ed6257859",
       "required_modules": 117,
       "numpy_version": "1.26.4"
     },
     "OpticalDesignBackend.exe": {
-      "sha256": "9cdf9c127f94fe0e54de72924c99511874220d04012f2181d891a90ed818fe5c",
+      "sha256": "a5eb2c3445c66e6b6f7d3a69a3ced27503001b3583919159bb63734e2634e5ac",
       "required_modules": 117,
       "numpy_version": "1.26.4"
     }

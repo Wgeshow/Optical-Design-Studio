@@ -1043,6 +1043,9 @@ class PcselResearchWorkspace(StructuredStudyWorkspace):
         for key, title in (('beam_saved_run', 'Saved finite-mode folder'), ('beam_mode', 'Finite mode number (−1: lowest accepted loss)')):
             self._move_scalar(key, source_form, title)
         source.addWidget(button('Browse saved finite-mode run…', self.browse_beam_run))
+        source.addWidget(label('The saved folder selects finite-mode fields. To reuse a device built in this app, '
+            'open Transfer inputs…, choose the PCSEL study, review the structure preview, and select '
+            'Copy compatible inputs. This study’s solver settings must still match the saved run.'))
         source_flow = QHBoxLayout()
         for title, detail in (('Source run', 'Saved folder or current finite-cavity inputs'),
                               ('Compatible finite mode', 'Input identity and accepted-mode checks retained'),
