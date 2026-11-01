@@ -184,6 +184,53 @@ def install_result_picker(panel, preferred):
     panel.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
 
 
+MESH_BUILDER_LIMIT = 10000
+MESH_BUILDER_CELL_LIMIT = 1000000
+
+
+def generated_mesh_nodes(start, end, count, required=()):
+    """Bounded explicit UI mesh construction; no solver or geometry mutation."""
+    for value in (start, end, count):
+        if isinstance(value, (bool, np.bool_)):
+            raise FieldError('mesh_builder', 'Enter numeric bounds and an integer base node count.')
+    start = number(start, 'mesh_builder.start', units='µm')
+    end = number(end, 'mesh_builder.end', units='µm')
+    count = number(count, 'mesh_builder.count', integer=True, minimum=3)
+    if not start < end or not np.isfinite(end-start):
+        raise FieldError('mesh_builder.end', 'Bounds must increase and have a finite span.', units='µm')
+    if count > MESH_BUILDER_LIMIT or len(required) > MESH_BUILDER_LIMIT:
+        raise FieldError('mesh_builder.count', 'Generator limit: 10,000 base/output nodes and required coordinate entries. The original explicit editor retains its own character capacity.')
+    coordinates = [number(v, 'mesh_builder.required', units='µm') for v in required]
+    outside = next((v for v in coordinates if v < start or v > end), None)
+    if outside is not None:
+        raise FieldError('mesh_builder.required', f'Authored coordinate {outside:g} µm is outside [{start:g}, {end:g}]. No nodes were applied.', units='µm')
+    base = np.linspace(start, end, count)
+    if not np.isfinite(base).all() or np.any(np.diff(base) <= 0):
+        raise FieldError('mesh_builder.count', 'These bounds/count cannot produce distinct increasing floating-point nodes.')
+    # Bounds win over authored coordinates; authored coordinates win over base
+    # samples. Use the backend's zero-rtol, max(1, abs(coordinate))*1e-12 rule.
+    candidates = [(float(v), 2) for v in base] + [(v, 1) for v in coordinates] + [(start, 0), (end, 0)]
+    merged = []
+    for value, priority in sorted(candidates):
+        if merged and abs(value-merged[-1][0]) <= max(1., abs(value))*1e-12:
+            if priority < merged[-1][1]: merged[-1] = (value, priority)
+        else:
+            merged.append((value, priority))
+    nodes = np.asarray([v for v, _ in merged])
+    if len(nodes) < 3 or nodes[0] != start or nodes[-1] != end or np.any(np.diff(nodes) <= 0):
+        raise FieldError('mesh_builder', 'At least three distinct nodes, including both bounds, must remain after tolerance merging.')
+    if len(nodes) > MESH_BUILDER_LIMIT:
+        raise FieldError('mesh_builder.count', 'Generated output exceeds 10,000 nodes after adding authored coordinates. No nodes were applied.')
+    if coordinates:
+        required_array = np.asarray(coordinates)
+        indices = np.searchsorted(nodes, required_array)
+        distance = np.minimum(abs(required_array-nodes[np.clip(indices, 0, len(nodes)-1)]),
+            abs(required_array-nodes[np.clip(indices-1, 0, len(nodes)-1)]))
+        if np.any(distance > np.maximum(1., abs(required_array))*1e-12):
+            raise FieldError('mesh_builder.required', 'Coordinates cannot be merged consistently at the backend tolerance; separate the near-coincident inputs.')
+    return nodes.tolist()
+
+
 class TransportResultsPanel(ResearchResultsPanel):
     def __init__(self, store, parent=None):
         super().__init__(store, 'sesame_transport', parent)
@@ -314,7 +361,8 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
     workspace_id = 'research_studies'
     state_key = 'sesame'
     material_keys = ('id', 'Nc', 'Nv', 'Eg', 'epsilon', 'mu_e', 'mu_h', 'tau_e', 'tau_h', 'affinity', 'Et', 'B', 'Cn', 'Cp', 'mass_e', 'mass_h')
-    region_keys = ('id', 'material', 'x_range_um', 'y_range_um', 'donors_cm3', 'acceptors_cm3', 'generation_cm3_s')
+    region_keys = ('id', 'material', 'x_range_um', 'y_range_um', 'donors_cm3', 'acceptors_cm3', 'generation_cm3_s',
+        'generation_profile', 'absorption_cm1', 'origin_um')
     defect_keys = ('id', 'location_um', 'density_cm2', 'sigma_e_cm2', 'sigma_h_cm2', 'energy_eV', 'transition')
 
     def __init__(self, store, parent=None, *, document_id=None):
@@ -330,7 +378,8 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
         device.addLayout(form)
         device.addWidget(label('Nodes must increase strictly. Regions must fill the domain without overlapping interiors; '
             'region and defect endpoints must coincide with mesh nodes. Later regions own shared interface nodes.'))
-        self.regions = _table(['Stable ID', 'Material ID', 'x min, max (µm)', 'y min, max (µm)', 'Donors (cm⁻³)', 'Acceptors (cm⁻³)', 'Generation (cm⁻³ s⁻¹)'], 'Semiconductor material and doping regions')
+        self.regions = _table(['Stable ID', 'Material ID', 'x min, max (µm)', 'y min, max (µm)', 'Donors (cm⁻³)', 'Acceptors (cm⁻³)', 'Generation (cm⁻³ s⁻¹)',
+            'Generation profile', 'Absorption (cm⁻¹)', 'Global x origin (µm)'], 'Semiconductor material and doping regions')
         _fill(self.regions, [['region_1', 'material_1', '0, 1', '0, 1', '0', '0', '0']])
         device.addWidget(self.regions)
         self.fields['regions'] = self.regions
@@ -427,7 +476,9 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
             'regions': [('id', 'Region name / ID', None), ('material', 'Material', [('material_1','material_1')]),
                 ('x_range_um', 'x start, end (µm)', None), ('y_range_um', 'y start, end (µm)', None),
                 ('donors_cm3', 'Donor density (cm⁻³)', None), ('acceptors_cm3', 'Acceptor density (cm⁻³)', None),
-                ('generation_cm3_s', 'Carrier generation (cm⁻³ s⁻¹)', None)],
+                ('generation_cm3_s', 'Generation amplitude G0 (cm⁻³ s⁻¹)', None),
+                ('generation_profile', 'Generation profile', [('Uniform', ''), ('Exponential along +x', 'exponential_x')]),
+                ('absorption_cm1', 'Absorption coefficient (cm⁻¹)', None), ('origin_um', 'Generation x origin (µm)', None)],
             'materials': list(zip(self.material_keys, ['Material name / ID', 'Conduction density of states Nc (cm⁻³)',
                 'Valence density of states Nv (cm⁻³)', 'Band gap Eg (eV)', 'Relative permittivity εr',
                 'Electron mobility (cm² / V s)', 'Hole mobility (cm² / V s)', 'Electron lifetime (s)', 'Hole lifetime (s)',
@@ -451,6 +502,9 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
             editor = self.inspectors[group]
             editor.actions.addWidget(button('Add '+noun, lambda _, g=group, values=default: self.add_row(getattr(self, g), [values[0]+uuid.uuid4().hex[:8]]+values[1:])))
             editor.actions.addWidget(button('Remove', lambda _, g=group: self.remove_row(getattr(self, g))))
+        self.inspectors['regions'].note.setText('Uniform: G = G0 (absorption and origin are unused). Exponential: G(x,y) = G0 exp[−α (x − x0) × 10⁻⁴], '
+            'with x and x0 in µm and α in cm⁻¹. Absolute device x coordinates; attenuation toward +x, uniform in y. '
+            'Enter x0 at or left of this region x minimum. No optical feedback is calculated.')
         # A compact domain editor with a true-coordinate preview, independent of material/runtime readiness.
         body = QWidget(); layout = QVBoxLayout(body)
         top = QHBoxLayout(); top.addWidget(label('Transport domain', 'setupHeading')); top.addStretch(); top.addWidget(self.dimension)
@@ -474,7 +528,9 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
         self.region_scroll.setWidget(self.inspectors['regions']); self.region_scroll.setMinimumWidth(280)
         self.domain_splitter.addWidget(context); self.domain_splitter.addWidget(self.region_scroll)
         self.domain_splitter.setStretchFactor(0, 3); self.domain_splitter.setStretchFactor(1, 2)
-        layout.addWidget(self.domain_splitter, 1); replace_section(self, 0, body)
+        layout.addWidget(self.domain_splitter, 1)
+        self._build_mesh_generator(layout)
+        replace_section(self, 0, body)
         # Materials and contacts retain independent sections and exact targets.
         self.assignment_previews = {}
         for index, group, caption, explanation in [
@@ -543,6 +599,97 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
         """A QObject-bound receiver disconnects when this page is deleted."""
         restyle_inspectors(self)
 
+    def _build_mesh_generator(self, layout):
+        # Transient helper controls are deliberately absent from self.fields:
+        # only explicit Apply changes the existing canonical mesh text editor.
+        self.mesh_builder_toggle = QCheckBox('Generate mesh nodes'); layout.addWidget(self.mesh_builder_toggle)
+        self.mesh_builder_body = QWidget(); form = native_form(self.mesh_builder_body)
+        self.mesh_builder_axis = QComboBox()
+        self.mesh_builder_axis.addItem('x transport axis', 'x'); self.mesh_builder_axis.addItem('y transverse axis', 'y')
+        self.mesh_builder_start = QLineEdit('0'); self.mesh_builder_end = QLineEdit('1')
+        self.mesh_builder_count = QLineEdit('5')
+        for caption, control in [('Axis', self.mesh_builder_axis), ('Start (µm)', self.mesh_builder_start),
+                ('End (µm)', self.mesh_builder_end), ('Base uniform node count', self.mesh_builder_count)]:
+            control.setAccessibleName('Generate mesh nodes '+caption); form.addRow(caption, control)
+        self.mesh_builder_include = QCheckBox('Include authored region boundaries and defect endpoints')
+        form.addRow(self.mesh_builder_include)
+        self.mesh_builder_note = label('All included coordinates must lie within Start/End. Only Apply changes the selected explicit node editor. Including authored coordinates changes the base uniform '
+            'discretization; this is not exact script transcription, convergence or paper agreement. Generator limit: 10,000 base/output nodes '
+            'and 10,000 required coordinate entries; in 2D, at most 1,000,000 potential mesh nodes using the current other-axis count. '
+            'These guards keep text and automatic input checks responsive. The selected explicit editor character capacity is also checked before Apply. '
+            'The original explicit editor is unchanged; solver resource checks are separate.')
+        form.addRow(self.mesh_builder_note)
+        self.mesh_builder_preview = label('Preview pending; existing nodes unchanged.'); form.addRow('Generated count', self.mesh_builder_preview)
+        self.mesh_builder_apply = button('Apply generated nodes', self.apply_generated_mesh)
+        self.mesh_builder_apply.setEnabled(False); form.addRow(self.mesh_builder_apply)
+        layout.addWidget(self.mesh_builder_body); self.mesh_builder_body.hide()
+        self._mesh_builder_timer = QTimer(self); self._mesh_builder_timer.setSingleShot(True)
+        self._mesh_builder_timer.setInterval(150); self._mesh_builder_timer.timeout.connect(self.preview_generated_mesh)
+        self.mesh_builder_toggle.toggled.connect(self.mesh_builder_body.setVisible)
+        self.mesh_builder_toggle.toggled.connect(self._queue_mesh_builder_preview)
+        self.mesh_builder_axis.currentIndexChanged.connect(self._queue_mesh_builder_preview)
+        self.mesh_builder_include.toggled.connect(self._queue_mesh_builder_preview)
+        for edit in (self.mesh_builder_start, self.mesh_builder_end, self.mesh_builder_count):
+            edit.textChanged.connect(self._queue_mesh_builder_preview)
+
+    def _queue_mesh_builder_preview(self, *args):
+        self.mesh_builder_apply.setEnabled(False)
+        self.mesh_builder_preview.setText('Preview pending; existing nodes unchanged.')
+        if self.mesh_builder_toggle.isChecked(): self._mesh_builder_timer.start()
+
+    def _generated_mesh_values(self):
+        axis = self.mesh_builder_axis.currentData(); two = self.dimension.currentData() == 2
+        if axis not in ('x', 'y') or (axis == 'y' and not two):
+            raise FieldError('mesh_builder.axis', 'The y axis requires a 2D transport study.')
+        required = []
+        if self.mesh_builder_include.isChecked():
+            entries = 2*self.regions.rowCount()+(2 if two else 1)*self.defects.rowCount()
+            if entries > MESH_BUILDER_LIMIT:
+                raise FieldError('mesh_builder', 'Generator limit: 10,000 required coordinate entries. No nodes were applied.')
+            for row in _rows(self.regions):
+                bounds = vector(row[2 if axis == 'x' else 3], 2, 'regions.'+axis+'_range_um', object_id=row[0])
+                if bounds[0] >= bounds[1]:
+                    raise FieldError('regions.'+axis+'_range_um', 'Authored region bounds must increase.', row[0], 'µm')
+                required.extend(bounds)
+            for row in _rows(self.defects):
+                if two:
+                    points = [vector(value.strip(), 2, 'defects.location_um', object_id=row[0]) for value in row[1].split(';')]
+                    if len(points) != 2 or points[0] == points[1]:
+                        raise FieldError('defects.location_um', 'Enter two distinct grain-boundary endpoints as x, y; x, y.', row[0], 'µm')
+                    required.extend(point[0 if axis == 'x' else 1] for point in points)
+                else:
+                    required.append(number(row[1], 'defects.location_um', object_id=row[0], units='µm'))
+        nodes = generated_mesh_nodes(self.mesh_builder_start.text(), self.mesh_builder_end.text(), self.mesh_builder_count.text(), required)
+        if two:
+            other = self.y_nodes if axis == 'x' else self.x_nodes
+            other_count = len(other.text().replace(',', ' ').split())
+            if len(nodes)*other_count > MESH_BUILDER_CELL_LIMIT:
+                raise FieldError('mesh_builder.count', 'Generator limit: 1,000,000 potential 2D mesh nodes using the current other-axis count. No nodes were applied; the explicit editor remains available.')
+        target = self.x_nodes if axis == 'x' else self.y_nodes
+        if len(', '.join(format(value, '.17g') for value in nodes)) > target.maxLength():
+            raise FieldError('mesh_builder.count', f'Generated text exceeds the explicit editor capacity of {target.maxLength()} characters. Choose fewer nodes; no nodes were applied.')
+        return nodes
+
+    def preview_generated_mesh(self):
+        try:
+            nodes = self._generated_mesh_values()
+            self.mesh_builder_preview.setText(str(len(nodes))+' nodes after tolerance merging; existing nodes unchanged.')
+            self.mesh_builder_apply.setEnabled(True)
+        except ValueError as exc:
+            self.mesh_builder_preview.setText(str(exc)); self.mesh_builder_apply.setEnabled(False)
+
+    def apply_generated_mesh(self):
+        try:
+            nodes = self._generated_mesh_values()  # Revalidate current choices; never apply a stale preview.
+            text = ', '.join(format(value, '.17g') for value in nodes)
+        except ValueError as exc:
+            self.mesh_builder_preview.setText(str(exc)); self.mesh_builder_apply.setEnabled(False)
+            return False
+        axis = self.mesh_builder_axis.currentData()
+        (self.x_nodes if axis == 'x' else self.y_nodes).setText(text)
+        self.mesh_builder_preview.setText(str(len(nodes))+' generated '+axis+' nodes applied. Check the complete physical inputs separately.')
+        return True
+
     def runtime_settings(self):
         runtime = super().runtime_settings()
         if runtime is not None:
@@ -579,6 +726,7 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
 
     def _queue_clean_refresh(self, *args):
         if hasattr(self, '_preview_timer'): self._preview_timer.start()
+        if hasattr(self, '_mesh_builder_timer'): self._queue_mesh_builder_preview()
         self._refresh_clean_ui()
 
     def _refresh_clean_ui(self, *args):
@@ -590,6 +738,10 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
                 for row in _rows(self.materials): material_choice.addItem(row[0],row[0])
         for inspector in self.inspectors.values(): inspector.refresh()
         two = self.dimension.currentData() == 2
+        if hasattr(self, 'mesh_builder_axis'):
+            with QSignalBlocker(self.mesh_builder_axis):
+                self.mesh_builder_axis.model().item(1).setEnabled(two)
+                if not two: self.mesh_builder_axis.setCurrentIndex(0)
         self.inspectors['regions'].set_field_visible('y_range_um', two)
         contact = self.contacts.currentRow()
         kind = self.contacts.item(contact, 1).text() if contact >= 0 else ''
@@ -638,10 +790,11 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
                     if len(points)!=2: raise ValueError('grain-boundary line needs two endpoints')
                     ax.plot([p[0] for p in points],[p[1] for p in points],color='#B45309',linewidth=2)
                 else: ax.axvline(number(row[1],'defects.location_um'),color='#B45309',linewidth=2)
-            for node in x:
+            # Bound drawing cost without changing the complete authored mesh.
+            for node in np.asarray(x)[np.linspace(0, len(x)-1, min(201, len(x)), dtype=int)]:
                 ax.axvline(node, color='#66788a', alpha=.16, linewidth=.6)
             if two:
-                for node in y:
+                for node in np.asarray(y)[np.linspace(0, len(y)-1, min(201, len(y)), dtype=int)]:
                     ax.axhline(node, color='#66788a', alpha=.16, linewidth=.6)
             ax.axvline(x[0], color='#334155', linewidth=3)
             ax.axvline(x[-1], color='#2563eb', linewidth=3)
@@ -652,7 +805,7 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
             self.domain_preview.draw_figure(figure)
             for preview, _, _ in self.assignment_previews.values():
                 preview.draw_figure(figure)
-            self.preview_note.setText('Region and grain-boundary geometry preview.')
+            self.preview_note.setText('Region and grain-boundary geometry preview. Sketch displays at most 201 mesh lines per axis for responsiveness; all authored nodes are retained.')
         except (ValueError, IndexError, TypeError) as exc:
             self.preview_note.setText('Preview needs geometry input: '+str(exc)+'. The last valid view is retained.')
 
@@ -736,6 +889,8 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
     def draft(self):
         state = super().draft()
         state.update({key: _rows(getattr(self, key)) for key in ('regions', 'materials', 'contacts', 'defects')})
+        # Preserve the seven-column representation of unchanged uniform drafts.
+        state['regions'] = [row[:7] if not any(row[7:]) else row for row in state['regions']]
         state['periodic_y'] = self.periodic.isChecked()
         return state
 
@@ -743,7 +898,10 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
         super().restore_draft(state)
         for key in ('regions', 'materials', 'contacts', 'defects'):
             if key in state:
-                _fill(getattr(self, key), state[key])
+                rows = state[key]
+                if key == 'regions':
+                    rows = [list(row)+['']*(len(self.region_keys)-len(row)) for row in rows]
+                _fill(getattr(self, key), rows)
         self.periodic.setChecked(state.get('periodic_y', False))
         self._dimension_changed()
         self._queue_clean_refresh()
@@ -790,6 +948,13 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
                 region['y_range_um'] = vector(row['y_range_um'], 2, 'regions.y_range_um', object_id=identity)
             for key in ('donors_cm3', 'acceptors_cm3', 'generation_cm3_s'):
                 region[key] = number(row[key], 'regions.'+key, minimum=0, object_id=identity)
+            kind = row['generation_profile'].strip()
+            if kind:
+                if kind != 'exponential_x':
+                    raise FieldError('regions.generation_profile', 'Choose Uniform or Exponential along +x.', identity)
+                region['generation_profile'] = dict(kind=kind,
+                    absorption_cm1=number(row['absorption_cm1'], 'regions.absorption_cm1', minimum=0, object_id=identity),
+                    origin_um=number(row['origin_um'], 'regions.origin_um', object_id=identity))
             cfg['regions'].append(region)
         for values in _rows(self.contacts):
             side, kind, electron, hole, work = values
@@ -866,7 +1031,14 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
                     return '; '.join(', '.join(map(str, row)) for row in value) if value and isinstance(value[0], list) else ', '.join(map(str, value))
                 return str(value)
             for group, keys in [('regions', self.region_keys), ('defects', self.defect_keys)]:
-                _fill(getattr(self, group), [[display(row.get(key, 0 if key in ('donors_cm3', 'acceptors_cm3', 'generation_cm3_s') else '')) for key in keys] for row in cfg.get(group, [])])
+                rows = []
+                for row in cfg.get(group, []):
+                    values = dict(row)
+                    if group == 'regions' and 'generation_profile' in row:
+                        profile = row['generation_profile']
+                        values.update(generation_profile=profile['kind'], absorption_cm1=profile['absorption_cm1'], origin_um=profile['origin_um'])
+                    rows.append([display(values.get(key, 0 if key in ('donors_cm3', 'acceptors_cm3', 'generation_cm3_s') else '')) for key in keys])
+                _fill(getattr(self, group), rows)
             _fill(self.contacts, [[side, row['kind'], row['electron_velocity_cm_s'], row['hole_velocity_cm_s'], row.get('work_function_eV', '')] for side, row in cfg['contacts'].items()])
             runtime = cfg.get('runtime') or {}
             for key in ('executable', 'distro', 'timeout_s'):

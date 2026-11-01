@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0-alpha.11",
+  "version": "1.4.0-alpha.13",
   "build_date": "2026-11-01",
   "profile": "public",
   "production_bytes_preserved": true,
@@ -552,7 +552,7 @@
     },
     "app_version.py": {
       "size": 1757,
-      "sha256": "66fac2e113dd9863a4a1e8933b36b8ac15d10f02f9be3f375c2006c55e73a781"
+      "sha256": "2f3a57d741771d7a4ca6794f502c8fb5f51c5ca0d5b0a2ea8157c46f80f2e2b2"
     },
     "application_restart.py": {
       "size": 7182,
@@ -1939,8 +1939,8 @@
       "sha256": "ea28cd1ab75fdfe479df7675c7b95397d952c7f8adf2ec20ae90f5affd2cc3fd"
     },
     "qt_sesame_setup.py": {
-      "size": 60467,
-      "sha256": "c59ae6e297b370864f12415764438d2b470ce3e57ab9ea9c112a7e2e4363c8cb"
+      "size": 73487,
+      "sha256": "b43183aac20e6185ed7e88dac3451fda80b056c05410f1cff9ee63c773ff7139"
     },
     "qt_simulation_flow.py": {
       "size": 38096,
@@ -2067,8 +2067,8 @@
       "sha256": "c2700264d75e2d7ea7c2d91162e2d2bedaa034ee96e0a1b45fb90b326c418119"
     },
     "research_physics_worker.py": {
-      "size": 11248,
-      "sha256": "b023757f1b0ec5cf705a8d00bf01514d2c52b26f5638b49cd2301ee9d0f5e92c"
+      "size": 12156,
+      "sha256": "3d846b1bdeb16debe6aaaf680ecc7a322fff9a3db66320636fd0cfa5c8cc76b6"
     },
     "research_simulation.py": {
       "size": 4643,
@@ -2087,8 +2087,8 @@
       "sha256": "88faaa90ec2f4ecdf6a5d246e1bdaced5b30b949ad48c9ca3a6e8a8c35513f82"
     },
     "sesame_transport.py": {
-      "size": 16816,
-      "sha256": "e84bbb2997806ce22f1acd4da21bdc0dbd11211b5fa03be574248352859b10c2"
+      "size": 18228,
+      "sha256": "5ba66c072b584764408d231c8c385c2a9538c48d4c4691e91c0ee7840e7020e6"
     },
     "setup_linux.sh": {
       "size": 392,
@@ -3038,6 +3038,10 @@
       "size": 4393,
       "sha256": "9f9bd25f3edb1786c521859ef47c6beaf7f15c40404ab74c2cd17ab6630284ad"
     },
+    "tests/test_qt_sesame_mesh_builder.py": {
+      "size": 10831,
+      "sha256": "d5d3fd2c8dad8bfb962cdaa3bd361b2ddbc260238c32e9df482c63c5ddffab1c"
+    },
     "tests/test_qt_sesame_region_diagnostics.py": {
       "size": 4670,
       "sha256": "45727646e39f40b305c0e699fe6931e9ebd302e93e2a573faf288b841a826306"
@@ -3210,6 +3214,10 @@
       "size": 5557,
       "sha256": "2d12a790b76d62c4e189c05ca8330e6e208597a50c9d7b392ba0653881ade699"
     },
+    "tests/test_sesame_generation_profile.py": {
+      "size": 12248,
+      "sha256": "513e316b6b47e3b1fca9dc6a4cc8f225112ce0781b54260496fe1f83f1e1cab7"
+    },
     "tests/test_sesame_transport.py": {
       "size": 3195,
       "sha256": "7fa5ec25fde280709d757a6519758b4cf1ebf8191add1de1bd693dbe604c1fc0"
@@ -3359,5 +3367,5 @@
       "sha256": "376162b4a329e6cc8fa45c8c70fdc1372a67c5a0366c0a76bb3c8b131076ac7c"
     }
   },
-  "source_tree_sha256": "43b2ca95b846cc4b5ecfd839ae297407efe6a1b172b7f6b2ff8735747ce54357"
+  "source_tree_sha256": "8f0b9403964ef42459503873f0c00f9b6736a7e74a1b1f641cc9299621005535"
 }

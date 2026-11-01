@@ -2,6 +2,8 @@
 
 The study has its own rectilinear semiconductor domain. No paper material,
 geometry, defect energy, contact or illumination is selected implicitly.
+Regions optionally support a structured exponential_x prescribed generation
+profile; absent profiles retain uniform generation without schema migration.
 """
 from __future__ import annotations
 
@@ -130,7 +132,7 @@ def prepare(project, settings):
     cfg['regions'] = []
     ids = set()
     for raw in regions:
-        if not isinstance(raw, dict) or set(raw)-{'id', 'material', 'x_range_um', 'y_range_um', 'donors_cm3', 'acceptors_cm3', 'generation_cm3_s'}:
+        if not isinstance(raw, dict) or set(raw)-{'id', 'material', 'x_range_um', 'y_range_um', 'donors_cm3', 'acceptors_cm3', 'generation_cm3_s', 'generation_profile'}:
             raise ValueError('Invalid material region fields')
         identity = raw.get('id')
         if not isinstance(identity, str) or not identity or identity in ids:
@@ -160,6 +162,22 @@ def prepare(project, settings):
             region[key] = [nodes[int(np.argmin(np.abs(np.asarray(nodes)-bound)))] for bound in bounds]
         for field in ('donors_cm3', 'acceptors_cm3', 'generation_cm3_s'):
             region[field] = _nonnegative(raw.get(field, 0.), 'regions.'+identity+'.'+field)
+        if 'generation_profile' in raw:
+            profile = raw['generation_profile']
+            path = 'regions.'+identity+'.generation_profile'
+            if not isinstance(profile, dict) or set(profile) != {'kind', 'absorption_cm1', 'origin_um'} or profile.get('kind') != 'exponential_x':
+                raise _invalid('Generation profile requires exponential_x, absorption_cm1 and origin_um only.', path, 'Device', identity)
+            values = {}
+            for key, units in [('absorption_cm1', 'cm^-1'), ('origin_um', 'um')]:
+                try:
+                    values[key] = _number(profile[key], path+'.'+key)
+                    if key == 'absorption_cm1' and values[key] < 0:
+                        raise ValueError('Absorption coefficient must be nonnegative.')
+                    if key == 'origin_um' and values[key] > region['x_range_um'][0]:
+                        raise ValueError('Generation x origin must be at or left of this region x minimum (global coordinates).')
+                except ValueError as exc:
+                    raise _invalid(str(exc), path+'.'+key, 'Device', identity, units) from exc
+            region['generation_profile'] = dict(kind='exponential_x', **values)
         for previous in cfg['regions']:
             overlaps = all(min(region[axis+'_range_um'][1], previous[axis+'_range_um'][1]) > max(region[axis+'_range_um'][0], previous[axis+'_range_um'][0]) for axis in ('x', 'y')[:dimension])
             if overlaps:

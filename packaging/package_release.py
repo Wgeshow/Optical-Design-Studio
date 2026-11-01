@@ -14,8 +14,8 @@ BUILD = Path(__file__).resolve().parent
 ROOT = BUILD.parent
 SRC = BUILD/'source'
 APP = BUILD/'dist'/'Optical Design Studio'
-OUT = ROOT/'GitHub-Release-1.4.0-alpha.11'
-VERSION = '1.4.0-alpha.11'
+OUT = ROOT/'GitHub-Release-1.4.0-alpha.13'
+VERSION = '1.4.0-alpha.13'
 REQUIRED_FROZEN_MODULES = ('field_volume', 'qt_field_volume', 'qt_native_field_volume',
     'qt_native_figure', 'qt_native_plot', 'qt_structure_3d', 'qt_lattice_diagram',
     'qt_windows_glass', 'qt_help', 'qt_materials', 'qt_core', 'data_library',

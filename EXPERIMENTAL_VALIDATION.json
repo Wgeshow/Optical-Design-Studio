@@ -1,11 +1,11 @@
 {
-  "version": "1.4.0-alpha.11",
+  "version": "1.4.0-alpha.13",
   "build_date": "2026-11-01",
   "signed": false,
-  "source_tests_run": 163,
+  "source_tests_run": 202,
   "source_tests_skipped": 0,
-  "source_tests_passed": 163,
-  "source_tree_sha256": "43b2ca95b846cc4b5ecfd839ae297407efe6a1b172b7f6b2ff8735747ce54357",
+  "source_tests_passed": 202,
+  "source_tree_sha256": "8f0b9403964ef42459503873f0c00f9b6736a7e74a1b1f641cc9299621005535",
   "frozen_verification": "partial",
   "native_startup_verification": "passed",
   "packaged_checks": {
@@ -30,7 +30,7 @@
   "archive_integrity": "pending",
   "published": false,
   "release_channel": "highly_experimental",
-  "validation_scope": "163 targeted staged-source tests and 34 packaging/privacy/license tests, zero failures/errors/skips; exact code match for 201 modules in each executable plus standalone Meep runner; critical frozen profile and actual Windows startup passed; fresh Terra packaged UI checks. Full installer matrix not rerun. See release notes for the dated aggregate scientific results; execution, numerical convergence and paper agreement remain distinct.",
+  "validation_scope": "202 targeted staged-source tests and 34 packaging/privacy/license tests, zero failures/errors/skips; exact code match for 201 modules in each executable plus standalone Meep and research workers; critical frozen profile and actual Windows startup passed; fresh Terra packaged UI checks. Full installer matrix not rerun. See release notes for the dated aggregate scientific results; execution, numerical convergence and paper agreement remain distinct.",
   "packaged_self_tests_passed": false,
   "compiled_validation_profile": "critical_release",
   "critical_packaged_checks_passed": true,
@@ -82,19 +82,23 @@
     "test_qt_research_nested_review",
     "test_qt_run_snapshot_consistency",
     "test_research_simulation",
-    "test_simulation_documents.DocumentStoreTests"
+    "test_simulation_documents.DocumentStoreTests",
+    "test_sesame_generation_profile",
+    "test_sesame_transport",
+    "test_qt_sesame_region_diagnostics",
+    "test_qt_sesame_mesh_builder"
   ],
   "source_test_scope": "Selected campaign regressions and release gates; offscreen/unit checks are not native scientific acceptance.",
-  "executable_sha256": "071c90bd10d507e7e81075c24cd45902885ff2cd4b9b157f285d2790a37dc4ac",
-  "backend_executable_sha256": "328912d2eb72d2d208f52f298175e4e8c42cbe81e01a76fb55946b912ba1a923",
+  "executable_sha256": "c7a82d91e60b10670b4c7f75d3efbbfbc4f41cc680f9541f52e8b8365708282f",
+  "backend_executable_sha256": "9cdf9c127f94fe0e54de72924c99511874220d04012f2181d891a90ed818fe5c",
   "frozen_module_inventory": {
     "Optical Design Studio.exe": {
-      "sha256": "071c90bd10d507e7e81075c24cd45902885ff2cd4b9b157f285d2790a37dc4ac",
+      "sha256": "c7a82d91e60b10670b4c7f75d3efbbfbc4f41cc680f9541f52e8b8365708282f",
       "required_modules": 117,
       "numpy_version": "1.26.4"
     },
     "OpticalDesignBackend.exe": {
-      "sha256": "328912d2eb72d2d208f52f298175e4e8c42cbe81e01a76fb55946b912ba1a923",
+      "sha256": "9cdf9c127f94fe0e54de72924c99511874220d04012f2181d891a90ed818fe5c",
       "required_modules": 117,
       "numpy_version": "1.26.4"
     }

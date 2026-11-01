@@ -51,6 +51,20 @@ def legume_pwe(cfg, directory):
                 plane_waves=int(pwe.gvec.shape[1]), output_npz='engine_bands.npz')
 
 
+def sampled_region_generation(region, x_um):
+    """Prescribed exponential source at absolute device coordinates, in cm^-3 s^-1."""
+    import numpy as np
+    profile = region['generation_profile']
+    x_um = np.asarray(x_um, dtype=float)
+    # Validated origin <= region start: exponents cannot be positive. Large
+    # attenuation may safely underflow to zero, including in a dark region.
+    if region['generation_cm3_s'] == 0 or profile['absorption_cm1'] == 0:
+        return np.full_like(x_um, region['generation_cm3_s'])
+    with np.errstate(over='ignore', under='ignore'):
+        attenuation = profile['absorption_cm1'] * ((x_um-profile['origin_um'])*1e-4)
+        return region['generation_cm3_s'] * np.exp(-attenuation)
+
+
 def sesame_transport(cfg, directory):
     import logging
     import numpy as np
@@ -77,7 +91,10 @@ def sesame_transport(cfg, directory):
         system.add_material(cfg['materials'][region['material']], location)
         system.add_donor(region['donors_cm3'], location)
         system.add_acceptor(region['acceptors_cm3'], location)
-        system.g[selected] = region['generation_cm3_s']/system.scaling.generation
+        if 'generation_profile' in region:
+            system.g[selected] = sampled_region_generation(region, xx.ravel()[selected])/system.scaling.generation
+        else:
+            system.g[selected] = region['generation_cm3_s']/system.scaling.generation
     left, right = cfg['contacts']['left'], cfg['contacts']['right']
     system.contact_type(left['kind'], right['kind'], left.get('work_function_eV'), right.get('work_function_eV'))
     system.contact_S(left['electron_velocity_cm_s'], left['hole_velocity_cm_s'], right['electron_velocity_cm_s'], right['hole_velocity_cm_s'])
