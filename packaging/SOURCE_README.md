@@ -1,8 +1,8 @@
-# Optical Design Studio 1.4.0-alpha.5 â€” corresponding source
+# Optical Design Studio 1.4.0-alpha.6 â€” corresponding source
 
 This is a **Highly Experimental prerelease**. Model execution, physical convergence and paper agreement are distinct validation outcomes; inspect the saved status and model assumptions before using results.
 
-For normal Windows use, download the separate **OpticalDesignStudio-Portable-1.4.0-alpha.5-Windows-x64.7z** and extract the complete folder. This source ZIP is for inspection, development, and rebuilding; it does not replace the portable runtime.
+For normal Windows use, download the separate **OpticalDesignStudio-Portable-1.4.0-alpha.6-Windows-x64.7z** and extract the complete folder. This source ZIP is for inspection, development, and rebuilding; it does not replace the portable runtime.
 
 Application source and requirement files are in **src**. The corresponding S4 native source is in **native/S4-source**. Dependency notices accompany the archive. The public Silicon tutorial under **src/help_assets** contains genuine saved S4 results, explicit constant-index inputs, and file checksums; it is not a private user library.
 
@@ -54,7 +54,7 @@ python .\audit_release_archives.py
 
 Stop if any command fails. Staging creates a fresh **packaging/source** snapshot and records its hashes; it refuses to overwrite an existing snapshot. The original shipped manifests are reference records, and staging replaces the manifest files with the hashes of your new snapshot. The compiler also refuses to overwrite an existing nonempty **packaging/dist**. The tests require the numerical, machine-learning and geometry dependencies from the pinned requirements in the build interpreter; the supplied dependency trees are additionally used by PyInstaller through **ODS_RELEASE_DEPENDENCIES**.
 
-The final command creates locally verified portable and corresponding-source archives in **GitHub-Release-1.4.0-alpha.5** beside **packaging**. It does not upload, publish, sign, or install them. The helpers do not download native S4, MKL, CUDA, CAD or third-party build inputs automatically; prepare those compatible inputs and retain their applicable source and licenses first.
+The final command creates locally verified portable and corresponding-source archives in **GitHub-Release-1.4.0-alpha.6** beside **packaging**. It does not upload, publish, sign, or install them. The helpers do not download native S4, MKL, CUDA, CAD or third-party build inputs automatically; prepare those compatible inputs and retain their applicable source and licenses first.
 
 The standard full verification workflow includes detailed spectrum/field solves, Fourier sampling, SQLite results, scan serialization and broader UI/theme checks. Both compiled executables must contain the required simulation and environment modules. See **packaging/BUILDING.md** for the candidate verification sequence.
 

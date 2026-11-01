@@ -1,11 +1,11 @@
 {
-  "version": "1.4.0-alpha.5",
+  "version": "1.4.0-alpha.6",
   "build_date": "2026-11-01",
   "signed": false,
-  "source_tests_run": 72,
+  "source_tests_run": 75,
   "source_tests_skipped": 0,
-  "source_tests_passed": 72,
-  "source_tree_sha256": "073c344381ec5affa4be562ea35db49484f425d5648da0c7bd42020f667ce1c7",
+  "source_tests_passed": 75,
+  "source_tree_sha256": "e8e14a985c5f0df8f0a3513ed43f1db88333d808f96f788acc52fb902ad7f614",
   "frozen_verification": "partial",
   "native_startup_verification": "passed",
   "packaged_checks": {
@@ -30,7 +30,7 @@
   "archive_integrity": "pending",
   "published": false,
   "release_channel": "highly_experimental",
-  "validation_scope": "72 targeted staged-source tests and 34 packaging/privacy/license tests, zero failures/errors/skips; exact code match for 201 modules in each executable plus standalone Meep runner; critical frozen profile and actual Windows startup passed; fresh Terra packaged UI checks. Full installer matrix not rerun. See release notes for the dated aggregate scientific results; execution, numerical convergence and paper agreement remain distinct.",
+  "validation_scope": "75 targeted staged-source tests and 34 packaging/privacy/license tests, zero failures/errors/skips; exact code match for 201 modules in each executable plus standalone Meep runner; critical frozen profile and actual Windows startup passed; fresh Terra packaged UI checks. Full installer matrix not rerun. See release notes for the dated aggregate scientific results; execution, numerical convergence and paper agreement remain distinct.",
   "packaged_self_tests_passed": false,
   "compiled_validation_profile": "critical_release",
   "critical_packaged_checks_passed": true,
@@ -60,16 +60,16 @@
     "test_qt_solver_environment_ownership"
   ],
   "source_test_scope": "Selected campaign regressions and release gates; offscreen/unit checks are not native scientific acceptance.",
-  "executable_sha256": "a496e3831bb7368c4708a401fe62b33b626a91a9df2cb37764c8593e73d7bbb3",
-  "backend_executable_sha256": "284dd2323d7e59b79a103364f0ab98ca0508924aa143a962e453db914dba950c",
+  "executable_sha256": "2ee46a339379472b61d15dd777b45008221bc18b106a13da125e55ebc75d09e9",
+  "backend_executable_sha256": "83ddf83e8835bb6b20bcf0b99a1184d8f091f58b6ed128b792e1a4db6f3b73ca",
   "frozen_module_inventory": {
     "Optical Design Studio.exe": {
-      "sha256": "a496e3831bb7368c4708a401fe62b33b626a91a9df2cb37764c8593e73d7bbb3",
+      "sha256": "2ee46a339379472b61d15dd777b45008221bc18b106a13da125e55ebc75d09e9",
       "required_modules": 117,
       "numpy_version": "1.26.4"
     },
     "OpticalDesignBackend.exe": {
-      "sha256": "284dd2323d7e59b79a103364f0ab98ca0508924aa143a962e453db914dba950c",
+      "sha256": "83ddf83e8835bb6b20bcf0b99a1184d8f091f58b6ed128b792e1a4db6f3b73ca",
       "required_modules": 117,
       "numpy_version": "1.26.4"
     }

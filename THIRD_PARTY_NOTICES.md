@@ -1,4 +1,4 @@
-# Additional notices for Optical Design Studio 1.4.0-alpha.5
+# Additional notices for Optical Design Studio 1.4.0-alpha.6
 
 The native scientific plotting runtime includes PyQtGraph and its Colorama dependency. The following notices supplement the existing application, native S4, Qt/PyQt, numerical, geometry, machine-learning, and optional runtime notices supplied in **THIRD_PARTY_LICENSES** and the corresponding source.
 

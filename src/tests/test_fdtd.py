@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from fdtd_model import DEFAULTS, build_job, convert_material, evaluate_medium, validate_options
+from fdtd_model import DEFAULTS, build_job, convert_material, evaluate_medium, validate_options, grid_alignment
 import meep_runtime
 
 
@@ -27,6 +27,30 @@ def project():
 
 
 class TranslationTests(unittest.TestCase):
+    def test_grid_alignment_matches_native_rounded_cell_without_material_work(self):
+        options = dict(DEFAULTS, dimensions=3, resolution=40)
+        before = copy.deepcopy(options)
+        with patch('fdtd_model.build_job', side_effect=AssertionError('No job preparation')):
+            result = grid_alignment(2.94, 2.94, .2695, options)
+        self.assertEqual([row['rounded_pixels'] for row in result['axes']], [118, 118, 171])
+        np.testing.assert_allclose([row['approximate_um'] for row in result['axes']], [2.95, 2.95, 4.275])
+        self.assertTrue(result['lateral_period_changes'])
+        self.assertEqual(options, before)
+
+    def test_grid_alignment_tolerance_positive_half_rounding_and_2d_axes(self):
+        options = dict(DEFAULTS, dimensions=3, resolution=40.81632653)
+        self.assertFalse(grid_alignment(2.94, 2.94, .2695, options)['lateral_period_changes'])
+        near = grid_alignment(120.00000002/40, 120/40, .2695, dict(options, resolution=40))
+        self.assertFalse(near['lateral_period_changes'])
+        self.assertEqual(near['axes'][0]['rounded_pixels'], 120)
+        result = grid_alignment(.0625, float('nan'), .2695, dict(options, dimensions=2, resolution=40))
+        self.assertEqual([row['axis'] for row in result['axes']], ['X', 'Z'])
+        self.assertEqual(result['axes'][0]['rounded_pixels'], 3)  # positive 2.5 rounds up, not to even.
+        self.assertEqual(grid_alignment(.001, 1, .2695, dict(options, resolution=40))['unresolved_axes'], ['X'])
+        for bad in (0, float('inf'), float('nan')):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                grid_alignment(bad, 1, .2695, options)
+
     def test_fractional_resolution_validates_and_preserves_job_budget(self):
         import math
         resolution = 20 / .49

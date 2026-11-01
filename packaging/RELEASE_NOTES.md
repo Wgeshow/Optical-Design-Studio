@@ -1,34 +1,47 @@
-# Optical Design Studio 1.4.0-alpha.5 — Meep grid and pulse controls
+# Optical Design Studio 1.4.0-alpha.6 — Meep grid alignment warnings
 
 Experimental Windows x64 usability update · 1 November 2026
 
-Meep spatial resolution now accepts fractional values. For a 0.49 µm lattice period, enter 40.81632653 cells/µm to represent 20 cells per lattice period. The source panel also exposes an opt-in **Integrated Gaussian source** setting, default off, with a summary in Check inputs. Both Reference and Device use the selected source setting. These controls make the convergence study possible through the native UI; they do not establish convergence by themselves.
+**Check inputs now shows the requested Meep pixel counts and approximate rounded cell dimensions.** The display updates when you edit resolution, cell dimensions, slab thickness, padding or PML. It warns when rounding changes a lateral periodic dimension and states that alignment does not establish convergence. The calculation reads the current UI tables and does not start a solver or fit material data. It does not silently change geometry or resolution.
 
-The earlier **Estimate runtime** button, live phase progress, elapsed time and estimated remaining time remain available. Estimates use matching measured history or live stepping data and do not launch a hidden solver. With no matching history the UI says so promptly. Stop remains available. A phase percentage describes its configured simulation-time budget, not overall completion or convergence.
+Fractional resolution, the opt-in integrated Gaussian source, Estimate runtime and live phase timing from earlier experimental versions remain available. The new grid display is an estimate; the actual solver log is the authority for the represented cell. Runtime estimates remain dependent on measured history, stepping data and machine load.
 
-## Download and validation
+## Grid calculation and derivation
 
-Download the Portable Windows x64 `.7z`, extract the complete archive using 7-Zip, and open `Optical Design Studio.exe`. Keep the backend executable and `_internal` directory together. The corresponding Source ZIP supports inspection and rebuilding. Bundled desktop/S4 support needs no separate Python; Meep uses its configured supported Linux/WSL runtime.
+Let L be a requested positive cell length in µm and ρ the resolution in cells/µm. In SI units L_SI=10⁻⁶L m and ρ_SI=10⁶ρ m⁻¹; the grid spacing is Δ=1/ρ_SI m. The desired number of cells is N*=L_SI/Δ=Lρ. Meep's positive-length nearest-pixel rule gives N=floor(N*+1/2), so the represented length is L_eff=N/ρ µm and the relative domain shift is (L_eff−L)/L. This is a representation calculation, not a bound on electromagnetic error.
 
-This build passed 72 targeted staged-source tests, 34 packaging/privacy/license checks, exact compiled-code comparison for 201 modules in each executable plus the standalone Meep runner, eight frozen critical checks, and seven actual Windows startup checks. A fresh GPT-6.1 Terra manual check verified fractional entry persistence, integrated-source controls, input preparation, responsive Estimate behavior, native Stop/cancellation and normal close. The full installer and scientific matrix was not rerun. Exact hashes and gate scope are recorded in `VALIDATION.json`.
+For L=2.94 µm and ρ=40 cells/µm: N*=117.6, N=118 and L_eff=2.95 µm, a +0.3401% shift. Choosing ρ=20/0.49≈40.81632653 cells/µm makes the lateral count approximately 120 and L_eff≈2.94 µm. The propagation length is calculated separately: for d=0.2695 µm slab thickness and p=h=1 µm padding/PML, L_z=d+2(p+h)=4.2695 µm; at this fractional resolution N_z≈174.2653 rounds to 174 and L_z,eff≈4.263 µm. Thus lateral alignment does not imply all dimensions align.
 
-Stable version 1.3.5 and its updater are preserved. The authored aggregate below is a dated scientific checkpoint, separate from release acceptance. It includes numerical results, assumptions, equations, comparison limits and outstanding work. No raw acceptance projects, research runs, private paths, logs or paper PDFs are included in public assets.
+The UI's near-integer display tolerance accommodates eight-decimal resolution entry; it is not the solver stopping tolerance. The implementation is in `src/fdtd_model.py:grid_alignment`, `src/qt_fdtd.py:FDTDPage.grid_alignment` and `src/qt_optical_journey.py:_checks`. The rounding rule follows [Meep 1.30.0 grid construction](https://github.com/NanoComp/meep/blob/v1.30.0/src/vec.cpp#L857-L873). Material refractive indices do not enter this grid estimate. Spatial, temporal and PML convergence still require separate calculations and appropriate reference comparisons.
+
+## Download and tested scope
+
+Extract the entire Portable Windows x64 `.7z` archive with 7-Zip, then open `Optical Design Studio.exe`; keep the backend and `_internal` folder together. The matching Source ZIP, checksums and `VALIDATION.json` accompany this experimental release. Bundled desktop/S4 support needs no separate Python; Meep uses its configured supported Linux/WSL runtime. Stable 1.3.5 and its updater remain unchanged.
+
+This build passed 75 targeted staged-source tests, 34 packaging/privacy/license checks, exact comparison of 201 compiled modules in each executable plus the standalone Meep runner, eight frozen critical checks and seven actual Windows startup checks. Fresh GPT-6.1 Terra manual checks confirmed the 40→40.81632653 display change, 2D/3D axes, immediate Estimate response and a separately captured normal-close exit code 0. The smoke manually authored cell/slab dimensions but retained default optical materials; it ran no scientific simulation. Operational Stop was not rerun on alpha.6. The full installer/scientific matrix and native field-map checks were not rerun; omitted checks remain explicit.
+
+The dated aggregate below reports 13 of 28 routes with native execution and five earlier scoped reference agreements. Meep's aligned-grid cap-400 run still fails Device decay and passive-power checks; cap 800 is in progress at this checkpoint. GME cutoff/basis sensitivity remains unresolved. The homogeneous periodic-transport mesh pair agrees at roundoff scale without establishing general device accuracy. These application/release checks do not establish physical validation. Public assets exclude raw acceptance projects, research data, logs, private paths and paper PDFs.
 
 ---
 
-# 1 November 2026 — aggregate UI campaign progress
+# 1 November 2026 — current 13-route UI campaign progress
 
-This evidence note summarizes only manually entered native UI calculations and independently checked aggregate results. It contains no private machine paths, PDFs, raw arrays, per-run identifiers, or imported geometry. The tested native application was **Optical Design Studio 1.4.0-alpha.4**, corresponding to public source commit `37a8dea74b9a897ee011d98ff7d03f301304bb23`. The alpha.5 r2 source candidate is separate from the alpha.4 optical/laser runs. Its integrated-source 40-resolution run was cancelled during Reference; the separate 40.81632653-resolution run passed Reference decay and remains active in Device with no full spectrum. The alpha.5 source checkpoint has been merged and hash-audited; no downloadable alpha.5 package or public release is claimed.
+This current local aggregate supersedes the earlier alpha.5 progress snapshot for campaign totals, while leaving dated publication notes immutable. It summarizes manually entered native UI calculations and independently checked aggregate results; it contains no private machine paths, raw arrays, per-run identifiers, or imported geometry. Historical scientific calculations retain their actual tested application versions. Alpha.5 is now a published experimental prerelease with seven public assets verified. Its public notes preserve the dated 12/28-route, five-agreement checkpoint; this live aggregate includes subsequent verified results at 13/28 with the same five agreements. Detailed local evidence is retained separately; this authored aggregate records the tested scope and results.
 
 ## Campaign status
 
-- **11 of 28** routes have a completed native UI calculation or simulation workflow.
-- **17** routes remain unexecuted.
-- **11** executed routes still have unresolved convergence or comparison questions.
-- **5** pre-existing scoped reference agreements remain; Nov. 1 high-field, laser and electrical.iv work adds no new paper-agreement count.
+- **13 of 28** routes have a completed native UI calculation or simulation workflow.
+- **15** routes remain unexecuted.
+- **13** executed routes still have unresolved convergence or comparison questions.
+- **5** pre-existing scoped reference agreements remain; Nov. 1 high-field, laser, electrical.iv, GME and periodic transport work adds no new paper-agreement count.
 
 These counts separate UI construction/execution, numerical convergence, and external reference agreement. A calculation completing in the UI is not by itself convergence or physical validation.
 
+## Alpha.5 publication and validation scope
+
+Optical Design Studio **1.4.0-alpha.5** is published as an experimental prerelease: [release and downloads](https://github.com/Wgeshow/Optical-Design-Studio/releases/tag/v1.4.0-alpha.5). Seven public assets and their digests were verified. The corresponding source commit is `edd15d30e3170980d0cee9502d78141ac6cbd55e`. Release checks recorded 72 selected source checks, 34 packaging/privacy/license checks, exact compiled matches for 201 modules per executable, 8 critical packaged checks, 7 Windows startup checks, and the documented fresh packaged UI scope. The full installer matrix was not rerun. These build and UI checks are separate from scientific convergence and paper agreement.
+
+Alpha.5 added an integrated-Gaussian source option that defaults off and a fractional spatial-resolution input. The fractional value `40.81632653 cells/µm` represents 20 cells per `0.49 µm` lattice period. In the aligned-grid/integrated-source Meep run, Reference decay passed but Device decay failed at the cap, and passive-range violations remained. Its comparison with the earlier standard-source spectrum changes both source waveform and grid/domain representation, so neither effect is isolated and no spectral correction is established.
 ## High-field optical response
 
 ### Setup
@@ -155,9 +168,52 @@ Noor et al. describes PN semiconductor drift-diffusion diode `J–V`. This nativ
 
 ### Limits
 
-This is a scoped equation diagnostic for the manually selected homogeneous bar. It does not model carrier continuity, injection, recombination, depletion, contact resistance, nonlinear transport, or a semiconductor diode. The 10/28 route count increases to 11/28, but scoped paper/reference agreements remain five.
+This is a scoped equation diagnostic for the manually selected homogeneous bar. It does not model carrier continuity, injection, recombination, depletion, contact resistance, nonlinear transport, or a semiconductor diode. That checkpoint raised campaign execution to 11/28; scoped paper/reference agreements remained five.
 
 **Evidence filenames:** `ELECTRICAL_MANUAL_UI_RECIPES.md`, `analyze_nov1_ohmic_iv.py`, `nov1-ohmic-iv-mesh-comparison.json`, `nov1-ohmic-8-analysis.json`, `nov1-ohmic-16-analysis.json`, `nov1-ohmic-8-ui-export.csv`, `nov1-ohmic-16-ui-export.csv`.
+
+## PCSEL periodic transport: homogeneous analyst diagnostic
+
+### Setup
+
+A fresh native UI study used a manually authored, unpatterned semiconductor slab in a periodic cell of `0.3 × 0.4 µm`, with `1 µm` thickness, donors `1×10¹⁶ cm⁻³`, zero acceptors, and full-face ideal ohmic top/bottom contacts. The analyst-selected material used `εr=12.9`, `Nc=1×10¹⁸ cm⁻³`, `Nv=1×10¹⁹ cm⁻³`, band gap `1.4 eV`, affinity `4 eV`, electron/hole mobilities `100/20 cm²/(V·s)`, and `300 K`; recombination coefficients/lifetime were zero. Biases were `0` and `0.01 V`, swept at the top terminal. The `0.3×0.4 µm` period area is `0.12 µm²`; no pattern or inclusion was present. These are analyst inputs, not measured material data or values taken from a paper.
+
+### Theory and units
+
+For a uniform low-field n-type slab, the drift estimate is `J≈q μ_n n E`, with `E=ΔV/L`. Integrating over the period cross-section `A` gives `I≈q μ_n n(A/L)ΔV`. Using `q=1.602176634×10⁻¹⁹ C`, assumed `n≈N_D=1×10¹⁶ cm⁻³`, `μ_n=100 cm²/(V·s)`, `A=(0.3×10⁻⁴ cm)(0.4×10⁻⁴ cm)=1.2×10⁻⁹ cm²`, `L=1×10⁻⁴ cm`, and `ΔV=0.01 V`, the field is `100 V/cm` and conductivity is `σ=q μ_n n=0.1602176634 S/cm`. Thus `J≈σE=16.02176634 A/cm²` and `I≈JA=1.9226119608×10⁻⁸ A`. This is a deliberately simple low-field equation check, not an independent carrier-density measurement.
+
+### Numerical method and results
+
+The native conformal solver used a P1 tetrahedral finite-element weak form, Fermi–Dirac carrier statistics, lumped charge/recombination, element-average conductivity and an exact residual Jacobian. Two meshes were compared while every non-mesh engine input, including both biases, remained identical. The coarse mesh used edge segments 3, xy size `0.08 µm`, z maximum step `0.25 µm`, 100 nodes and 312 tetrahedra; the refined mesh used edge segments 6, xy size `0.04 µm`, z maximum step `0.125 µm`, 522 nodes and 2160 tetrahedra. Cell volume was `0.12 µm³` at both. Periodic matching-face triangle counts were 24 per axis and 96 per axis, respectively.
+
+Both selected native UI exports have two rows and seven numeric columns and exactly match their saved native CSV fields; the refined export and saved CSV share SHA-256 `856d07410cc9888916d491e7d6637b39779db398ab4b9d411129e2bf0610d07a`. At `0.01 V`, coarse top/bottom currents are `+1.9226119607999046×10⁻⁸ A` and `−1.9226119608000012×10⁻⁸ A`; refined values are `+1.922611960799936×10⁻⁸ A` and `−1.9226119608000118×10⁻⁸ A`. The expected current is `1.9226119608000002×10⁻⁸ A`. Absolute top-current equation residuals are `9.5622×10⁻²² A` (relative `4.9736×10⁻¹⁴`) coarse and `6.4189×10⁻²² A` (relative `3.3386×10⁻¹⁴`) refined. The coarse/refined top-current difference is `3.1433×10⁻²² A`, or `1.6349×10⁻¹⁴` relative to the coarse current. Relative terminal imbalance is `5.0252×10⁻¹⁴` coarse and `3.9410×10⁻¹⁴` refined; scaled residuals are `9.8571×10⁻¹⁷ V` and `2.8717×10⁻¹⁶ V`; contact-range overshoot is zero at saved precision. The two meshes show only roundoff-scale sensitivity for this ideal uniform slab. Two meshes do not establish a refinement order, discretization-error estimate, or general accuracy.
+
+### Paper comparison and limits
+
+No matched primary-paper case is claimed for this analyst-authored homogeneous cell. The drift-law comparison is equation consistency for analyst-selected coefficients, not an additional scoped paper agreement. The ideal periodic cell and full-face contacts do not represent a finite aperture, patterned PCSEL, diode, or laser; no experimental material accuracy is claimed. The mesh pair is a limited sensitivity check only; convergence order and paper comparison remain unresolved.
+## Guided-mode expansion: Fan 2002 slab modes
+
+### Setup
+
+Three reciprocal-cutoff native UI GME runs, plus one guided-index expansion, used a square lattice with period `a=1000 nm`, a `500 nm` patterned dielectric slab (`n=√12`), one centered air hole of radius `r/a=0.20`, and air half-spaces. The calculation used normal incidence at the Γ point, guided-mode indices `[0,1]`, and 12 requested modes. Reciprocal cutoff `gmax=3.1, 4.1, 5.1` was varied while the other saved inputs were held fixed. These cutoff choices are numerical trials, not settings reported by Fan and Joannopoulos.
+
+### Theory and comparison scope
+
+The UI reports dimensionless frequency `a/λ` and perturbative radiation-loss magnitude `|Im(f)|`; its quality estimate is `Q=f/[2|Im(f)|]`. At Γ the paper states that doubly degenerate modes can couple to normal-incidence waves, whereas singly degenerate states are uncoupled by symmetry. This makes a degenerate finite-loss pair a plausible candidate class, but branch identity requires field symmetry or polarization-overlap evidence. Figure 12(d) is a driven transmission spectrum with Fano line shapes; a plotted transmission minimum need not coincide with an eigenfrequency. The article's text gives approximately `Q=213` for the lowest-order resonance at `r/a=0.20` ([Fan and Joannopoulos, PRB 65, 235112](https://doi.org/10.1103/PhysRevB.65.235112); paper DOI).
+
+### Numerics and results
+
+The near-degenerate pair tracked provisionally as sorted bands 4 and 5 has mean frequency `0.38136973`, `0.38205016`, and `0.38248123 a/λ` and mean perturbative `Q=253.49`, `267.36`, and `277.80` at `gmax=3.1`, `4.1`, and `5.1`. Frequency shifts by `0.1784%` then `0.1128%`; Q shifts by `5.47%` then `3.90%`. All saved summaries leave convergence unestablished. All four selected UI exports exactly match their saved native mode tables. At fixed `gmax=5.1`, expanding guided indices from `[0,1]` to `[0,1,2,3]` changes the provisional band-4/5 pair frequency by `−0.0035%` and perturbative Q by `−1.83%`; other sorted band labels reorder, so band-index tracking is not branch proof.
+
+### Primary-paper comparison
+
+The paper's first narrow Figure 12(d) transmission feature is raster-estimated near `0.377–0.382 a/λ` with approximate reading uncertainty `±0.002`; the gmax-5.1 candidate eigenfrequency is `0.000481 a/λ` above the nominal interval, within that raster uncertainty. Its perturbative `Q=277.80` is `30.4%` above the article's approximate `213`. This is only a plausible frequency-region and mode-class comparison. No eigenfield symmetry/polarization overlap identifies the branch, and the observables differ; no quantitative paper agreement is claimed.
+
+### Limits
+
+Only reciprocal cutoff was varied: guided-mode indices `[0,1]` and requested mode count 12 stayed fixed. Mode tracking by sorted band index is provisional without eigenvector overlap data, and radiative Q is perturbative. These calculations do not reproduce the paper's driven transmission spectrum. The route is native-executed with partial reciprocal-cutoff and guided-index sensitivity evidence; basis convergence and paper comparison remain unresolved.
+
+**Evidence filenames:** `PCSEL_FAN2002_MANUAL_UI_RECIPES.md`, `analyze_nov1_gme.py`, `nov1-gme-external-analysis.json`, `analyze_nov1_gme_guided_basis.py`, `nov1-gme-guided-basis-analysis.json`, `nov1-gme-5p1-guided0123-ui-export.csv`, `nov1-gme-3p1-ui-export.csv`, `nov1-gme-4p1-ui-export.csv`, `nov1-gme-5p1-ui-export.csv`, `fan2002-figure12d-reference.json`.
 
 ## Photonic-crystal cavity array: cap-400 Meep diagnostic
 
@@ -179,17 +235,17 @@ Passivity counts are still bad. Cap-200 has `R>1` at 3 samples, `T>1` at 20, and
 
 Sampled transmission minima are retained as unfitted grid points in `nov1-meep-cap400-comparison.json`; they are not paired as resonances or used to infer `Q`.
 
-The alpha.5 integrated-source `40 cells/µm` run was stopped through the native UI during Reference at displayed `t=269 µm/c`; the log ends at `t=276 µm/c` during cancellation. The Reference decay ratio stayed near `2.129×10⁻⁵` across `t=120–260 µm/c`, above the `10⁻⁷` target. It produced no Device phase or spectrum. A separate integrated-source run at `40.81632653 cells/µm` passed Reference decay at `t=80.017 µm/c` with ratio `5.4877×10⁻⁹` and elapsed phase time `154.07 s`. Its Device phase is still running; no full spectrum or overall convergence result is available. The captured job audit shows this second run differs from the preceding resolution-40 job only in resolution; cell/memory counts are derived values. Its actual represented cell is `2.94 × 2.94 × 4.263 µm`.
+The alpha.5 integrated-source `40 cells/µm` run was stopped through the native UI during Reference at displayed `t=269 µm/c`; the log ends at `t=276 µm/c` during cancellation. The Reference decay ratio stayed near `2.129×10⁻⁵` across `t=120–260 µm/c`, above the `10⁻⁷` target. It produced no Device phase or spectrum. A separate integrated-source run at `40.81632653 cells/µm` completed with Reference decay pass at `t=80.017 µm/c`, ratio `5.4877×10⁻⁹`, and phase time `154.07 s`; Device decay failed at the cap with final ratio `4.8616×10⁻⁴` against target `10⁻⁷` after `979.92 s`. It retains a passive-range warning: `R>1` at 1/401 points, `T>1` at 21/401, and `A<0` at 205/401. Against the alpha.4 standard-source cap-400 spectrum on the identical frequency grid, max/RMS pointwise differences are `R=0.99488/0.12707`, `T=0.67581/0.12011`, `A=0.77434/0.12162`. This comparison is confounded by both integrated-source setting and grid resolution: the computational cell changes from `2.95 × 2.95 × 4.275 µm` at 40 cells/µm to `2.94 × 2.94 × 4.263 µm` at 40.81632653 cells/µm. The integrated source represents a free polarization that vanishes after the pulse, following the [Meep source-current definition](https://meep.readthedocs.io/en/latest/FAQ/#how-is-the-source-current-defined). Meep’s [FAQ on static fields and DFT](https://meep.readthedocs.io/en/latest/FAQ/#how-do-i-include-static-fields-in-a-frequency-domain-calculation) states residual electrostatic fields do not affect nonzero-frequency DFT quantities. No DC-field explanation or spectral correction is established, and no eigenmode/Fano/Q claim is made.
 
 ### Primary-paper comparison
 
-Altug and Vuckovic, [“Two-dimensional coupled photonic crystal resonator arrays,” Fig. 2 (2004), DOI 10.1063/1.1639505](https://web.stanford.edu/group/nqp/jv_files/papers/hatice1.pdf), supplies approximate `Γ`-point eigenband context. A driven R/T spectrum is a different observable; proximity of a transmission feature to an eigenband coordinate does not identify a mode, prescribe a Fano minimum, or validate `Q`.
+Altug and Vuckovic, [“Two-dimensional coupled photonic crystal resonator arrays,” Fig. 2 (2004), DOI 10.1063/1.1639505](https://doi.org/10.1063/1.1639505), supplies approximate `Γ`-point eigenband context. A driven R/T spectrum is a different observable; proximity of a transmission feature to an eigenband coordinate does not identify a mode, prescribe a Fano minimum, or validate `Q`.
 
 ### Limits
 
-Both cap-400 phase decay tests failed, and passive-range violations persist. The large differences establish sensitivity to post-source cap but not convergence, mode identity, Fano agreement, or physical correction. The primary Altug–Vuckovic `Γ`-point eigenband is coordinate context, not a driven transmission target. The native UI export audit passes at the stated roundoff tolerance; it does not change scientific status. The read-only analysis utility is `analyze_nov1_meep_cap400.py`.
+Both cap-400 phase decay tests failed, and passive-range violations persist. The large differences establish sensitivity to post-source cap but not convergence, mode identity, Fano agreement, or physical correction. The primary Altug–Vuckovic `Γ`-point eigenband is coordinate context, not a driven transmission target. The native UI export audit passes at the stated roundoff tolerance; it does not change scientific status. The alpha.5 aligned-grid saved-output comparison is in `nov1-meep-aligned-comparison.json` with a single-run audit in `nov1-meep-aligned-run-analysis.json`; the read-only comparison utility is `compare_nov1_meep_aligned.py`. Its selected native UI export has 401 rows and matches the saved seven-column result at serialization roundoff: maxima are 2.27×10⁻¹³ nm for wavelength, 2.22×10⁻¹⁶ for R/T, 9.89×10⁻¹⁷ for A, and 3.55×10⁻¹⁵ for incident flux; angle and frequency are exact. This confirms export integrity only.
 
-## Alpha.5 r2 source candidate checkpoint
+## Alpha.5 source controls and scientific limits
 
 ### Setup and theory
 
@@ -197,14 +253,33 @@ A separate source candidate adds an opt-in integrated-Gaussian source setting an
 
 ### Verification and limits
 
-The cumulative v2 source suite passed 66 tests; the clean staged candidate passed 72 source checks and 34 packaging checks. Build completed in `142.437 s`. All 201 compiled modules match within each executable; the standalone runner matches exactly. Eight frozen critical checks and actual Windows startup passed. Fresh packaged-UI checks confirmed integrated-source default-off/checked behavior, fractional-resolution `40.81632653` persistence through navigation, input preparation, and the immediate Estimate no-data message. A native Stop request cancelled the integrated-source resolution-40 Reference-only run; a separate fresh no-solve candidate chooser closed normally with process exit 0. The source checkpoint is merged and its 10-file payload hashes are verified; no downloadable alpha.5 package or public release is claimed. These UI/source checks remain separate from scientific results.
+The cumulative v2 source suite passed 66 tests; the clean staged candidate passed 72 source checks and 34 packaging checks. Build completed in `142.437 s`. All 201 compiled modules match within each executable; the standalone runner matches exactly. Eight frozen critical checks and actual Windows startup passed. Fresh packaged-UI checks confirmed integrated-source default-off/checked behavior, fractional-resolution `40.81632653` persistence through navigation, input preparation, and the immediate Estimate no-data message. A native Stop request cancelled the integrated-source resolution-40 Reference-only run; a separate fresh no-solve candidate chooser closed normally with process exit 0. The alpha.5 source is published at the corresponding commit and seven public assets were verified. These UI/source checks remain separate from scientific results.
 
 **Evidence filenames:** `nov1-ui-change-checkpoint.md`, `nov1-fractional-resolution-v2-implementation.json`, `nov1-source-cumulative-v2-hashes.json`, `nov1-source-v2-final-tests.log`, `nov1-private-publication.json`, `manual-packaged-ui.json`.
 
+## Alpha.6 grid-alignment build and native UI control check
+
+### Build and frozen verification
+
+The separate alpha.6 candidate passed 75 selected source checks, 34 packaging/privacy/license checks, and exact compiled-module matching for 201 modules per executable. Its bounded critical frozen profile passed 8/8 checks, and actual Windows startup passed 7/7 checks. These results do not constitute scientific validation or publication. The manual Meep grid-warning check described next is UI-control evidence only.
+
+### Meep grid rounding and observed controls
+
+For requested positive cell length `L` and resolution `ρ` in pixels per micrometre, the Meep 1.30 implementation forms an integer grid count `N=floor(Lρ+0.5)` (C++ positive-value conversion after adding 0.5) and uses grid spacing `1/ρ`; therefore the represented size is `L_eff=N/ρ`. The implementation also emits a warning when the requested size is not an integer number of pixels ([Meep v1.30.0 `grid_volume` spacing, `vec.cpp` lines 283–289](https://github.com/NanoComp/meep/blob/v1.30.0/src/vec.cpp#L283-L289); [`vol3d` rounding, lines 857–873](https://github.com/NanoComp/meep/blob/v1.30.0/src/vec.cpp#L857-L873)). The source uses strict integer rounding and warns when a requested dimension is not an integer number of pixels; the manual UI observation below records the UI’s displayed near-integer alignment state separately. This rounding rule predicts the previously observed alpha.5 geometry:
+
+- At `ρ=40 cells/µm`, requested `2.94 × 2.94 × 4.2695 µm` yields `N=118 × 118 × 171` and `L_eff=2.95 × 2.95 × 4.275 µm`.
+- At `ρ=40.81632653 cells/µm`, the same request yields `N=120 × 120 × 174` and `L_eff≈2.94000000004 × 2.94000000004 × 4.26300000006 µm`, displayed as `2.94 × 2.94 × 4.263 µm` at reported precision. The slab thickness was `0.2695 µm`; the requested cell Z extent is `4.2695 µm` (slab plus surrounding padding), distinct from the rounded `4.263 µm` represented at fractional resolution.
+
+Terra's alpha.6 native UI control check manually authored a `2.94 µm` cell and `0.2695 µm` slab; default GaAs/SiO2 materials remained selected and do not change the grid-rounding calculation. At resolution `40`, the 2D UI showed a lateral warning (X 117.6→118; Z 170.78→171). At `40.81632653`, it showed lateral alignment (X 120→120; Z 174.2653061→174). The 3D control added Y 120→120 at the aligned resolution. This is the UI’s near-integer status display, not a change to Meep’s source rounding rule. Estimate returned responsively. No solver was launched, so this verifies the UI warning/alignment display and input interaction, not that geometry was automatically corrected, nor any spectral change or convergence. Operational Stop was not rerun. One close attempt has no captured exit; a separate owned-window close exited normally with code 0.
+
+### Limits
+
+The source formula explains grid rounding; the native UI check establishes the displayed warning/alignment state for these tested inputs. Neither establishes a solution to the passive-power violations, validates a nonzero-frequency spectrum, or makes the alpha.5 integrated-source/aligned-grid comparison unconfounded. The alpha.6 candidate is not published, and no scientific validation is claimed.
 ## Next actions
 
-1. Allow the current alpha.5-r2 integrated-source `40.81632653 cells/µm` Device phase to complete; the Reference passed its decay target, but no Device spectrum is available yet. Keep the cancelled resolution-40 trial separate.
-2. Continue the 17 remaining user-authorized routes in queue order, preserving each native entry, execution, convergence and reference scope.
-3. Maintain the five scoped reference agreements unless a later route adds independently supported quantitative evidence. Do not convert a completed run, static arithmetic check, or source test into broader physical validation.
+1. Continue the 15 remaining user-authorized routes in queue order, preserving native entry, execution, convergence and reference scopes. The periodic transport route now has a two-mesh sensitivity pair; do not infer general convergence from it.
+2. Alpha.6 grid-alignment candidate build checks passed: 75 source checks, 34 packaging checks and 201 compiled modules per executable. Its critical frozen profile (8 checks) and Windows startup (7 checks) have now passed; Terra passed the native grid-warning UI control check without a solver run; warning visibility does not imply corrected geometry. Do not treat this as a release or a scientific result. Maintain the five scoped reference agreements unless later evidence independently supports a scoped quantitative comparison.
 
-**Aggregate evidence filenames:** `nov1-session-report.json`, `nov1-route-queue.json`, `nov1-electrical-iv-native-acceptance-updates.json`, `nov1-meep-native-acceptance-updates.json`, `nov1-private-publication.json`, `nov1-ui-change-checkpoint.md`, `nov1-fractional-resolution-v2-implementation.json`, `nov1-source-cumulative-v2-hashes.json`, `nov1-source-v2-final-tests.log`, `build_qa_report.py`. This aggregate is dated; update it after the active Device phase or another route produces verified evidence.
+**Aggregate evidence filenames:** `nov1-session-report.json`, `nov1-route-queue.json`, `nov1-pcsel-transport-analysis.json`, `nov1-pcsel-periodic-export-audit.json`, `nov1-pcsel-periodic-refinement-analysis.json`, `nov1-pcsel-periodic-refinement-export-audit.json`, `nov1-pcsel-periodic-refined-ui-export.csv`, `NOV1_ALPHA6_NATIVE_GATE_HANDOFF.md`, `nov1-grid-alignment-alpha6-build-handoff.json`, `nov1-electrical-iv-native-acceptance-updates.json`, `nov1-meep-native-acceptance-updates.json`, `nov1-private-publication.json`, `nov1-ui-change-checkpoint.md`, `nov1-fractional-resolution-v2-implementation.json`, `nov1-source-cumulative-v2-hashes.json`, `nov1-source-v2-final-tests.log`, `build_qa_report.py`. This aggregate reflects the live 13-route state after verified alpha.5 publication. The public alpha.5 notes remain a dated 12-route snapshot; see the separate live-report addendum. Alpha.6 passed the stated build/critical/startup gates and manual grid-warning control check; it is not published.
+
+

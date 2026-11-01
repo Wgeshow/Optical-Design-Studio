@@ -17,7 +17,7 @@ import uuid
 import zipfile
 
 ROOT=Path(__file__).resolve().parent
-VERSION='1.4.0-alpha.5'
+VERSION='1.4.0-alpha.6'
 GUI_MODULES=('installer_smoke','qt_app','qt_device_builder','qt_lattice_diagram','qt_materials',
     'qt_help','qt_native_figure','qt_native_plot','qt_native_field_volume','qt_field_volume','qt_windows_glass',
     'scan_storage','field_sampling', 'field_reconstruction', 'field_storage', 'direct_npz','simulation_fields','contour_sweep',

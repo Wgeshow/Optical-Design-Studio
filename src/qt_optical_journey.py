@@ -187,6 +187,33 @@ def _checks(page,store,route,host):
                 ' Both reference and device use this setting. Decay and spectral convergence require separate checks.')
         page.controls['source_is_integrated'].toggled.connect(update_source_summary)
         update_source_summary()
+        grid_summary=QLabel(); grid_summary.setWordWrap(True)
+        grid_summary.setAccessibleName('Meep grid alignment estimate')
+        page.journey_grid_summary=grid_summary
+        layout.addWidget(grid_summary)
+        def update_grid_summary(*_):
+            try:
+                estimate=page.grid_alignment()
+                rows=['Grid alignment estimate (cells/µm): '+format(estimate['resolution'], '.10g')]
+                for row in estimate['axes']:
+                    rows.append(f"{row['axis']}: {row['requested_um']:.10g} µm × resolution = "
+                        f"{row['requested_pixels']:.10g} cells → {row['rounded_pixels']} "
+                        f"(approximately {row['approximate_um']:.10g} µm)")
+                if estimate['lateral_period_changes']:
+                    rows.append('Warning: noninteger lateral cell sizes change the simulated periodic dimensions.')
+                else:
+                    rows.append('Lateral cell sizes align with the grid within display precision.')
+                if estimate['unresolved_axes']:
+                    rows.append('Warning: a dimension rounds to zero cells; increase resolution or revise the cell.')
+                rows.append('Nearest-pixel estimate only; check actual dimensions in the run log. Alignment does not establish convergence.')
+                grid_summary.setText('\n'.join(rows))
+            except (ValueError, TypeError, KeyError, AttributeError, OverflowError) as exc:
+                grid_summary.setText('Grid alignment estimate unavailable: '+str(exc))
+        for key in ('resolution', 'pml_um', 'padding_um'):
+            page.controls[key].valueChanged.connect(update_grid_summary)
+        page.controls['dimensions'].currentIndexChanged.connect(update_grid_summary)
+        store.changed.connect(update_grid_summary)
+        update_grid_summary()
     if route=='tools.ai':
         operation=QComboBox(); operation.setAccessibleName('AI operation to validate')
         for title,key in [('Collect and train','collect'),('Fit saved data','fit'),('Search','search'),('Verify leaders','verify')]: operation.addItem(title,key)

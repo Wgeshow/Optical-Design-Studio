@@ -62,6 +62,41 @@ class FDTDExteriorEditingTests(unittest.TestCase):
         self.assertIn('20 µm/c', self.page.controls['decay_by'].toolTip())
         self.assertEqual(self.page.options(), before)
 
+    def test_journey_live_grid_summary_is_read_only_and_uses_current_tables(self):
+        before = copy.deepcopy(self.store.project())
+        with patch('fdtd_model.build_job', side_effect=AssertionError('No job preparation')), \
+             patch('fdtd_model.convert_material', side_effect=AssertionError('No material fit')), \
+             patch.object(self.store, 'save_search', return_value=None), \
+             patch.object(self.store.library, 'snapshot', side_effect=AssertionError('No file snapshot')), \
+             patch('meep_runtime.probe', side_effect=AssertionError('No runtime probe')):
+            self.store.settings.update(ax_um=2.94, ay_um=2.94)
+            self.store.layers = self.store.layers.iloc[:3].copy()
+            self.store.layers.loc[:, 'Thickness_um'] = [0., .2695, 0.]
+            self.page.controls['dimensions'].setCurrentIndex(1)
+            self.page.controls['resolution'].setValue(40)
+            self.page.optical_journey.select_stage('checks')
+            self.app.processEvents()
+            label = self.page.journey_grid_summary
+            self.assertTrue(label.isVisible())
+            self.assertIn('117.6 cells → 118', label.text())
+            self.assertIn('approximately 2.95 µm', label.text())
+            self.assertIn('noninteger lateral cell sizes', label.text())
+            self.assertIn('does not establish convergence', label.text())
+            self.page.controls['resolution'].setValue(40.81632653)
+            self.app.processEvents()
+            self.assertNotIn('noninteger lateral cell sizes', label.text())
+            self.assertIn('align with the grid', label.text())
+            self.store.settings['ax_um'] = 3.01
+            self.store.changed.emit('geometry')
+            self.app.processEvents()
+            self.assertIn('noninteger lateral cell sizes', label.text())
+            self.assertEqual(self.store.settings['ax_um'], 3.01)
+            self.assertEqual(self.page.controls['resolution'].value(), 40.81632653)
+        after = self.store.project()
+        for key in ('materials', 'patterns', 'device', 'electrical_materials'):
+            self.assertEqual(after[key], before[key])
+
+
     def test_journey_fractional_resolution_entry_persistence_restore_and_job(self):
         before = copy.deepcopy(self.page.options())
         self.page.optical_journey.select_stage('structure')

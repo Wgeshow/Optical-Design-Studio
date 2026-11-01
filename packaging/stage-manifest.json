@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0-alpha.5",
+  "version": "1.4.0-alpha.6",
   "build_date": "2026-11-01",
   "profile": "public",
   "production_bytes_preserved": true,
@@ -552,7 +552,7 @@
     },
     "app_version.py": {
       "size": 1756,
-      "sha256": "86b80a356b18485423bb1d158547e78d99853b914b66e7c1e023b9ab7218dcf0"
+      "sha256": "f58c347ac2d68434eaabc30a0030a575c50bcf4085de7ca5d07d5b52e5c46bc3"
     },
     "application_restart.py": {
       "size": 7182,
@@ -971,8 +971,8 @@
       "sha256": "63199c589542c166ae094a235245f479ccd506dd4219b3f83f790d1afd6a670b"
     },
     "fdtd_model.py": {
-      "size": 13046,
-      "sha256": "f596ea8181387e25da8c67c10f502a245b4c8827171a4a23d46073faa8c8e39d"
+      "size": 14934,
+      "sha256": "02cfeecfb23d292e1c00ceccfb61063d7ad9f69e5c1c9ef3c8836d0a41b9896d"
     },
     "fdtd_progress.py": {
       "size": 4586,
@@ -1791,8 +1791,8 @@
       "sha256": "4b33b360a0d6396a688d0ad08de342cbee93bd7cab5e4fd6456611c14d9af91a"
     },
     "qt_fdtd.py": {
-      "size": 51477,
-      "sha256": "90c18851021d4543f856bbf2993fd57ef9e5f8b45575dd42e1b8bb2f2f8e277a"
+      "size": 52143,
+      "sha256": "9272c4fb452d04ff1ce5944ebf991fc96906830f1a30cf6044188ed4f7e2dfce"
     },
     "qt_field_compare.py": {
       "size": 10754,
@@ -1867,8 +1867,8 @@
       "sha256": "8d24e0300c1b64ed4975226d824aee4ee3b0b12ea84b96f8e02b9312a04dcefb"
     },
     "qt_optical_journey.py": {
-      "size": 28363,
-      "sha256": "ac9a0c346675faa273f809e1e59562ce9d8f541ff1d1fe22105c68dfdb33a30e"
+      "size": 30257,
+      "sha256": "58a5e75c3cd7b20e831bc6cc7d642f7415cce4a96d7eac098c52ca0f0ac1579d"
     },
     "qt_optical_results.py": {
       "size": 18104,
@@ -2383,8 +2383,8 @@
       "sha256": "63ca4dd6933b26ff2bda6d221f047ff07af3c2f9f61de39ae6731bcacb4059b7"
     },
     "tests/test_fdtd.py": {
-      "size": 16258,
-      "sha256": "d94402259afd2e8659ee87755d4ab819442bc2681430ae9e41c23263a7a8f89f"
+      "size": 17959,
+      "sha256": "7dba17d14d4805e73ba32c434364ec9fc13f54353d8631e8afa05509ba4d025f"
     },
     "tests/test_fdtd_progress.py": {
       "size": 3340,
@@ -2799,8 +2799,8 @@
       "sha256": "f1671c7382bc6d8b9824654d3095f0a2e85a59753f7092b8796489b233f7f448"
     },
     "tests/test_qt_fdtd_exterior_editing.py": {
-      "size": 9012,
-      "sha256": "6789ca1705b400e4a942464cd6b8b161284da2aaf32b9a6efe9c2de6d4234fdb"
+      "size": 11183,
+      "sha256": "e50384f9ffaa5408baa01757b5b70c125e985b44501394d7f5d06e8118d9d372"
     },
     "tests/test_qt_fdtd_result_reset.py": {
       "size": 5112,
@@ -3339,5 +3339,5 @@
       "sha256": "376162b4a329e6cc8fa45c8c70fdc1372a67c5a0366c0a76bb3c8b131076ac7c"
     }
   },
-  "source_tree_sha256": "073c344381ec5affa4be562ea35db49484f425d5648da0c7bd42020f667ce1c7"
+  "source_tree_sha256": "e8e14a985c5f0df8f0a3513ed43f1db88333d808f96f788acc52fb902ad7f614"
 }

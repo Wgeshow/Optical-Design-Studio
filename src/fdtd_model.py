@@ -51,6 +51,42 @@ def validate_options(options):
     return result
 
 
+def grid_alignment(ax_um, ay_um, total_um, options):
+    """Cheap read-only cell estimate; no materials, geometry compilation or Meep.
+
+    Meep v1.30 vec.cpp vol2d/vol3d uses int(length*resolution + .5)
+    for positive cell dimensions. Near-integer tolerance affects warnings only,
+    allowing for the resolution widget's eight decimal places, not the solver.
+    """
+    def positive(value, name):
+        value = float(value)
+        if not math.isfinite(value) or value <= 0:
+            raise ValueError(name+' must be finite and positive.')
+        return value
+    resolution = positive(options['resolution'], 'Resolution')
+    dimensions = options['dimensions']
+    if dimensions not in (2, 3):
+        raise ValueError('Choose a 2D cross section or the full 3D structure.')
+    total = positive(total_um, 'Device thickness')
+    padding = positive(options['padding_um'], 'Padding')
+    pml = positive(options['pml_um'], 'PML thickness')
+    lengths = [('X', positive(ax_um, 'Cell X'), True)]
+    if dimensions == 3:
+        lengths.append(('Y', positive(ay_um, 'Cell Y'), True))
+    lengths.append(('Z', positive(total+2*(padding+pml), 'Cell Z'), False))
+    axes = []
+    for axis, length, lateral in lengths:
+        pixels = positive(length*resolution, 'Requested cell pixels')
+        rounded = math.floor(pixels+.5)
+        tolerance = max(1e-6, length*5.1e-9)
+        axes.append(dict(axis=axis, requested_um=length, requested_pixels=pixels,
+            rounded_pixels=rounded, approximate_um=rounded/resolution,
+            aligned=abs(pixels-rounded) <= tolerance, lateral=lateral))
+    return dict(resolution=resolution, dimensions=dimensions, axes=axes,
+        lateral_period_changes=any(row['lateral'] and not row['aligned'] for row in axes),
+        unresolved_axes=[row['axis'] for row in axes if row['rounded_pixels'] < 1])
+
+
 def evaluate_medium(medium, frequencies):
     import numpy as np
     f = np.asarray(frequencies, dtype=float)

@@ -770,6 +770,16 @@ class FDTDPage(QWidget):
         except (ValueError,TypeError,KeyError,OSError) as exc:
             self.status.setText('Could not save Meep setup: '+str(exc))
 
+    def grid_alignment(self):
+        """Estimate from the same authored tables used by FDTD, without fitting."""
+        from fdtd_model import grid_alignment
+        from model import number as finite_number
+        thickness = sum(finite_number(value, 'Layer thickness', default=0., minimum=0.)
+            for value in self.store.layers['Thickness_um'].iloc[1:-1])
+        options = {key: self.controls[key].value() for key in ('resolution', 'pml_um', 'padding_um')}
+        options['dimensions'] = self.controls['dimensions'].currentData()
+        return grid_alignment(self.store.settings['ax_um'], self.store.settings['ay_um'], thickness, options)
+
     def options(self):
         return validate_options({key: control.currentData() if isinstance(control, QComboBox)
             else control.isChecked() if isinstance(control, QCheckBox) else control.value()
