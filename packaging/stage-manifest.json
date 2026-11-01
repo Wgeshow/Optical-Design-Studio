@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0-alpha.6",
+  "version": "1.4.0-alpha.8",
   "build_date": "2026-11-01",
   "profile": "public",
   "production_bytes_preserved": true,
@@ -552,15 +552,15 @@
     },
     "app_version.py": {
       "size": 1756,
-      "sha256": "f58c347ac2d68434eaabc30a0030a575c50bcf4085de7ca5d07d5b52e5c46bc3"
+      "sha256": "e29c6d2fe654b0e8760e8d5e035b181dcb3966e45e30708fe4b876cf32b5acdf"
     },
     "application_restart.py": {
       "size": 7182,
       "sha256": "a52b51290e34cef08d6b9cee1178a1449a2151789fd97fc46d554f3d183db7a1"
     },
     "backend.py": {
-      "size": 27054,
-      "sha256": "1ef8e9b9297f563bfe195522906949a3be6840eecefc9eb009ece6d52911c6d8"
+      "size": 26877,
+      "sha256": "aad0343d6b383975751772ee7d20692f14783df6c4d7873135dc3ea0ee45dbea"
     },
     "bandgap_narrowing.py": {
       "size": 2288,
@@ -855,8 +855,8 @@
       "sha256": "c9e7ff62a83b46fb0f925c06fd159232bfacced683d2f5c2c97e2b871d0c2f31"
     },
     "eigenfree_scan.py": {
-      "size": 12762,
-      "sha256": "201dd3fd9b3aee9cc65fce0d106bc4357448d4e785b13121c434d2dea9edaace"
+      "size": 12479,
+      "sha256": "834d194ccd9001510d460bec61f08c3de52d365e6380180a89c712bf98dc58c5"
     },
     "electrical_fermi_transport.py": {
       "size": 5529,
@@ -991,8 +991,8 @@
       "sha256": "faec68a88c35e77c261716218fa3fc0543426ab1011029d42160af9428570bd4"
     },
     "field_solver.py": {
-      "size": 17487,
-      "sha256": "8659ad9f43338858c3df1c2430dc6fc24bc5153b64bcf1a48113ca95d2b9736f"
+      "size": 17203,
+      "sha256": "7f10130dbbb15cb23cda044c3d2bd045ced7b00660253de1c131133d6896a233"
     },
     "field_storage.py": {
       "size": 8406,
@@ -1579,20 +1579,20 @@
       "sha256": "a197b702aa4d8ada9260827118c83e6326c5265dab2afcd370a435534777b125"
     },
     "meep_runtime.py": {
-      "size": 11057,
-      "sha256": "31af3dd2158e67f23fe1d78953efeda859ed849ab6d220504460170856e4ba13"
+      "size": 11565,
+      "sha256": "2e2e32cca49f374a2d6e9acb1d2b0038475da7588161ab0b1e7e65cc06fdadf7"
     },
     "ml_optimizer.py": {
-      "size": 35162,
-      "sha256": "214499cec7f6d1ac417a2f38186a8151bd45b65d1da961aed5392fcfa652ba68"
+      "size": 34988,
+      "sha256": "5648f4f20a7e45af715cfa720d2b1fcce14fbd09ef0cfdd1074f1803976f4899"
     },
     "ML_SEARCH_GUIDE.md": {
       "size": 12060,
       "sha256": "a04da8022670221c6f615966088e860bcfa2dd9cb82988465ad3cc73f4586ee6"
     },
     "model.py": {
-      "size": 17093,
-      "sha256": "0d8887c0d31b2d6ed659f532e077760050acdf1ce03318342a2bcc3bf1b08be2"
+      "size": 17172,
+      "sha256": "c43848799332b5621605154d74f994173a9e80d60cbbf036d846af8d9cb8622f"
     },
     "nk_import.py": {
       "size": 4451,
@@ -1679,8 +1679,8 @@
       "sha256": "b25b0210756d0415481ce1d031841817e3ab05963ee5c3c574a48b4857ca8282"
     },
     "peak_optimizer.py": {
-      "size": 26603,
-      "sha256": "77b56051c34c5284474b1958028f17b1e99e4d0001d410c45df71aa8a980f3a3"
+      "size": 26398,
+      "sha256": "defb8fbef22d960e72c01f7e1dbddb3bec2543d73773f2d23adc403bdf8fbbdc"
     },
     "PEAK_SEARCH_GUIDE.md": {
       "size": 5103,
@@ -1695,8 +1695,8 @@
       "sha256": "450995fd33167469d47d125e01aa084a67f5640fa8e3633931c92d0b417fc808"
     },
     "photonic_bands.py": {
-      "size": 41831,
-      "sha256": "a891fadbbbc99da5fad6e61c8616e47af27ef3522eaa7b2a5c0d3e8f3d742f76"
+      "size": 41801,
+      "sha256": "a3a193b1aa9cc457c37c98cd3ff27986a6d6d2459144f8030e7c991189af73d2"
     },
     "platform_setup.py": {
       "size": 1959,
@@ -1743,16 +1743,16 @@
       "sha256": "ea96bd0ff241aa919a471a32c685eebf75f8c8f36d9b9d71be9e3a90229c60a1"
     },
     "qt_compute.py": {
-      "size": 144481,
-      "sha256": "d8c6b55e0c21086d4a10a1f6391f13e2969c2d51b576d14ec8356d43afa33a2e"
+      "size": 145102,
+      "sha256": "cac5c1e0f2483a3597b6b55ebe92667f1f0e61d72d9db52934eb42ad819b4422"
     },
     "qt_comsol_import.py": {
       "size": 2732,
       "sha256": "df97aab2e7d02d6782c21e2c1c476a56a39a85b069df5cda2c560bec4cf9fabe"
     },
     "qt_core.py": {
-      "size": 55128,
-      "sha256": "65dea4cb882370de5bc35fdbe7fa6f9c2241aa38ddc4a064a647236a1e61e9d3"
+      "size": 54692,
+      "sha256": "439b0bca03dd477b612d9739b22896763462cf92f16cade2ecd49b0f4c06e68a"
     },
     "qt_custom_device.py": {
       "size": 176043,
@@ -1807,8 +1807,8 @@
       "sha256": "9407ab082902dba63bd5437e6b426d730637dc2b3d3f16b77a65169d2dc0018e"
     },
     "qt_help.py": {
-      "size": 105065,
-      "sha256": "230b7ed4ebef5e1780f9113fb5e0c8b57e7352d8e12f4ce1da739263ccac83e1"
+      "size": 105169,
+      "sha256": "60b7e3ab71d501d063d4494b4dcf4c6ade9d8cb7c27d3a4d9bba4f3c1e605e2a"
     },
     "qt_high_field_results.py": {
       "size": 5931,
@@ -1867,8 +1867,8 @@
       "sha256": "8d24e0300c1b64ed4975226d824aee4ee3b0b12ea84b96f8e02b9312a04dcefb"
     },
     "qt_optical_journey.py": {
-      "size": 30257,
-      "sha256": "58a5e75c3cd7b20e831bc6cc7d642f7415cce4a96d7eac098c52ca0f0ac1579d"
+      "size": 30272,
+      "sha256": "32d5b577fad82a72fc4d207b4c2a1a52125d18068fc8925cf666566dc84fddc7"
     },
     "qt_optical_results.py": {
       "size": 18104,
@@ -1883,16 +1883,16 @@
       "sha256": "578f858149b247c1e2a9583ca5e051a67ab7a0479c25c4fc3444a9c47fd12d50"
     },
     "qt_pcsel_research_setup.py": {
-      "size": 109829,
-      "sha256": "922c6bf0b96cc60e498fd73d25b02f506aa059eb11cc974d4c2f4b2e7c0ee766"
+      "size": 109933,
+      "sha256": "2f75a72d14f3ee87ff47251c69ae45c67adc2e7c879dd74c2c25bd809ce15151"
     },
     "qt_photonic_band_results.py": {
       "size": 12957,
       "sha256": "7d30257b387c18677aad14c86689f511f909ae9a26dc4c114da74a274167cdca"
     },
     "qt_photonic_bands.py": {
-      "size": 135476,
-      "sha256": "c73dd8b080b7c38549e86ca3d176eeeee61ae52aaa95683a207d1be01b86e953"
+      "size": 135803,
+      "sha256": "48831e958bf716f12066ddbb4b42c28f098c71f30e2fd94d244be88d295e4eb1"
     },
     "qt_photonic_crystal_3d.py": {
       "size": 20667,
@@ -1939,8 +1939,8 @@
       "sha256": "ea28cd1ab75fdfe479df7675c7b95397d952c7f8adf2ec20ae90f5affd2cc3fd"
     },
     "qt_sesame_setup.py": {
-      "size": 60203,
-      "sha256": "0991400854848835012391d8686316002613f6e8b8f09761a632c62884f30acb"
+      "size": 60467,
+      "sha256": "c59ae6e297b370864f12415764438d2b470ce3e57ab9ea9c112a7e2e4363c8cb"
     },
     "qt_simulation_flow.py": {
       "size": 38096,
@@ -2063,8 +2063,8 @@
       "sha256": "d8b1e69decdd1255683402f77484bce28a0394616ebd7107a37cac6c26c8b05d"
     },
     "research_physics_runtime.py": {
-      "size": 9023,
-      "sha256": "a5cc986d03e04847a86bee7532bcf7c847bd361399a3efa962e5a01a856aa3b4"
+      "size": 8815,
+      "sha256": "c2700264d75e2d7ea7c2d91162e2d2bedaa034ee96e0a1b45fb90b326c418119"
     },
     "research_physics_worker.py": {
       "size": 11248,
@@ -2107,8 +2107,8 @@
       "sha256": "37eaf76078d5ee503ba4680da39892063489b8e8177c1fb9981a3751ba00ac1c"
     },
     "simulation_setup_plan.json": {
-      "size": 650539,
-      "sha256": "c22662be0f3b16c0678a2d79008148ced777996f1cebca6170c2716bbde8b45a"
+      "size": 650509,
+      "sha256": "6721da1ac5234140d9b6d80889792e77bae84aa68187e13b89287a89dbe25115"
     },
     "simulation_setup_state.py": {
       "size": 81837,
@@ -2155,8 +2155,8 @@
       "sha256": "126922e8249a8578e001070ce04768bc192ed42bd7bac981363b9041bd0ccdd2"
     },
     "target_optimizer.py": {
-      "size": 27157,
-      "sha256": "64671424955247c1b8835a28d21f4490d6cea2200904d993c8e3a85666eadae0"
+      "size": 27008,
+      "sha256": "091473a263b3b492da954c74fffa93ef547f160da132601c17acbb2bfa07bf74"
     },
     "target_ui.py": {
       "size": 23121,
@@ -3210,6 +3210,10 @@
       "size": 1346,
       "sha256": "398504b9e11762eaecc37b8aa5e83cd1a4a6a812c7dadfe61cbc728c54180fff"
     },
+    "tests/test_simulation_process_lifetime.py": {
+      "size": 18333,
+      "sha256": "7e36093789c1bf0b6ebc0afb8b271b66248d1888cbc743202d399c16966fc253"
+    },
     "tests/test_simulation_sample_peak.py": {
       "size": 3085,
       "sha256": "44f69ffc16c6edfc52da73b0dc5f97b6ea85a9345f236db5f5de05a6ce7b786b"
@@ -3339,5 +3343,5 @@
       "sha256": "376162b4a329e6cc8fa45c8c70fdc1372a67c5a0366c0a76bb3c8b131076ac7c"
     }
   },
-  "source_tree_sha256": "e8e14a985c5f0df8f0a3513ed43f1db88333d808f96f788acc52fb902ad7f614"
+  "source_tree_sha256": "88b2b3516b0d1215a91cd3e4d92d6622f991adfe24d251b572638278a1668667"
 }

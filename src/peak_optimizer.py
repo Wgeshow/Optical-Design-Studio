@@ -349,8 +349,6 @@ def execute_search(base, perf, cfg, directory, executor, emit, cancelled):
             if not stopped:
                 if cancelled():
                     status, reason, stopped = 'cancelled', 'Sweep cancelled by user', True
-                elif time.monotonic()-started >= perf['timeout_seconds']:
-                    status, reason, stopped = 'partial', 'Whole-sweep timeout reached', True
                 elif total_points+len(model['points']) > cfg['point_budget']:
                     status, reason, stopped = 'partial', 'Sample budget reached; remaining designs were not run', True
             if stopped:
@@ -363,7 +361,7 @@ def execute_search(base, perf, cfg, directory, executor, emit, cancelled):
             rows, info = [], {}
             evaluation_status, evaluation_reason = 'evaluated', ''
             try:
-                remaining = max(1, int(perf['timeout_seconds']-(time.monotonic()-started)))
+                remaining = 0  # No elapsed-time limit.
                 def progress(event):
                     if event.get('kind') in ('started', 'progress'):
                         emit(dict(kind='search_progress', design=design_id, total=cfg['design_count'],

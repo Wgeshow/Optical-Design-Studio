@@ -143,7 +143,6 @@ def execute(model, p, emit, cancelled, checkpoint=None, result_store=None,
     def solve_segments(payloads,batch):
         """Isolate singular points without changing successful batch values."""
         if cancelled():raise Cancelled('Cancelled while isolating an unavailable GPU point')
-        if time.monotonic()-started>p['timeout_seconds']:raise TimeoutError('Eigenfree scan exceeded the configured timeout')
         try:
             solution=solve_batch(payloads,backend='cupy',symmetry=bool(p.get('eigenfree_symmetry',False)))
             rta=solution.rta()
@@ -165,8 +164,6 @@ def execute(model, p, emit, cancelled, checkpoint=None, result_store=None,
             for offset in range(0,len(points),batch_size):
                 if cancelled():
                     raise Cancelled('Cancelled between bounded GPU batches')
-                if time.monotonic()-started > p['timeout_seconds']:
-                    raise TimeoutError('Eigenfree scan exceeded the configured timeout')
                 batch = points[offset:offset+batch_size]
                 payloads = [payload_at(wave,theta) for _,wave,theta in batch]
                 for solution,segment,segment_payloads,value in solve_segments(payloads,batch):

@@ -100,7 +100,7 @@ def run_worker(prepared, directory, emit=lambda event: None, cancelled=lambda: F
             except OSError as exc:
                 raise RuntimeError('Optional physics runtime could not start: '+str(exc)) from exc
             try:
-                for line in process.stream(Cancellation(), timeout=runtime['timeout_s']):
+                for line in process.stream(Cancellation()):
                     accept(line, log)
             finally:
                 if process.process.poll() is None:
@@ -130,8 +130,6 @@ def run_worker(prepared, directory, emit=lambda event: None, cancelled=lambda: F
                 while True:
                     if cancelled():
                         raise InterruptedError('Physics simulation cancelled')
-                    if time.monotonic()-started > runtime['timeout_s']:
-                        raise TimeoutError('The physics simulation exceeded its configured time limit')
                     try:
                         line = pending.get(timeout=.1)
                     except queue.Empty:

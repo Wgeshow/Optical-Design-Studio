@@ -243,7 +243,9 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         self.executable = self.line(solver_form, 'Executable (MPB or Python)', 'runtime.executable', 'mpb')
         self.module_paths = self.line(solver_form, 'Python package folders (Legume)', 'runtime.module_paths', '', '', 'Separate explicit paths with semicolons')
         self.library_paths = self.line(solver_form, 'Native library folders (Legume)', 'runtime.library_paths', '', '', 'Separate explicit paths with semicolons')
-        self.timeout = self.line(solver_form, 'Runtime limit', 'runtime.timeout_s', '86400', 's')
+        self.timeout = self.line(solver_form, 'Saved runtime value', 'runtime.timeout_s', '86400', 's')
+        solver_form.setRowVisible(self.timeout, False)
+        solver_form.addRow('Elapsed-time limit', label('None. Use Stop to cancel.'))
         solver.addLayout(solver_form)
         solver.addWidget(label('MPB on Windows runs through WSL. For Legume select the Python executable containing its installation '
             '(an absolute Linux path for WSL). Changing solver never silently rewrites the runtime or device.'))
@@ -618,8 +620,10 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
         self.advanced_solver = QWidget()
         self.advanced_solver_form = QFormLayout(self.advanced_solver)
         for caption, widget in [('Eigensolver tolerance', self.tolerance), ('Material averaging mesh', self.mesh_size),
-                ('Python package folders', self.module_paths), ('Native library folders', self.library_paths), ('Time limit (s)', self.timeout)]:
+                ('Python package folders', self.module_paths), ('Native library folders', self.library_paths), ('Saved runtime value', self.timeout)]:
             self.advanced_solver_form.addRow(caption, widget)
+        self.advanced_solver_form.setRowVisible(self.timeout, False)
+        self.advanced_solver_form.addRow('Elapsed-time limit', label('None. Use Stop to cancel.'))
         slayout.addWidget(self.advanced_solver)
         self.advanced_solver_toggle.toggled.connect(self.advanced_solver.setVisible)
         self.advanced_solver.hide()
@@ -1897,7 +1901,7 @@ class PhotonicBandsWorkspace(ResearchWorkspaceBase):
             rows.append(('parameter_sweep', 'Parameter sweep '+str(index+1), ' · '.join(values), 'Parameter sweep'))
         rows.extend([('runtime.mode', 'Run on', self.runtime_mode.currentText()),
             ('runtime.executable', 'Solver executable', self.executable.text() or 'Not supplied'),
-            ('runtime.timeout_s', 'Runtime limit (s)', self.timeout.text())])
+            ('runtime.timeout_s', 'Elapsed-time limit', 'None; Stop available')])
         if self.runtime_mode.currentData() == 'wsl':
             rows.append(('runtime.distro', 'WSL distribution', self.distro.text() or 'Not supplied'))
         if self.solver.currentData() == 'legume':

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from pathlib import Path, PureWindowsPath
 import shutil
@@ -213,13 +214,21 @@ class ManagedProcess:
             if force:
                 self.process.kill()
 
-    def stream(self, cancelled, timeout=86400):
+    def stream(self, cancelled, timeout=None):
+        """Scientific runs are unlimited; explicit bounds are for setup/checks."""
+        if timeout is not None:
+            if isinstance(timeout, bool):
+                raise ValueError("Operation timeout must be finite and nonnegative.")
+            timeout = float(timeout)
+            if not math.isfinite(timeout) or timeout < 0:
+                raise ValueError("Operation timeout must be finite and nonnegative.")
+            timeout = timeout or None
         started, requested = time.monotonic(), None
         while True:
             now = time.monotonic()
-            if now-started > timeout:
+            if timeout is not None and now-started > timeout:
                 self.terminate(force=True)
-                raise TimeoutError('The Meep operation exceeded its time limit.')
+                raise TimeoutError('The bounded runtime operation exceeded its time limit.')
             if cancelled.is_set():
                 if requested is None:
                     requested = now

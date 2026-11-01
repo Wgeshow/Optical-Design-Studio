@@ -374,7 +374,7 @@ def install_optical_journey(page,store,route):
                 ('Optical sampling & tracking',_pair(_sampling(page,route),_compact(_body(_group(page.controls['reference_nm']),setup))),'sampling')]
     elif route=='tools.fields':
         display=_group(page.wavelength)
-        sampling=_fields('Field sampling',[(label,getattr(page,name)) for label,name in [('Wavelength','wavelength'),('Layer','layer'),('Grid samples per axis','grid'),('Depth samples','depth')]])
+        sampling=_fields('Field sampling',[(label,getattr(page,name)) for label,name in [('Wavelength','wavelength'),('Layer','layer'),('Grid samples per axis','grid'),('Volume depth samples / layer','depth')]])
         stages=[('Structure & excitation',geometry,'structure'),('Field sampling',_body(sampling,setup),'parameters')]
         # Keep one compact display/export sidebar; nested splitters otherwise
         # consume most of the result width and squeeze the actual field maps.

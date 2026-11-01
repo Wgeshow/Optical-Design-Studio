@@ -280,7 +280,6 @@ class FieldSession:
         started=time.monotonic()
         while not self.parent.poll(.1):
             if cancelled():raise Cancelled('Field sampling cancelled; completed samples retained')
-            if time.monotonic()-started>perf['timeout_seconds']:raise TimeoutError('Field sampling exceeded the run timeout')
             if not self.process.is_alive():raise RuntimeError('S4 field worker exited unexpectedly')
         message=self.parent.recv()
         if 'error' in message:raise RuntimeError(message['error'])
@@ -323,8 +322,6 @@ def execute_fields(model, perf, cfg, directory, cancelled=lambda:False):
         while not parent.poll(.1):
             if cancelled():
                 raise Cancelled('Field sampling cancelled; completed CSV rows retained')
-            if time.monotonic()-started > perf['timeout_seconds']:
-                raise TimeoutError('Field sampling exceeded the remaining run timeout')
             if not process.is_alive():
                 raise RuntimeError('S4 field worker exited unexpectedly')
         message = parent.recv()

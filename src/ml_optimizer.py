@@ -339,9 +339,7 @@ def execute_ml_search(base, perf, cfg, directory, executor, emit, cancelled):
     def guard():
         if cancelled():
             raise Cancelled('Search cancelled by user; completed observations saved')
-        remaining = perf['timeout_seconds']-(time.monotonic()-started)
-        if remaining < 1:
-            raise TimeoutError('Whole-search timeout reached; resume from optimization_history.json')
+        remaining = 0  # No elapsed-time limit.
         return remaining
 
     def notify(text):
@@ -379,7 +377,7 @@ def execute_ml_search(base, perf, cfg, directory, executor, emit, cancelled):
                 def progress(event):
                     if event['kind'] in ('started', 'progress'):
                         notify(f'{phase} design {trial_id}, refinement {round_id}/{cfg["refinement_rounds"]}: {event.get("done", 0)}/{len(wavelengths)} points')
-                rows, info = executor(evaluation, dict(perf, timeout_seconds=max(1, int(remaining))), progress, cancelled)
+                rows, info = executor(evaluation, dict(perf, timeout_seconds=0), progress, cancelled)
                 spent += len(rows)
                 if any(not all(math.isfinite(float(v)) for v in r) or r[5] < -1e-8 or r[5] > 1 for r in rows):
                     raise ValueError('Nonphysical absorption; check material loss and Fourier convergence')

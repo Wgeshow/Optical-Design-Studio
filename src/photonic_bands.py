@@ -537,7 +537,7 @@ def execute(prepared, directory, emit=lambda event: None, cancelled=lambda: Fals
     completed = 0
     try:
         with (directory/'mpb.log').open('w', encoding='utf-8') as log:
-            for line in process.stream(Cancellation(), timeout=runtime['timeout_s']):
+            for line in process.stream(Cancellation()):
                 log.write(line)
                 lines.append(line)
                 if re.match(r'^(?:te|tm)?freqs:,\s*\d+,', line):

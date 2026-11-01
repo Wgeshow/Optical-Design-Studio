@@ -392,7 +392,9 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
         self.distro = self.line(form, 'WSL distribution', 'runtime.distro', 'Ubuntu')
         self.module_paths = self.line(form, 'Python package folders', 'runtime.module_paths', '', '', 'Explicit paths separated by semicolons')
         self.library_paths = self.line(form, 'Shared-library folders', 'runtime.library_paths', '', '', 'Explicit native-library paths separated by semicolons')
-        self.timeout = self.line(form, 'Runtime limit', 'runtime.timeout_s', '86400', 's')
+        self.timeout = self.line(form, 'Saved runtime value', 'runtime.timeout_s', '86400', 's')
+        form.setRowVisible(self.timeout, False)
+        form.addRow('Elapsed-time limit', label('None. Use Stop to cancel.'))
         solver.addLayout(form)
         solver.addWidget(label('Select a Python installation containing Sesame and its dependencies. '
             'WSL requires an absolute Linux Python path. Runtime availability is checked when starting the worker.'))
@@ -516,8 +518,10 @@ class SesameSetupWorkspace(ResearchWorkspaceBase):
         self.solver_advanced = QWidget(); form = native_form(self.solver_advanced)
         for title, edit in [('Newton update tolerance', self.tolerance), ('Maximum Newton iterations', self.max_iterations),
                             ('Python package folders (semicolon separated)', self.module_paths),
-                            ('Shared-library folders (semicolon separated)', self.library_paths), ('Runtime limit (s)', self.timeout)]:
+                            ('Shared-library folders (semicolon separated)', self.library_paths), ('Saved runtime value', self.timeout)]:
             form.addRow(title, edit)
+        form.setRowVisible(self.timeout, False)
+        form.addRow('Elapsed-time limit', label('None. Use Stop to cancel.'))
         box.addWidget(self.solver_advanced); self.solver_advanced.hide()
         self.solver_advanced_toggle.toggled.connect(self.solver_advanced.setVisible)
         row = QHBoxLayout(); row.addWidget(button('Import settings…', self.import_settings)); row.addWidget(button('Export settings…', self.export_settings))

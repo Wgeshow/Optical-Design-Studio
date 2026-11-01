@@ -72,7 +72,7 @@ TITLES = {
     'hole_mobility_cm2_Vs': 'Hole mobility (cm²/V·s)', 'B_cm3_s': 'Radiative B (cm³/s)',
     'C_cm6_s': 'Auger C (cm⁶/s)', 'tau_s': 'Lifetime (s)', 'source': 'Source / assumption',
     'executable': 'Python interpreter', 'distro': 'WSL distribution', 'mode': 'Run on',
-    'timeout_s': 'Time limit (s)', 'module_paths': 'Python module folders',
+    'timeout_s': 'Elapsed-time limit', 'module_paths': 'Python module folders',
     'library_paths': 'Shared-library folders', 'edge_segments': 'Segments per cell edge',
     'circle_segments': 'Segments per circle', 'xy_size_um': 'In-plane mesh size (µm)',
     'z_max_step_um': 'Largest vertical step (µm)', 'maximum_tetrahedra': 'Tetrahedron limit',
@@ -127,7 +127,9 @@ class TreeForm(QWidget):
             if key in skip or keys is not None and key not in keys:
                 continue
             title = TITLES.get(key, key.replace('_', ' ').capitalize())
-            if _kind(item) in ('number', 'text', 'boolean'):
+            if key == 'timeout_s':
+                control = label('None. Use Stop to cancel.')
+            elif _kind(item) in ('number', 'text', 'boolean'):
                 control = self._scalar(item, title)
             elif _kind(item) == 'array' and self._table_shape(item) is not None:
                 control = self._array(item, title)
