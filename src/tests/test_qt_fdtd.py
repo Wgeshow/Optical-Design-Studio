@@ -34,6 +34,27 @@ class PanelTests(unittest.TestCase):
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
+    def test_integrated_source_checkbox_persists_restores_and_invalidates_estimate(self):
+        store = Store()
+        store.search_state = {}
+        store.save_search = Mock()
+        page = FDTDPage(store)
+        control = page.controls['source_is_integrated']
+        self.assertEqual(control.text(), 'Integrated Gaussian source')
+        self.assertFalse(control.isChecked())
+        self.assertFalse(page.options()['source_is_integrated'])
+        self.assertIn('residual static electric fields', control.toolTip())
+        previous_generation = page._estimate_generation
+        control.setChecked(True)
+        self.assertGreater(page._estimate_generation, previous_generation)
+        self.assertTrue(store.save_search.call_args.args[1]['source_is_integrated'])
+        store.search_state = {'fdtd': page.options()}
+        restored = FDTDPage(store)
+        self.assertTrue(restored.controls['source_is_integrated'].isChecked())
+        self.assertTrue(restored.options()['source_is_integrated'])
+        restored.deleteLater()
+        page.deleteLater()
+
     def test_monitor_decay_label_tooltip_and_numeric_default(self):
         page = FDTDPage(Store())
         self.assertIn('Monitor field decay target', [label.text() for label in page.findChildren(QLabel)])

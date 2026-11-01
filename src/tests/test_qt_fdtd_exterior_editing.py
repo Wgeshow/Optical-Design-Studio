@@ -8,6 +8,8 @@ from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from PyQt6 import sip
+from PyQt6.QtCore import Qt
+from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QLabel
 from data_library import DataLibrary
 from fdtd_model import build_job
@@ -59,6 +61,67 @@ class FDTDExteriorEditingTests(unittest.TestCase):
         self.assertNotIn('Field energy decay target', labels)
         self.assertIn('20 µm/c', self.page.controls['decay_by'].toolTip())
         self.assertEqual(self.page.options(), before)
+
+    def test_journey_fractional_resolution_entry_persistence_restore_and_job(self):
+        before = copy.deepcopy(self.page.options())
+        self.page.optical_journey.select_stage('structure')
+        self.app.processEvents()
+        control = self.page.controls['resolution']
+        self.assertTrue(control.isVisible())
+        self.assertEqual(control.decimals(), 8)
+        value = '40.81632653'
+        control.setFocus()
+        control.selectAll()
+        QTest.keyClicks(control, value)
+        QTest.keyClick(control, Qt.Key.Key_Enter)
+        self.app.processEvents()
+        entered = float(value)
+        self.assertEqual(control.value(), entered)
+        self.assertAlmostEqual(.49*entered, 20, places=8)
+        self.assertEqual(self.store.search_state['fdtd']['resolution'], entered)
+        job = build_job(self.store.portable_project(), {}, self.page.options())
+        self.assertEqual(job['options']['resolution'], entered)
+        self.assertEqual(self.page.options(), dict(before, resolution=entered))
+        self.page._restore()
+        self.assertEqual(control.value(), entered)
+        control.setValue(40)
+        self.app.processEvents()
+        self.assertIsInstance(self.page.options()['resolution'], int)
+        self.assertEqual(self.page.options()['resolution'], 40)
+
+    def test_journey_integrated_source_visible_click_saved_job_and_check_review(self):
+        before = copy.deepcopy(self.page.options())
+        self.page.optical_journey.select_stage('parameters')
+        self.app.processEvents()
+        control = self.page.controls['source_is_integrated']
+        self.assertTrue(control.isVisible())
+        self.assertTrue(control.isEnabled())
+        self.assertTrue(self.page.optical_journey.stack.currentWidget().isAncestorOf(control))
+        self.assertFalse(control.isChecked())
+        previous_generation = self.page._estimate_generation
+        QTest.mouseClick(control, Qt.MouseButton.LeftButton)
+        self.app.processEvents()
+        self.assertTrue(control.isChecked())
+        self.assertGreater(self.page._estimate_generation, previous_generation)
+        self.assertTrue(self.store.search_state['fdtd']['source_is_integrated'])
+        expected = dict(before, source_is_integrated=True)
+        self.assertEqual(self.page.options(), expected)
+        self.page.optical_journey.select_stage('checks')
+        self.app.processEvents()
+        self.assertTrue(self.page.journey_source_summary.isVisible())
+        self.assertIn('integrated polarization (on)', self.page.journey_source_summary.text())
+        self.page.check_journey_inputs()
+        self.assertIn('Input preparation passed', self.page.journey_check_state.text())
+        job = build_job(self.store.portable_project(), {}, self.page.options())
+        self.assertTrue(job['options']['source_is_integrated'])
+        self.page.optical_journey.select_stage('parameters')
+        self.app.processEvents()
+        QTest.mouseClick(control, Qt.MouseButton.LeftButton)
+        self.app.processEvents()
+        self.assertFalse(self.store.search_state['fdtd']['source_is_integrated'])
+        self.assertEqual(self.page.options(), before)
+        self.assertIn('current (integration off)', self.page.journey_source_summary.text())
+        self.assertIn('Inputs changed', self.page.journey_check_state.text())
 
     def test_runtime_estimate_controls_are_on_visible_run_stage(self):
         self.page.optical_journey.select_stage('run')

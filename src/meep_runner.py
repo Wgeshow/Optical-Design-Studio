@@ -65,7 +65,8 @@ def run(job, directory, mp=None):
             geometry.append(mp.Prism(vertices, height=thick, center=center, material=medium))
     fcen, df = (job['fmin']+job['fmax'])/2, job['fmax']-job['fmin']
     src_z, refl_z, tran_z = -total/2-padding*.7, -total/2-padding*.35, total/2+padding*.35
-    source = mp.Source(mp.GaussianSource(frequency=fcen, fwidth=df, cutoff=5),
+    source = mp.Source(mp.GaussianSource(frequency=fcen, fwidth=df, cutoff=5,
+        is_integrated=options.get('source_is_integrated', False)),
         component=component, center=v(z=src_z), size=v(job['ax'], job['ay'], 0))
     common = dict(cell_size=v(job['ax'], job['ay'], job['size_z']), dimensions=options['dimensions'],
         resolution=options['resolution'], Courant=options['courant'],
@@ -98,8 +99,9 @@ def run(job, directory, mp=None):
                       phase_progress=min(1., current/budget) if budget > 0 else 0.,
                       message=f'{phase} ({phase_index}/2): t = {current:.1f} µm/c')
         def stop(sim):
-            # Meep calls this only after sources end. The source stop time is
-            # provided by the native fields object, avoiding pulse estimates.
+            # Meep evaluates this during the pulse too, then gates termination
+            # on source completion. Sampling throughout retains the pulse peak.
+            # The post-source cap uses the native source end, not an estimate.
             reached = decay(sim)
             decay_reached[0] = bool(reached)
             return reached or sim.meep_time() >= sim.fields.last_source_time()+options['run_after_sources']

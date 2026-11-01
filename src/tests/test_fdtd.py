@@ -27,6 +27,43 @@ def project():
 
 
 class TranslationTests(unittest.TestCase):
+    def test_fractional_resolution_validates_and_preserves_job_budget(self):
+        import math
+        resolution = 20 / .49
+        source = project()
+        source['settings'].update(ax_um=2.94, ay_um=2.94)
+        for grid in (resolution, 24 / .49, 28 / .49):
+            with self.subTest(grid=grid):
+                job = build_job(source, [], dict(dimensions=3, resolution=grid))
+                self.assertEqual(job['options']['resolution'], grid)
+                self.assertEqual(json.loads(json.dumps(job))['options']['resolution'], grid)
+                expected = math.ceil(2.94*grid)**2 * math.ceil(job['size_z']*grid)
+                self.assertEqual(job['estimated_cells'], expected)
+                with self.assertRaisesRegex(ValueError, 'Estimated grid'):
+                    build_job(source, [], dict(dimensions=3, resolution=grid, max_cells=expected-1))
+        for invalid in (0, -1, float('nan'), float('inf'), 4.99, 1000.01):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                validate_options(dict(resolution=invalid))
+        self.assertIsInstance(validate_options(dict(resolution=40))['resolution'], int)
+        self.assertIsInstance(validate_options(dict(resolution=40.))['resolution'], int)
+
+    def test_integrated_source_legacy_default_and_explicit_job_roundtrip(self):
+        self.assertFalse(validate_options({})['source_is_integrated'])
+        for enabled in (False, True):
+            with self.subTest(enabled=enabled):
+                job = build_job(project(), [], dict(source_is_integrated=enabled))
+                restored = json.loads(json.dumps(job))
+                self.assertIs(restored['options']['source_is_integrated'], enabled)
+        for invalid in ('true', 1, None):
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(ValueError, 'source_is_integrated'):
+                validate_options(dict(source_is_integrated=invalid))
+
+    def test_integrated_source_invalidates_measured_timing_match(self):
+        from fdtd_progress import timing_key
+        old = validate_options({})
+        new = dict(old, source_is_integrated=True)
+        self.assertNotEqual(timing_key(project(), old, {}), timing_key(project(), new, {}))
+
     def test_exact_dielectric_slab(self):
         job = build_job(project(), [], {})
         self.assertEqual(job['materials']['Glass']['epsilon'], 2.25)
@@ -89,7 +126,7 @@ class TranslationTests(unittest.TestCase):
     def test_resolution_guard_and_invalid_numbers(self):
         with self.assertRaisesRegex(ValueError, 'Estimated grid'):
             build_job(project(), [], dict(dimensions=3, resolution=1000))
-        for options in [dict(resolution=30.5), dict(courant=.6), dict(wavelength_min_nm=float('nan')),
+        for options in [dict(resolution=30.5, frequency_points=3.5), dict(courant=.6), dict(wavelength_min_nm=float('nan')),
                         dict(wavelength_min_nm=2000), dict(dimensions=1), dict(save_fields='yes')]:
             with self.subTest(options=options), self.assertRaises((ValueError, OverflowError)):
                 validate_options(options)
@@ -151,10 +188,26 @@ class RuntimeTests(unittest.TestCase):
 
 class RunnerContractTests(unittest.TestCase):
     def test_reference_subtraction_and_power_signs(self):
+        self._check_reference_subtraction_and_power_signs(None)
+
+    def test_integrated_source_passed_to_both_native_phases(self):
+        self._check_reference_subtraction_and_power_signs(True)
+
+    def test_explicit_nonintegrated_source_passed_to_both_native_phases(self):
+        self._check_reference_subtraction_and_power_signs(False)
+
+    def test_fractional_resolution_reaches_native_api_without_truncation(self):
+        self._check_reference_subtraction_and_power_signs(False, 20 / .49)
+
+    def _check_reference_subtraction_and_power_signs(self, integrated, resolution=30):
         """A controlled API double checks accounting, not solver correctness."""
         import meep_runner
         source = project()
-        job = build_job(source, [], dict(frequency_points=3, save_fields=False))
+        job = build_job(source, [], dict(frequency_points=3, save_fields=False, resolution=resolution))
+        if integrated is None:
+            del job['options']['source_is_integrated']  # Legacy saved jobs omit the new key.
+        else:
+            job['options']['source_is_integrated'] = integrated
         simulations = []
         class Sim:
             def __init__(self, **kwargs):
@@ -203,6 +256,10 @@ class RunnerContractTests(unittest.TestCase):
         self.assertEqual([item['phase'] for item in finished], ['Reference', 'Device'])
         self.assertTrue(all(item['decay_reached'] for item in finished))
         self.assertEqual(simulations[0].arguments['geometry'], [])
+        for simulation in simulations:
+            self.assertEqual(simulation.arguments['resolution'], resolution)
+            pulse = simulation.arguments['sources'][0].args[0]
+            self.assertIs(pulse.is_integrated, bool(integrated))
         self.assertEqual(simulations[1].subtracted, 'saved-reference-fields')
         self.assertTrue(np.allclose(rows['R'], .25))
         self.assertTrue(np.allclose(rows['T'], .6))

@@ -443,15 +443,26 @@ class FDTDPage(QWidget):
         layout.addWidget(note)
         note.hide()
         self.controls = dict(
-            dimensions=QComboBox(), resolution=integer(30, 5, 1000), max_cells=integer(30000000, 100, 100000000),
+            dimensions=QComboBox(), resolution=number(30, 5, 1000, 8), max_cells=integer(30000000, 100, 100000000),
             wavelength_min_nm=number(1200, .001), wavelength_max_nm=number(1800, .001),
             frequency_points=integer(101, 2, 2001), polarization=QComboBox(),
             pml_um=number(1., .001), padding_um=number(1., .001),
             run_after_sources=number(200., 1., 1e7), courant=number(.5, .001, .5),
             section_y_um=number(0.), decay_by=number(1e-7, 1e-12, .1, 12),
             fit_materials=QCheckBox('Fit material dispersion'), fit_tolerance=number(.05, .000001, .1, 6),
-            save_fields=QCheckBox('Save XZ field map'))
+            save_fields=QCheckBox('Save XZ field map'),
+            source_is_integrated=QCheckBox('Integrated Gaussian source'))
+        self.controls['source_is_integrated'].setToolTip(
+            'Use Meep is_integrated=True: supply the integrated current (polarization), '
+            'which vanishes when the source turns off. This can avoid residual static electric fields. '
+            'Default is off for compatibility. Compare reference/device decay and spectra; '
+            'this setting does not establish convergence. '
+            'See https://meep.readthedocs.io/en/latest/FAQ/#how-is-the-source-current-defined')
         self.controls['save_fields'].setToolTip('Save the centre-frequency XZ field map.')
+        self.controls['resolution'].setToolTip(
+            'Grid cells per micrometre; fractional values are supported to eight decimal places. '
+            'For a lattice pitch a in micrometres, enter desired cells per pitch divided by a. '
+            'Meep rounds cell dimensions to grid pixels; check the actual cell in the saved run log.')
         self.controls['decay_by'].setToolTip(
             'Meep stop_when_fields_decayed checks the selected electric-field component’s squared amplitude '
             'at the transmission plane over a 20 µm/c decay window. '
@@ -480,7 +491,7 @@ class FDTDPage(QWidget):
         self._refresh_exterior()
         self.input_groups = []
         for group_title, rows in [
-            ('Domain & excitation', [('View', 'dimensions'), ('Resolution (cells/µm)', 'resolution'), ('Section Y (µm)', 'section_y_um'), ('Polarization', 'polarization')]),
+            ('Domain & excitation', [('View', 'dimensions'), ('Resolution (cells/µm)', 'resolution'), ('Section Y (µm)', 'section_y_um'), ('Polarization', 'polarization'), ('Pulse source', 'source_is_integrated')]),
             ('Spectrum', [('First wavelength (nm)', 'wavelength_min_nm'), ('Last wavelength (nm)', 'wavelength_max_nm'), ('Frequency samples', 'frequency_points')]),
             ('Boundaries & stopping', [('PML thickness (µm)', 'pml_um'), ('Air/medium padding (µm)', 'padding_um'), ('Maximum time after pulse (µm/c)', 'run_after_sources'), ('Courant factor', 'courant'), ('Monitor field decay target', 'decay_by')])]:
             group = QGroupBox(group_title)

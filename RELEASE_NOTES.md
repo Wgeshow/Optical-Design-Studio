@@ -1,156 +1,210 @@
-# Optical Design Studio 1.4.0-alpha.4 — Meep progress and runtime estimates
+# Optical Design Studio 1.4.0-alpha.5 — Meep grid and pulse controls
 
-Experimental Windows x64 usability update · 30 October 2026
+Experimental Windows x64 usability update · 1 November 2026
 
-The Meep Run stage now includes **Estimate runtime**, a live elapsed clock, and progress and estimated remaining time for the current Reference or Device phase. The pre-run button reads matching measured timing records in a background worker; it does not start a solver or hidden calibration run. With no matching record it explains that a run is needed to calibrate. The live estimate appears after enough time-stepping data is available, resets between phases, and becomes unavailable when updates go stale. Stop remains available during a run.
+Meep spatial resolution now accepts fractional values. For a 0.49 µm lattice period, enter 40.81632653 cells/µm to represent 20 cells per lattice period. The source panel also exposes an opt-in **Integrated Gaussian source** setting, default off, with a summary in Check inputs. Both Reference and Device use the selected source setting. These controls make the convergence study possible through the native UI; they do not establish convergence by themselves.
 
-The progress percentage describes the current phase's configured simulation-time budget. It is not an overall completion percentage or a measure of convergence. Runtime estimates may change with machine load; decay may end a phase early. The original alpha.3 cavity-array pilot described below predates these timing controls.
-
-Generated default objects now use neutral names such as **Optical device** and **Circle 1**. The stopping control is labeled **Monitor field decay target**, with wording that distinguishes the sampled squared field from integrated electromagnetic energy. The numerical stopping rule is unchanged.
+The earlier **Estimate runtime** button, live phase progress, elapsed time and estimated remaining time remain available. Estimates use matching measured history or live stepping data and do not launch a hidden solver. With no matching history the UI says so promptly. Stop remains available. A phase percentage describes its configured simulation-time budget, not overall completion or convergence.
 
 ## Download and validation
 
-Download the Portable Windows x64 `.7z`, extract the complete archive using 7-Zip, and open `Optical Design Studio.exe`. Keep its backend executable and `_internal` directory together. The corresponding Source ZIP is for inspection and rebuilding. Bundled desktop/S4 support needs no separate Python; Meep uses its configured supported Linux/WSL runtime.
+Download the Portable Windows x64 `.7z`, extract the complete archive using 7-Zip, and open `Optical Design Studio.exe`. Keep the backend executable and `_internal` directory together. The corresponding Source ZIP supports inspection and rebuilding. Bundled desktop/S4 support needs no separate Python; Meep uses its configured supported Linux/WSL runtime.
 
-See the accompanying `VALIDATION.json` for the exact staged-source hash, source/package/frozen checks, native startup and manual Terra acceptance actually completed on this build. This candidate must pass those gates before publication. The broader full scientific/UI matrix remains incomplete. Stable 1.3.5 and its updater channel are preserved.
+This build passed 72 targeted staged-source tests, 34 packaging/privacy/license checks, exact compiled-code comparison for 201 modules in each executable plus the standalone Meep runner, eight frozen critical checks, and seven actual Windows startup checks. A fresh GPT-6.1 Terra manual check verified fractional entry persistence, integrated-source controls, input preparation, responsive Estimate behavior, native Stop/cancellation and normal close. The full installer and scientific matrix was not rerun. Exact hashes and gate scope are recorded in `VALIDATION.json`.
 
-The following authored aggregate report distinguishes original simulation evidence from this usability update. No acceptance project, research data, private path, log or paper PDF is included in the public assets.
+Stable version 1.3.5 and its updater are preserved. The authored aggregate below is a dated scientific checkpoint, separate from release acceptance. It includes numerical results, assumptions, equations, comparison limits and outstanding work. No raw acceptance projects, research runs, private paths, logs or paper PDFs are included in public assets.
 
 ---
 
-# Meep cavity-array pilot: aggregate progress report
+# 1 November 2026 — aggregate UI campaign progress
 
-**Date:** 30 October 2026  
-**Tested packaged build:** Optical Design Studio 1.4.0-alpha.3  
-**Tested source commit:** `57e20ecd313d5e0e55db2407ea0ca05744c935cd`
+This evidence note summarizes only manually entered native UI calculations and independently checked aggregate results. It contains no private machine paths, PDFs, raw arrays, per-run identifiers, or imported geometry. The tested native application was **Optical Design Studio 1.4.0-alpha.4**, corresponding to public source commit `37a8dea74b9a897ee011d98ff7d03f301304bb23`. The alpha.5 r2 source candidate is separate from the alpha.4 optical/laser runs. Its integrated-source 40-resolution run was cancelled during Reference; the separate 40.81632653-resolution run passed Reference decay and remains active in Device with no full spectrum. The alpha.5 source checkpoint has been merged and hash-audited; no downloadable alpha.5 package or public release is claimed.
 
-## Setup
+## Campaign status
 
-The user selected the published ideal suspended coupled photonic-crystal resonator array (CPCRA) of Altug and Vučković. The manually entered design uses a square silicon slab with refractive index $n=3.5$, hole radius $r=0.4a$, slab thickness $d=0.55a$, and air holes and exterior media. At the analyst-selected scale $a=0.49\,\mu\mathrm m$, the cavity-array primitive period is $A=3a=1.47\,\mu\mathrm m$. A periodically repeated $6a\times6a$ supercell contains four cavity defects; it represents a repeated infinite array, not four isolated cavities.
+- **11 of 28** routes have a completed native UI calculation or simulation workflow.
+- **17** routes remain unexecuted.
+- **11** executed routes still have unresolved convergence or comparison questions.
+- **5** pre-existing scoped reference agreements remain; Nov. 1 high-field, laser and electrical.iv work adds no new paper-agreement count.
 
-The user approved removing the factory Device layer and starter circle and deleting the four designated holes. The resulting UI-authored geometry has one $0.2695\,\mu\mathrm m$ slab and 32 air holes of radius $0.196\,\mu\mathrm m$, leaving the four intended missing-hole defects. The visible UI geometry audit passed **16/16 geometry checks** and **14/14 saved-option checks**. An independent check of the actual Meep job snapshot passed **10/10 geometry, material, and option checks**. No structure, project, preset, material file, or curve was imported.
+These counts separate UI construction/execution, numerical convergence, and external reference agreement. A calculation completing in the UI is not by itself convergence or physical validation.
 
-## Theory and derivation
+## High-field optical response
 
-For a linear, isotropic, nonmagnetic slab, the time-domain Maxwell equations are
+### Setup
 
-$$
-\frac{\partial\mathbf B}{\partial t}=-\nabla\times\mathbf E,\qquad
-\mathbf B=\mu_0\mathbf H,
-$$
-$$
-\frac{\partial\mathbf D}{\partial t}=\nabla\times\mathbf H-\mathbf J,\qquad
-\mathbf D=\epsilon_0\epsilon_r(\mathbf r)\mathbf E.
-$$
+Five calculations were manually entered through the high-field UI: one 41-sample spectrum and four 81-sample refinements. The model used individual electron and hole masses of `0.1106 m₀`, band gap `1.519 eV`, temperature `300 K`, reduced Fermi levels `−50`, fields `0` and `6.6 MV/m`, and absorption prefactor `1 cm⁻¹√eV`. The Kramers–Kronig (KK) cases used energy-grid/cutoff pairs `4096/12 eV`, `4096/12 eV` on the 81-point spectrum, `8192/12 eV`, `8192/24 eV`, and `16384/24 eV`.
 
-Here $\mathbf E$ is in V/m, $\mathbf H$ in A/m, $\mathbf J$ in A/m$^2$, and $\epsilon_r$ is dimensionless. For the ideal materials, $\epsilon_r=n^2=12.25$ in the slab and 1 in air. In a Yee FDTD discretization, the fields are spatially staggered and electric and magnetic updates are offset by half a time step. For example,
+### Theory and scope
 
-$$
-H_x^{n+1/2}=H_x^{n-1/2}-\frac{\Delta t}{\mu_0}
-\left[\frac{E_z|_{y+}-E_z|_{y-}}{\Delta y}-
-\frac{E_y|_{z+}-E_y|_{z-}}{\Delta z}\right].
-$$
+For each heavy-hole branch, the effective reduced mass is `μ_j=m₀ m_e,r m_h,j,r/(m_e,r+m_h,j,r)`, where the supplied masses are ratios to the free-electron mass `m₀`. For the equal UI masses this gives `μ=0.0553m₀`. Photon energy is converted from wavelength by `E(eV)=1239.8419843320026/λ(nm)`. With kinetic energy `K=max(E−E_g,0)` and thermal energy `E_T=k_B T/e` in eV, the local occupation proxy is
 
-The actual circular interfaces are represented on a finite mesh, so agreement of the entered dimensions does not establish resolution convergence.
+\[
+f_j(K)=\mathrm{expit}\!\left(\frac{K m_{e,r}}{m_{e,r}+m_{h,j,r}}\frac{1}{E_T}-\eta_p\right)-\mathrm{expit}\!\left(\eta_n-\frac{K m_{h,j,r}}{m_{e,r}+m_{h,j,r}}\frac{1}{E_T}\right).
+\]
 
-For the repeated cavities, let $c_{mn}$ be one modal amplitude at lattice site $(m,n)$, with neighboring cavity period $A=3a$. A one-orbital nearest-neighbor illustration allows unequal coupling along the two axes:
+Let `r_j=m_e,r m_h,j,r/(m_e,r+m_h,j,r)=μ_j/m₀`. The weighted coefficient is `C_j=P r_j^(3/2)/Σ_i r_i^(3/2)`, where the supplied prefactor `P` has units `cm⁻¹√eV`. At zero field, the branch absorption is `α_j=C_j√K/E f_j(K)`; the implementation uses this zero-field expression whenever `|F|<1000 V/m`. At nonzero field, the Airy energy and profile are
 
-$$
-\dot c_{mn}=-(i\omega_0+\gamma)c_{mn}
--i\kappa_x(c_{m+1,n}+c_{m-1,n})
--i\kappa_y(c_{m,n+1}+c_{m,n-1})+s_{mn}(t).
-$$
+\[
+\theta_j=\frac{1}{e}\left(\frac{\hbar^2 e^2 F^2}{2\mu_j}\right)^{1/3},\quad
+g(x)=\mathrm{Ai}'(x)^2-x\mathrm{Ai}(x)^2,
+\]
+\[
+\alpha_j=\frac{\pi C_j\sqrt{\theta_j}}{E}
+\left[g\!\left(\frac{E_g-E}{\theta_j}\right)-g\!\left(\frac{E_g+E}{\theta_j}\right)\right]f_j(K).
+\]
 
-Substitute the Bloch form $c_{mn}=c_0e^{i(k_xmA+k_ynA)-i\omega t}$, set the drive $s_{mn}=0$, and combine opposite neighbors using $e^{iq}+e^{-iq}=2\cos q$. This gives
+The `E_g+E` term is the implemented counter-rotating subtraction. The occupation factor is a local band-edge proxy; finite-field transitions are nonlocal in momentum and this is not a multiband susceptibility. The state absorption sums the branches. The reference is the unoccupied zero-field edge `α_ref=P√max(E−E_g,ref,0)/E`. Thus `Δα=α_F−α_ref` and `Δk=Δα λ/(4π)` after converting wavelength to metres and absorption to m⁻¹.
 
-$$
-\omega(k_x,k_y)=\omega_0+2\kappa_x\cos(k_xA)+2\kappa_y\cos(k_yA)-i\gamma,
-$$
-$$
-\mathbf v_g=\nabla_{\mathbf k}\operatorname{Re}\omega
-=-2A\left[\kappa_x\sin(k_xA)\hat{\mathbf x}
-+\kappa_y\sin(k_yA)\hat{\mathbf y}\right].
-$$
+For the KK transform, begin with `n(ω)−1=(2/π)PV∫₀∞ Ωκ(Ω)/(Ω²−ω²)dΩ` and `α(Ω)=2Ωκ(Ω)/c`, where `Ω` is angular frequency in rad/s, `κ` is dimensionless, and SI absorption is in m⁻¹. Substitution gives `(c/π)PV∫α(Ω)/(Ω²−ω²)dΩ`. Represent photon energy numerically in eV as `E_eV=ℏω/e`, so `ω=eE_eV/ℏ`. Then `dΩ=(e/ℏ)dE′` and `Ω²−ω²=(e/ℏ)²(E′²−E²)`, which yields
 
-The rates $\omega_0,\kappa_x,\kappa_y,\gamma$ have units s$^{-1}$; $A\kappa_x$ and $A\kappa_y$ have units m/s. This is a teaching model, not a fit to the paper's multiple dipole, quadrupole, and monopole bands.
+\[
+\Delta n(E)=\frac{c\hbar}{\pi e}\,\mathrm{PV}\int\frac{\Delta\alpha_{SI}(E')}{E'^2-E^2}\,dE'
+=\frac{100c\hbar}{\pi e}\,\mathrm{PV}\int\frac{\Delta\alpha_{cm^{-1}}(E')}{E'^2-E^2}\,dE'.
+\]
 
-The $6a\times6a$ cell is a $2\times2$ repetition of the $3a\times3a$ primitive cavity-array cell. At supercell $\Gamma$, it folds exactly the primitive $\Gamma$, $X_x=(\pi/A,0)$, $X_y=(0,\pi/A)$, and $M=(\pi/A,\pi/A)$ points. A spatially uniform normal-incidence source preserves the primitive translations and probes the bright primitive-$\Gamma$ sector. This fixed in-plane wavevector does not map the full band diagram or group velocity.
+For the Airy energy, `F` is V/m, `μ_j` is kg, `e` is C, and `ℏ` is J·s; `θ` is reported in eV after division by `e`. In the occupation factor, `k_B` is J/K, `T` is K, and `m_e,r,m_h,r` are dimensionless. For the KK expression, `E′` and `E` are numerical energies in eV, `c` is m/s, `ℏ` is J·s, `e` is C, and `100` converts stored cm⁻¹ to m⁻¹. The implementation integrates over `[10⁻⁵ eV,E_cut]`, where `E_cut` is 12 or 24 eV. It interpolates `Δα` and evaluates the principal value as `Δα(E′)/(E′−E)` times `1/(E′+E)`, exactly the squared-energy denominator above. Grid order and upper cutoff require separate convergence checks.
 
-## Numerical method
+### Numerics and results
 
-The completed pilot used a three-dimensional cell, periodic boundaries in $x,y$, PML along $z$, normal-incidence $p$-polarized / $E_x$ excitation, 40 cells/µm, Courant factor 0.5, 1 µm PML and air padding, and wavelengths from 1400 to 1800 nm with 401 uniform-frequency output samples. The options also specified a 200 µm/$c$ post-source time cap, a $10^{-7}$ monitored squared-field decay target, dispersion fitting off, and field-map output off. At 40 cells/µm, $\Delta x=25$ nm and the corresponding proposed time step is $\Delta t=0.5\Delta x/c\approx0.0417$ fs. For a three-dimensional isotropic grid with minimum refractive index 1, the usual Courant bound is $S\le1/\sqrt3\approx0.577$; this pilot's $S=0.5$ is below that bound.
+All five native calculations completed with zero reported KK quadrature warnings. The selected UI CSV exports exactly match all seven audited numeric arrays in the saved numerical data. The 41- and 81-sample absorption spectra agree exactly at the 41 shared energy nodes. This confirms consistent evaluation at those nodes; it does not prove that the energy spacing resolves every feature.
 
-The runner performs an empty-geometry reference run and then the device run, subtracting the reference Fourier fields from the device reflected monitor. The reference uses the incident material throughout; for this air/air case it represents both exterior media. Its suitability does not automatically extend to a device with a different exit medium. With signed monitor fluxes, the reported quantities are
+For sampled `Δn` curves `n_left(E_i)` and `n_right(E_i)`, error is measured as `max_i|n_right(E_i)−n_left(E_i)|` and `RMSE=√[(1/N)Σ_i(n_right−n_left)²]`; the percentage divides that pointwise maximum by `max_i|n_left(E_i)|`. At 8192 points, expanding the upper cutoff from 12 to 24 eV gives pointwise maximum difference `2.6340×10⁻⁷` (`101.7%` of the left curve peak). The peak magnitudes themselves differ by `7.8827×10⁻⁸`. This holds point count fixed but also coarsens linear-grid spacing from `(12−0.5)/8191=0.00140398 eV` to `(24−0.5)/8191=0.00286900 eV`; it is not an isolated tail/cutoff test. Increasing point count at fixed 12 eV gives pointwise maximum difference `2.6910×10⁻⁸` (`10.2%` of the left curve peak); increasing point count at fixed 24 eV gives `1.7659×10⁻⁸` (`9.8%`). These fixed-cutoff comparisons refine grid spacing. Zero quadrature warnings do not establish KK cutoff/grid convergence.
 
-$$
-R=-\frac{P_{\mathrm{refl,signed}}}{P_{\mathrm{inc}}},\qquad
-T=\frac{P_{\mathrm{trans,signed}}}{P_{\mathrm{inc}}},\qquad
-A=1-R-T.
-$$
+A future UI-entered spacing-matched cutoff comparison is `8192 points / 12 eV` versus `16383 points / 23.5 eV`: each linear segment from 0.5 eV has spacing `(12−0.5)/8191=(23.5−0.5)/16382=0.00140398 eV`. It is planned only, not run, and would compare the added high-energy tail at approximately fixed spacing; it would not prove a global KK error bound.
 
-Here $A$ is a residual power-balance quantity, not an independently computed absorption. In this lossless model, passive values are expected within [0,1] only when the flux calculation is sufficiently reliable.
+### Primary-paper comparison
 
-The plotted normalized frequency is
+The primary reference is Duque-Gomez and Sipe, [“The Franz–Keldysh effect revisited” (2014)](https://arxiv.org/abs/1403.1619), Figures 4(a,b), dashed independent-particle two-band curves. Each simulated curve and the manually digitized paper curve were divided by their own 1.90 eV Figure 4(a) endpoint. No horizontal shift, amplitude fit, or parameter fit was applied.
 
-$$
-\nu=\frac{a}{\lambda}=\frac{0.49\,\mu\mathrm m}{\lambda\;(\mu\mathrm m)}.
-$$
+On the 81-sample normalized curves and digitized raster values `y_app,i` and `y_fig,i`, metrics are `MAE=(1/N)Σ_i|y_app,i−y_fig,i|` and `RMSE=√[(1/N)Σ_i(y_app,i−y_fig,i)²]`. Figure 4(a) shape differences are MAE `0.004956` and RMSE `0.006197`. Figure 4(b)'s normalized differential-absorption shape differences are MAE `0.009762` and RMSE `0.016765`; oscillatory features are less reliable against the raster. Estimated raster-reading uncertainty is `±0.01 eV` horizontally and `±0.03×10⁴ cm⁻¹` vertically. These are analyst digitization uncertainties, not tolerances supplied by the authors.
 
-Thus the wavelength range maps to $\nu=0.272222$–0.35, and the 401 output points have spacing $\Delta\nu\approx0.000194444$. This is output sampling, not independent spectral resolution. The rough Fourier scale associated with a 200 µm/$c$ time cap is
+### Limits
 
-$$
-\Delta\nu_{\mathrm{time}}\sim\frac{a}{cT}=\frac{0.49}{200}\approx0.00245.
-$$
+The selected prefactor is arbitrary, and the UI lacks the paper's refractive-index and velocity-matrix-element inputs. Equal individual UI masses are not the paper's material parameterization. Endpoint-normalized shape similarity therefore does not validate absolute absorption, `Δk`, `Δn`, or all assumptions in the paper calculation. This remains a preliminary figure comparison, not an added scoped agreement.
 
-It is only an order-of-magnitude estimate; the run stopped at its cap before the requested decay threshold, so this scale is not a claim of achieved resolution. The official [Meep Python API documentation](https://meep.readthedocs.io/en/stable/Python_User_Interface/) defines the Courant factor, field-decay stopping rule, and flux-data subtraction used by the runner.
+**Evidence filenames:** `HIGH_FIELD_MANUAL_UI_RECIPE.md`, `high_field_optics.py`, `analyze_nov1_high_field.py`, `nov1-high-field-analysis.json`.
 
-## Results
+## Lumped-laser steady-state A-only calculation
 
-The packaged UI run reached terminal status in **1021.1357 s** (about 17 min 1.14 s) and produced 401 finite spectrum rows. The saved summary reports Meep 1.30.0 and **Reference=false, Device=false** for the field-decay checks: both phases reached the post-source time cap without meeting the target. It also warns that the passive power range is exceeded by more than 3% and recommends refining resolution, PML, or runtime. Terminal completion means the job ended; it does not mean convergence.
+### Setup
 
-Across the sampled spectrum:
+A fresh native UI calculation used the narrow, ideal A-only steady-state case: wavelength `1550 nm`, group index `3.6`, `Q=1215`, confinement `Γ=0.44`, transparency density `1.2×10¹⁸ cm⁻³`, differential gain `3.6025×10⁻¹⁶ cm²`, active volume `90 µm³`, `A=333,330,000 s⁻¹`, `B=C=0`, injection efficiency `1`, differential efficiency `0.5`, internal loss `0`, spontaneous factor `β=0`, gain compression `0`, temperature `300 K`, and thermal resistance `0`. The UI exported a completed 41-point sweep from 0 to 20 mA in 0.5 mA steps; the raw result records unchanged inputs. The selected CSV exactly matches all eight numeric sweep columns in the raw result.
 
-- $R=0.00227185$ to $1.22603797$
-- $T=0.00581409$ to $1.18131285$
-- residual $A=-0.95978723$ to $0.51958065$
-- 214 of 401 samples have at least one of $R,T,A$ outside [0,1]
-- the maximum $|R+T-1|$ is 0.95978723
+### Theory and analytical checks
 
-Although $R+T+A=1$ to about $1.11\times10^{-16}$, that is an algebraic identity because the runner defines $A=1-R-T$; it is not an independent energy-conservation check. The excursions above unity and negative residual values, together with both failed decay flags, make this pilot spectrum unsuitable for physical interpretation or quantitative fitting.
+For actual captured UI inputs, the independent scalar calculation uses
 
-The native UI-exported CSV has the same seven columns in the same order and the same 401 rows as the saved run CSV. Of 2807 parsed numerical cells, 1894 compare exactly as floating-point values. The largest absolute differences are $2.27\times10^{-13}$ nm for wavelength, $2.22\times10^{-16}$ for $R$ and $T$, $9.96\times10^{-17}$ for $A$, and $3.55\times10^{-15}$ for incident flux; frequency and angle values compare exactly. These very small differences are consistent with text serialization and float representation, but that cause is an inference; the values are not described as exactly equal.
+\[
+\omega=\frac{2\pi c}{\lambda},\quad \tau_p=\frac{Q}{\omega},\quad
+\alpha_Q=\frac{1}{(c/n_g)\tau_p\,100},
+\]
 
-Campaign-wide status is **8/28 routes with UI-launched execution** and **5 scoped reference-agreement routes**. Those earlier agreement counts are unchanged. The cavity-array pilot adds an execution, but no new convergence or agreement result.
+where `α_Q` is in `cm⁻¹`; `(c/n_g)τ_p` is a length in metres and its inverse is divided by 100 to convert `m⁻¹` to `cm⁻¹`. The threshold carrier density and current are
 
-## Paper comparison
+\[
+N_{th}=N_{tr}+\frac{\alpha_Q+\alpha_i}{\Gamma g'},\qquad
+I_{th,A}=\frac{q V_{cm^3} A_{SRH} N_{th}}{\eta_{inj}}.
+\]
 
-The selected primary reference is Altug and Vučković, “Two-dimensional coupled photonic crystal resonator arrays,” *Applied Physics Letters* 84, 161–163 (2004), [author-hosted paper](https://web.stanford.edu/group/nqp/jv_files/papers/hatice1.pdf). Their Figure 2 is a coupled eigenband plot, not a tabulated normal-incidence transmission curve. A coarse visual read of the primitive-$\Gamma$ $x/y$-dipole branches gives approximately $a/\lambda=0.310$, with analyst-assigned raster-reading uncertainty $\pm0.004$. At $a=490$ nm this is a central wavelength near 1581 nm and an outward-rounded interval about 1560–1602 nm. The paper separately reports a normalized-frequency calculation resolution of 0.0022. Raster-reading uncertainty, paper calculation resolution, CSV sampling interval, and the time-cap estimate are distinct quantities; none is an acceptance tolerance.
+With `B=C=0`, below threshold the carrier balance is
 
-For reference only, the pilot has 41 samples in the coarse $\Gamma$-dipole interval $0.306\le\nu\le0.314$; sampled $T$ spans 0.0488–1.0763 and sampled $R$ spans 0.0307–0.9067. The lowest $T$ sample within that interval lies at its upper edge, near $\nu=0.313833$ (1561.34 nm), with $T=0.0488$. This is an interval statistic from an under-decayed, passive-range-violating run. It is not evidence that the sample is an eigenmode, a Fano minimum, or a paper resonance, and it is not an agreement claim. No exact $T$ target, fitted $Q$, or quantitative paper agreement is reported.
+\[
+N(I)=\frac{\eta_{inj} I_A}{qV_{cm^3}A_{SRH}}.
+\]
 
-## Limits and next steps
+Here `A_SRH` denotes the SRH recombination coefficient `333,330,000 s⁻¹`, while subscripts `_A` on current denote amperes. With `q` in coulombs, `N` in cm⁻³ and `V_cm3=90 µm³=9×10⁻¹¹ cm³`, the product `q V_cm3 A_SRH N` has units of amperes. Equivalently, use `V_m3=9×10⁻¹⁷ m³` with `N_m3=10⁶ N_cm3`. Below threshold, `I_A` is current in amperes; sweep values in mA are multiplied by `10⁻³`. Above threshold, the application clamps carriers at `N_th` and computes the above-threshold photon-density term `S_app=η_inj(I_A−I_th,A)τ_p/(qV_cm3)`. Its output law is `P_W=[η_d hc/(qλ)] max(I_A−I_th,A,0)/(1+εN_th)`; for this case `ε=0`, so output is linear in excess current. The independently evaluated equations reproduce the saved model result, not an experimental measurement.
 
-One mesh and one capped-time spectrum cannot establish spatial, temporal, PML/padding, or sampling convergence. The next scientific work is to address the incomplete reference decay first, then perform controlled runtime, spatial-resolution, PML/padding, and output-sampling refinements and compare the matched spectra. A normal-incidence scattering run cannot reproduce the complete paper eigenband diagram or determine group velocity.
+### Numerics and results
 
-The scientific pilot described above used [alpha.3](https://github.com/Wgeshow/Optical-Design-Studio/releases/tag/v1.4.0-alpha.3). Alpha.4 adds the runtime controls described at the start of these notes; their separate software and packaged checks are recorded below and in VALIDATION.json. Passing those usability checks does not make the original spectrum converged or establish paper agreement.
+The saved threshold is material gain `272.97427206167424 cm⁻¹`, carrier density `1.9577356615174858×10¹⁸ cm⁻³`, and current `9.409820898145572 mA`. Independent calculations using the actual exported inputs reproduce all three threshold values with zero residual at stored precision. All 41 applicable checks pass: below threshold, carrier balance and zero output; above threshold, carrier clamping and linear output; at threshold, zero output. Across the sweep, the largest carrier-density residual is `768 cm⁻³` (maximum relative residual `4.10×10⁻¹⁶`); remaining nonzero residuals are floating-point roundoff. The actual representation uses analyst choices `λ=1550 nm` and `n_g=3.6`, yielding `Q=1215.25907568` before UI rounding to 1215. For comparison, the paper parameter conversion `g' = 10⁴ g₀/v_g` with `g₀=3×10⁻¹² m³/s` gives `3.60249222814×10⁻¹⁶ cm²`, rounded in the UI to `3.6025×10⁻¹⁶ cm²`. These are representation choices, not paper-reported λ or group-index parameters. The UI's in-process calculation completed; this route has no backend solver job because it is a lumped scalar model.
 
+### Paper comparison
 
-## Alpha.4 build verification and timing method
+Li et al., [“Step-Pulse Modulation of Gain-Switched Semiconductor Pulsed Laser,” Eqs. 1–3 (2019)](https://doi.org/10.3390/app9030602), supplies a model and parameters but no numerical steady threshold or steady L–I dataset. Its ideal `β=0`, A-only onset limit is derived from
 
-The new candidate passed 42 targeted source tests and 34 packaging/privacy/license tests, with zero failures, errors or skips. Independently compiled code matches 201 staged modules in each executable, and the standalone Meep runner matches the staged bytes. The critical frozen profile passed 8 checks and real Windows startup passed 7 checks. The broader full installer/scientific matrix was not rerun. Fresh manual feature acceptance and final archive checks are recorded separately in VALIDATION.json.
+\[
+\Gamma g_0(N_{th}-N_t)=1/\tau_p,\qquad I_{th}=qVN_{th}/\tau_N.
+\]
 
-Separate development-snapshot checks passed 48 tests, including six in-process electrical unit tests. These are separate from the 42 tests on the exact packaged candidate and are not substituted for its validation.
+Using the paper's published parameters and the modern charge constant gives the derived limit `N_th=1.9575757575757578×10¹⁸ cm⁻³` and `I_th=9.409146414218183 mA`; using the paper's rounded charge constant gives `9.396363636363636 mA`. The actual UI-rounded calculation is higher than the modern-constant ideal by `0.008168%` in density and `0.007168%` in current. The modern-versus-paper charge convention alone changes current by about `0.1360%`. These differences describe rounded model inputs and constants, not experimental error bars. Because the paper has no corresponding numerical steady-state data, this is not paper agreement.
 
-For timing, let $\tau$ denote simulated time in units of $\ell_0/c$ with $\ell_0=1\,\mu\mathrm m$, and $w$ wall-clock seconds. The actual source end time $\tau_s$ plus the configured post-source duration $\tau_a$ gives the phase budget $B=\tau_s+\tau_a$. Recent positive time advances give a measured rate
+### Limits
 
-$$r=\frac{\tau_j-\tau_i}{w_j-w_i}.$$
+The comparison is restricted to the `β=0`, `B=C=0`, zero-compression, ideal steady-state threshold limit. The application does not solve coupled time-dependent carrier/photon rate equations. Its heuristic modulation output is excluded from the paper comparison. Finite-β behavior, pulse timing and waveforms, absolute optical power, raw photon-density normalization, and a spatial device or optical-mode result are not validated.
 
-Assuming that short-term rate continues, solve $\tau_j+rE=B$ for estimated remaining wall time:
+**Evidence filenames:** `LASER_MANUAL_UI_RECIPE.md`, `laser_model.py`, `laser2019-steady-threshold-reference.json`, `analyze_nov1_laser_aonly.py`, `nov1-laser-a-only-analysis.json`.
 
-$$E=\frac{\max(0,B-\tau_j)}{r},\qquad p=\min(1,\tau_j/B).$$
+## Electrical I–V: homogeneous Ohmic equation diagnostic
 
-Here $E$ is in seconds and $p$ is the fraction of the current phase's configured time budget. The Reference rate is discarded when Device begins. Initialization and stale or invalid measurements have no ETA. Early field decay can finish a phase before its cap; load and memory pressure can change the measured rate. This is a performance estimate, not a convergence test or a guaranteed deadline.
+### Setup
 
-For an exact matching saved configuration, the cached estimate sums each phase's $I+B/r$, where $I=\max(0,w_1-\tau_1/r)$ estimates initialization, plus observed overhead outside phase timers. Physical inputs, options, application/runtime/machine identity and thread settings must match. Saved timing reads and hashing occur in a background worker; a lightweight GUI timer updates elapsed time. Without a match, the button explains that measured calibration is missing. It never silently runs a solver.
+A manually authored native UI study used one constant-conductivity conductor, `σ=1 S/m`, with analyst-selected relative permittivity `5`, zero doping, a `10 × 10 × 1 µm` bar, and full-face top and bottom potential contacts. The top terminal was swept at `−1, −0.5, 0, 0.5, 1 V`; the bottom was held at zero. Two runs used `8³` and `16³` spatial meshes. Static dielectric charge mode was selected; carrier transport and thermal solving were disabled.
 
-Implementation: [timing calculations](https://github.com/Wgeshow/Optical-Design-Studio/blob/v1.4.0-alpha.4/src/fdtd_progress.py), [native controls and background worker](https://github.com/Wgeshow/Optical-Design-Studio/blob/v1.4.0-alpha.4/src/qt_fdtd.py), and [standalone solver telemetry](https://github.com/Wgeshow/Optical-Design-Studio/blob/v1.4.0-alpha.4/src/meep_runner.py). These additions preserve the configured decay and time-cap stopping rules.
+### Theory
+
+For a uniform rectangular bar, `G=σA/L` and `I_top=G(V_top−V_bottom)`. Here `A=(10 µm)(10 µm)=1×10⁻¹⁰ m²`, `L=1 µm=1×10⁻⁶ m`, so `G=1×10⁻⁴ S` and the signed top current is `I_top=1×10⁻⁴ V_top A`. The application convention is positive conventional current entering the device from its swept top terminal; the bottom terminal current is equal and opposite.
+
+### Numerics and results
+
+All five requested biases completed at both meshes. The selected native UI CSV exports match their saved five-row outputs row-by-row within `1×10⁻¹²` absolute tolerance across all four fields. Both saved studies report zero terminal-current balance at every bias. The largest current deviation from the exact decimal Ohmic values is `2.71×10⁻²⁰ A` (`2.71×10⁻¹⁶` relative at `|V|=1 V`); the maximum `8³` to `16³` current change is the same roundoff scale. This shows mesh stability for the uniform full-face slab, not a general refinement order or accuracy claim for nonuniform geometries.
+
+### Paper comparison
+
+Noor et al. describes PN semiconductor drift-diffusion diode `J–V`. This native route used a fixed-conductivity conductor with transport disabled, so the paper is not a quantitative target and receives no agreement credit.
+
+### Limits
+
+This is a scoped equation diagnostic for the manually selected homogeneous bar. It does not model carrier continuity, injection, recombination, depletion, contact resistance, nonlinear transport, or a semiconductor diode. The 10/28 route count increases to 11/28, but scoped paper/reference agreements remain five.
+
+**Evidence filenames:** `ELECTRICAL_MANUAL_UI_RECIPES.md`, `analyze_nov1_ohmic_iv.py`, `nov1-ohmic-iv-mesh-comparison.json`, `nov1-ohmic-8-analysis.json`, `nov1-ohmic-16-analysis.json`, `nov1-ohmic-8-ui-export.csv`, `nov1-ohmic-16-ui-export.csv`.
+
+## Photonic-crystal cavity array: cap-400 Meep diagnostic
+
+### Setup
+
+The 1.4.0-alpha.4 native Meep run used the manually authored 3D cavity-array cell, 40 pixels/µm, 401 spectral samples over 1400–1800 nm, p polarization, 1 µm PML and padding, Courant factor 0.5, and decay target `10⁻⁷`. Its only saved job-setting difference from the prior cap-200 run is post-source runtime cap `400 µm/c` vs `200 µm/c`; all other job JSON fields match exactly.
+
+### Theory and numerical interpretation
+
+The runner first computes an empty-cell Reference phase and then a Device phase, subtracting reference flux to obtain reflectance/transmittance. At normal incidence in an air/air configuration, the lossless passive expectation is `0≤R,T≤1`; residual `A=1−R−T` is derived from those values, so `R+T+A=1` is an algebraic identity rather than an independent conservation check. A rough finite-window spectral scale is `Δ(a/λ)≈a/(cT)`: approximately `0.00245` for the 200 µm/c cap and `0.001225` for 400 µm/c. This is an order-of-magnitude time-window estimate, not a measured resolution or acceptance tolerance.
+
+### Current results
+
+The cap-400 run completed in `1721.4694 s` runner time; Reference took `780.3362 s` and Device `869.3645 s`. Both phases reached the cap with decay flags false. The summary records 401 samples and warns power balance is outside the passive range by more than 3%. The cap-200 baseline also has both decay flags false and the same warning. The selected native UI CSV export has 401 rows and matches the saved CSV row-by-row within `1×10⁻¹²` absolute tolerance across all seven numeric columns; per-column maximum absolute differences are `2.27×10⁻¹³ nm` for wavelength, `2.22×10⁻¹⁶` for each of R and T, `9.80×10⁻¹⁷` for A, and `3.55×10⁻¹⁵` for incident flux; angle and frequency are exact. These quantities have different units, so no cross-column maximum is reported. This establishes export integrity only.
+
+The two saved 401-point spectra share an exact frequency grid; comparison uses rowwise pairs with no interpolation. Define `δy_i=y_400,i−y_200,i`, `max_abs=max_i|δy_i|`, and `RMS=√[(1/401)Σ_iδy_i²]`. Over the full window, `R` has max/RMS difference `1.04065/0.122765`, `T` `0.997682/0.133840`, and residual `A` `1.33771/0.165772`. Maxima occur near normalized frequency `a/λ≈0.273`, near the low-frequency end. In coarse `Γ`-eigenband context `0.306≤a/λ≤0.314` (41 samples), `max|δT|=0.323363` and RMS `0.128460`.
+
+Passivity counts are still bad. Cap-200 has `R>1` at 3 samples, `T>1` at 20, and residual `A<0` at 214. Cap-400 has `R>1` at 4, `T>1` at 16, and `A<0` at 205. The count reduction is not convergence. For cap-400, ranges are `R=0.008525…1.170518`, `T=0.002063…1.173590`, and `A=−0.623163…0.458071`. Since `A=1−R−T`, `R+T+A=1` is an identity, not an independent energy-conservation test.
+
+Sampled transmission minima are retained as unfitted grid points in `nov1-meep-cap400-comparison.json`; they are not paired as resonances or used to infer `Q`.
+
+The alpha.5 integrated-source `40 cells/µm` run was stopped through the native UI during Reference at displayed `t=269 µm/c`; the log ends at `t=276 µm/c` during cancellation. The Reference decay ratio stayed near `2.129×10⁻⁵` across `t=120–260 µm/c`, above the `10⁻⁷` target. It produced no Device phase or spectrum. A separate integrated-source run at `40.81632653 cells/µm` passed Reference decay at `t=80.017 µm/c` with ratio `5.4877×10⁻⁹` and elapsed phase time `154.07 s`. Its Device phase is still running; no full spectrum or overall convergence result is available. The captured job audit shows this second run differs from the preceding resolution-40 job only in resolution; cell/memory counts are derived values. Its actual represented cell is `2.94 × 2.94 × 4.263 µm`.
+
+### Primary-paper comparison
+
+Altug and Vuckovic, [“Two-dimensional coupled photonic crystal resonator arrays,” Fig. 2 (2004), DOI 10.1063/1.1639505](https://web.stanford.edu/group/nqp/jv_files/papers/hatice1.pdf), supplies approximate `Γ`-point eigenband context. A driven R/T spectrum is a different observable; proximity of a transmission feature to an eigenband coordinate does not identify a mode, prescribe a Fano minimum, or validate `Q`.
+
+### Limits
+
+Both cap-400 phase decay tests failed, and passive-range violations persist. The large differences establish sensitivity to post-source cap but not convergence, mode identity, Fano agreement, or physical correction. The primary Altug–Vuckovic `Γ`-point eigenband is coordinate context, not a driven transmission target. The native UI export audit passes at the stated roundoff tolerance; it does not change scientific status. The read-only analysis utility is `analyze_nov1_meep_cap400.py`.
+
+## Alpha.5 r2 source candidate checkpoint
+
+### Setup and theory
+
+A separate source candidate adds an opt-in integrated-Gaussian source setting and a fractional spatial-resolution field. The fractional control can express 20 grid cells per `0.49 µm` period as `20/0.49 = 40.81632653 cells/µm`; the earlier integer-only value 40 represented a `2.95 µm` cell for a requested `2.94 µm` period. Moving to an aligned `2.94 µm` cell changes both grid and domain representation, so that future comparison is not a pure discretization refinement. The integrated-source setting is opt-in and defaults off; static-field FAQ reasoning motivates a controlled test but does not show that nonzero-frequency spectra are fixed.
+
+### Verification and limits
+
+The cumulative v2 source suite passed 66 tests; the clean staged candidate passed 72 source checks and 34 packaging checks. Build completed in `142.437 s`. All 201 compiled modules match within each executable; the standalone runner matches exactly. Eight frozen critical checks and actual Windows startup passed. Fresh packaged-UI checks confirmed integrated-source default-off/checked behavior, fractional-resolution `40.81632653` persistence through navigation, input preparation, and the immediate Estimate no-data message. A native Stop request cancelled the integrated-source resolution-40 Reference-only run; a separate fresh no-solve candidate chooser closed normally with process exit 0. The source checkpoint is merged and its 10-file payload hashes are verified; no downloadable alpha.5 package or public release is claimed. These UI/source checks remain separate from scientific results.
+
+**Evidence filenames:** `nov1-ui-change-checkpoint.md`, `nov1-fractional-resolution-v2-implementation.json`, `nov1-source-cumulative-v2-hashes.json`, `nov1-source-v2-final-tests.log`, `nov1-private-publication.json`, `manual-packaged-ui.json`.
+
+## Next actions
+
+1. Allow the current alpha.5-r2 integrated-source `40.81632653 cells/µm` Device phase to complete; the Reference passed its decay target, but no Device spectrum is available yet. Keep the cancelled resolution-40 trial separate.
+2. Continue the 17 remaining user-authorized routes in queue order, preserving each native entry, execution, convergence and reference scope.
+3. Maintain the five scoped reference agreements unless a later route adds independently supported quantitative evidence. Do not convert a completed run, static arithmetic check, or source test into broader physical validation.
+
+**Aggregate evidence filenames:** `nov1-session-report.json`, `nov1-route-queue.json`, `nov1-electrical-iv-native-acceptance-updates.json`, `nov1-meep-native-acceptance-updates.json`, `nov1-private-publication.json`, `nov1-ui-change-checkpoint.md`, `nov1-fractional-resolution-v2-implementation.json`, `nov1-source-cumulative-v2-hashes.json`, `nov1-source-v2-final-tests.log`, `build_qa_report.py`. This aggregate is dated; update it after the active Device phase or another route produces verified evidence.

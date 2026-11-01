@@ -12,18 +12,23 @@ DEFAULTS = dict(dimensions=2, resolution=30, wavelength_min_nm=1200.,
     wavelength_max_nm=1800., frequency_points=101, polarization='s',
     pml_um=1., padding_um=1., run_after_sources=200., courant=.5,
     section_y_um=0., decay_by=1e-7, fit_materials=True, fit_tolerance=.05,
-    save_fields=True, max_cells=30000000)
+    save_fields=True, source_is_integrated=False, max_cells=30000000)
 
 
 def validate_options(options):
     result = dict(DEFAULTS, **options)
-    for key in ('dimensions', 'resolution', 'frequency_points', 'max_cells'):
+    for key in ('dimensions', 'frequency_points', 'max_cells'):
         value = float(result[key])
         if not math.isfinite(value) or not value.is_integer():
             raise ValueError(f'{key} must be a finite whole number.')
         result[key] = int(value)
     if result['dimensions'] not in (2, 3):
         raise ValueError('Choose a 2D cross section or the full 3D structure.')
+    resolution = float(result['resolution'])
+    if not math.isfinite(resolution) or resolution <= 0:
+        raise ValueError('resolution must be finite and positive.')
+    # Keep legacy whole-number serialization while allowing commensurate grids.
+    result['resolution'] = int(resolution) if resolution.is_integer() else resolution
     for key, low, high in [('resolution', 5, 1000), ('frequency_points', 2, 2001),
                            ('max_cells', 100, 100000000)]:
         if not low <= result[key] <= high:
@@ -40,7 +45,7 @@ def validate_options(options):
         raise ValueError('Courant must be ≤ 0.5, decay < 1, and material-fit tolerance ≤ 10%.')
     if result['polarization'] not in ('s', 'p'):
         raise ValueError('FDTD supports s or p polarization at normal incidence.')
-    for key in ('save_fields', 'fit_materials'):
+    for key in ('save_fields', 'fit_materials', 'source_is_integrated'):
         if not isinstance(result[key], bool):
             raise ValueError(f'{key} must be true or false.')
     return result

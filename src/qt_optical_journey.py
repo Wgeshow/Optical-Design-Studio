@@ -177,6 +177,16 @@ def _checks(page,store,route,host):
     body=QWidget(); layout=QVBoxLayout(body)
     state=QLabel('Current inputs have not been checked. Runtime availability is separate.'); state.setWordWrap(True); layout.addWidget(state)
     page.journey_check_state=state
+    if route=='fdtd':
+        source_summary=QLabel(); source_summary.setWordWrap(True)
+        page.journey_source_summary=source_summary
+        layout.addWidget(source_summary)
+        def update_source_summary(*_):
+            integrated=page.controls['source_is_integrated'].isChecked()
+            source_summary.setText('Gaussian source: '+('integrated polarization (on).' if integrated else 'current (integration off).')+
+                ' Both reference and device use this setting. Decay and spectral convergence require separate checks.')
+        page.controls['source_is_integrated'].toggled.connect(update_source_summary)
+        update_source_summary()
     if route=='tools.ai':
         operation=QComboBox(); operation.setAccessibleName('AI operation to validate')
         for title,key in [('Collect and train','collect'),('Fit saved data','fit'),('Search','search'),('Verify leaders','verify')]: operation.addItem(title,key)
@@ -318,7 +328,8 @@ def install_optical_journey(page,store,route):
             ('PML thickness (µm)', 'pml_um'), ('Air/medium padding (µm)', 'padding_um')]])
         pulse = _fields('Broadband pulse', [(label, page.controls[key]) for label, key in [
             ('Polarization', 'polarization'), ('Minimum wavelength (nm)', 'wavelength_min_nm'),
-            ('Maximum wavelength (nm)', 'wavelength_max_nm'), ('Frequency samples', 'frequency_points')]])
+            ('Maximum wavelength (nm)', 'wavelength_max_nm'), ('Frequency samples', 'frequency_points'),
+            ('Pulse source', 'source_is_integrated')]])
         stopping = _fields('Time stepping and stopping', [(label, page.controls[key]) for label, key in [
             ('Maximum time after pulse (µm/c)', 'run_after_sources'), ('Courant factor', 'courant'), ('Monitor field decay target', 'decay_by'), ('Dispersion fit tolerance', 'fit_tolerance')] if key in page.controls])
         presets = QWidget(); preset_row = QHBoxLayout(presets); preset_row.setContentsMargins(0, 0, 0, 0)
