@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0-alpha.8",
+  "version": "1.4.0-alpha.9",
   "build_date": "2026-11-01",
   "profile": "public",
   "production_bytes_preserved": true,
@@ -552,7 +552,7 @@
     },
     "app_version.py": {
       "size": 1756,
-      "sha256": "e29c6d2fe654b0e8760e8d5e035b181dcb3966e45e30708fe4b876cf32b5acdf"
+      "sha256": "1934c92c05ae4efe6ceb847f616e7c0b6f1971c5acaf5bfbac2386b9736666d9"
     },
     "application_restart.py": {
       "size": 7182,
@@ -1719,8 +1719,8 @@
       "sha256": "5f7f7683d2dc77a20f0bd0d30292c74ae25b87295c75716d89111f5011a0a7e9"
     },
     "qt_ai_search.py": {
-      "size": 29550,
-      "sha256": "14fb679332a28f75d451a6bda7147b7d00e3ab8e1764524ad615695b1176c40f"
+      "size": 33586,
+      "sha256": "2395adf299cb3645ee383f1d6fbaa8063cb9a6567b2532894e726c01f1846929"
     },
     "qt_app.py": {
       "size": 118574,
@@ -1867,8 +1867,8 @@
       "sha256": "8d24e0300c1b64ed4975226d824aee4ee3b0b12ea84b96f8e02b9312a04dcefb"
     },
     "qt_optical_journey.py": {
-      "size": 30272,
-      "sha256": "32d5b577fad82a72fc4d207b4c2a1a52125d18068fc8925cf666566dc84fddc7"
+      "size": 33691,
+      "sha256": "891fd9c7c6cb7f53eb2229b164321a3a1661c6b29002adb49b115f2cb3d33835"
     },
     "qt_optical_results.py": {
       "size": 18104,
@@ -1903,8 +1903,8 @@
       "sha256": "2f8928760e97aefe34ff18b3ada59cf1424766061f96a55c48cbbd28a721ae3f"
     },
     "qt_ranges.py": {
-      "size": 21257,
-      "sha256": "feb0c3c34a7fddd55eb282974bae9658ee0d61fff907b3e16632882ad5f143ac"
+      "size": 23442,
+      "sha256": "431a7e70516628183b6ca30057529c05a8af7d1ecade8d6fd1c11628a4f09149"
     },
     "qt_reference_style.py": {
       "size": 4586,
@@ -1927,8 +1927,8 @@
       "sha256": "1b64971ba03f570f5c86459b2ce6d1308cefd8389041bc1c0dc86cbf120e0c3c"
     },
     "qt_research_studies.py": {
-      "size": 61051,
-      "sha256": "ec3b69cef392738298c14769f5fe186c872af740a9c786450accc135b33683b8"
+      "size": 62104,
+      "sha256": "63a708e63358cc541044c35af47d5032ea27eff61ac72ed25003509f51734fcb"
     },
     "qt_result_export.py": {
       "size": 1456,
@@ -2682,6 +2682,10 @@
       "size": 7291,
       "sha256": "7fa2dc8f66289fe60879b68855ee27803e1ff4c556d52fb565df849c5349139c"
     },
+    "tests/test_qt_ai_plan_feedback.py": {
+      "size": 7045,
+      "sha256": "2ce48a7d3e2639e8224062aeb5f58d5570cb06c4420cdf75e446f700d7c4b10d"
+    },
     "tests/test_qt_ai_range_transfer.py": {
       "size": 5814,
       "sha256": "d1e2d7deb5fb8f8b79e77d9739ea65756df914372fb8c93f09882f19196f8957"
@@ -2749,6 +2753,10 @@
     "tests/test_qt_desktop_surfaces.py": {
       "size": 9292,
       "sha256": "ab1e50a63b28918cfa885ede19ae8a490fe69ef1f1b63cce6168dd8f131fbfde"
+    },
+    "tests/test_qt_device_assignment_contacts.py": {
+      "size": 5925,
+      "sha256": "7a43c27fefff22ce9ff927044e19c882f946d5c17b5d59feddf00ccbf7122037"
     },
     "tests/test_qt_device_builder.py": {
       "size": 3905,
@@ -2961,6 +2969,10 @@
     "tests/test_qt_photonic_runtime.py": {
       "size": 6869,
       "sha256": "79a06b2f8f1ae7bc5109b42be70d29b0c359248945abd8128eabc6f8512946fa"
+    },
+    "tests/test_qt_range_draft.py": {
+      "size": 7380,
+      "sha256": "c8cc09471b7ecb7bf254f44afa0beecec15d9e3e6de2750b65744fdf828b5699"
     },
     "tests/test_qt_rcwa_saved_plot.py": {
       "size": 4538,
@@ -3343,5 +3355,5 @@
       "sha256": "376162b4a329e6cc8fa45c8c70fdc1372a67c5a0366c0a76bb3c8b131076ac7c"
     }
   },
-  "source_tree_sha256": "88b2b3516b0d1215a91cd3e4d92d6622f991adfe24d251b572638278a1668667"
+  "source_tree_sha256": "8690024b25ae5cbdbc153d27453ee0d1231f51ff9b55d7c83f969e18f80d3d1e"
 }

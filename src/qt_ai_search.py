@@ -58,7 +58,7 @@ class AISearchPage(_RunPage):
         box,_=_group('Advanced incident light and field goal',[(label,self.controls[key]) for label,key in [('Incidence θ (degrees)','theta_deg'),('Azimuth φ (degrees)','phi_deg'),('Fourier basis','basis'),('Shell width (µm)','shell_um'),('Shape goal','approach')]])
         layout.addWidget(box)
         box,_=_group('Training collection',[(label,self.controls[key]) for label,key in [('Scan method','mode'),('Initial training designs','initial'),('Independent test designs','test_count'),('Adaptive designs','adaptive'),('Optional new-design limit (0 = none)','new_budget')]])
-        layout.addWidget(box);layout.addWidget(self.controls['reuse']);self.plan_label=QLabel('Preview the plan before running. Test designs never enter fitting or candidate rankings.');self.plan_label.setWordWrap(True);layout.addWidget(self.plan_label);layout.addWidget(_button('Preview count and estimated time',self.preview))
+        layout.addWidget(box);layout.addWidget(self.controls['reuse']);self.plan_label=QLabel('Preview the plan before running. Test designs never enter fitting or candidate rankings.');self.plan_label.setWordWrap(True);layout.addWidget(self.plan_label);layout.addWidget(_button('Preview count and estimated time',self.preview_collection))
         box,_=_group('Sampling and contour detail',[(label,self.controls[key]) for label,key in [('Field grid per axis','grid'),('Volume depths per layer','depth_samples'),('Contour amplitude step','contour_step'),('RTA half-window (nm)','half_window'),('RTA step (nm)','rta_step'),('Random seed','seed')]])
         layout.addWidget(box)
         box,form=_group('Reference field', [('Saved fields directory',self.reference),('Shape weight',self.controls['reference_weight'])]);form.addRow(_button('Choose reference fields…',self.choose_reference));layout.addWidget(box)
@@ -103,6 +103,15 @@ class AISearchPage(_RunPage):
         for w in self.controls.values():_on_edit(w,self.save)
         self.controls['mode'].currentIndexChanged.connect(self.enabling);self.controls['approach'].currentIndexChanged.connect(self.enabling)
         self.reference.editingFinished.connect(self.save);self.resume.editingFinished.connect(self.save);store.changed.connect(self.restore)
+        self.bounds.changed.connect(self.invalidate_preview)
+        self.bounds.draftChanged.connect(self.invalidate_preview)
+        for control in self.controls.values():
+            signal=next((getattr(control,name) for name in ('valueChanged','textChanged','currentIndexChanged','toggled') if hasattr(control,name)),None)
+            if signal is not None:signal.connect(self.invalidate_preview)
+            if isinstance(control,QAbstractSpinBox):control.lineEdit().textEdited.connect(self.invalidate_preview)
+        self.reference.textChanged.connect(self.invalidate_preview)
+        self.resume.textChanged.connect(self.invalidate_preview)
+        store.changed.connect(self.invalidate_preview)
         self.restore('project');self._loading=False
         for b in self.stops:b.setText('Pause and save')
         self.enabling()
@@ -118,7 +127,7 @@ class AISearchPage(_RunPage):
             guard_unfocused_wheel(control)
         for explanation in (note,hint,self.inspect_note):
             explanation.hide();explanation.parentWidget().setToolTip(explanation.text())
-        self.plan_label.setText('')
+        self.invalidate_preview()
         self.summary.setText('No campaign loaded')
         self.setup_tabs.setCurrentIndex(0)
         if self.resume.text() and Path(self.resume.text()).is_file():
@@ -166,6 +175,7 @@ class AISearchPage(_RunPage):
         except Exception as exc:self.status.setText('Saved AI setup needs review: '+str(exc))
         finally:self._loading=False
         self.enabling()
+        self.invalidate_preview()
 
     def default_ranges(self):
         try:
@@ -215,16 +225,58 @@ class AISearchPage(_RunPage):
             self.status.setText('Copied parameter-sweep ranges into this AI setup. Review the limits before running.')
         except Exception as exc:self.status.setText(str(exc))
 
+    def invalidate_preview(self,*_):
+        if self._loading:return
+        text=f'Plan preview needs refresh. Saved range rows: {len(self.bounds.records())}.'
+        if not self.bounds.records():text+=' No saved ranges: current design only (1 grid candidate before validation).'
+        text+=f" Requested initial training: {self.controls['initial'].text()}; independent tests: {self.controls['test_count'].text()}."
+        if self.bounds.has_unsaved_changes():text+=' Unsaved range edits: click Save range to include them.'
+        text+=' Preview again or Check current inputs; earlier combination/time estimates are no longer current.'
+        self.plan_label.setText(text)
+
+    def plan_feedback(self,cfg):
+        count=cfg['design_count'];operation=cfg.get('operation','search')
+        text=(f"Saved range-grid capacity before geometry checks: {count:,}. Requested initial training: {cfg['initial']:,}; "
+              f"independent tests: {cfg['test_count']:,}. ")
+        if operation=='collect':
+            size=count if cfg['mode']=='Full range scan' else min(count,cfg['initial']+cfg['test_count'])
+            tests=min(cfg['test_count'],max(0,size-2));train=size-tests
+            if cfg['mode']=='Full range scan':text+='Full scan ignores the initial-training count. '
+            text+=(f'Fresh no-history collection upper capacity: ≤{size:,} design(s); nominal allocation {train:,} training + {tests:,} held-out test if geometry checks pass. ')
+            if (cfg['mode']!='Full range scan' and train<cfg['initial']) or tests<cfg['test_count']:
+                text+='Available designs cannot supply the requested training/test counts. '
+            if cfg['test_count'] and not tests:text+='No held-out coverage is planned. '
+            if train<2:text+='A one-design collection is allowed; fitting needs at least two complete training observations. '
+        elif operation=='fit':
+            text+='Fit uses compatible completed campaign training/test history, not a fresh collection count. '
+        elif operation=='verify':
+            text+='Verification uses eligible leaders from compatible campaign history; the range grid is not a new verification count. '
+        else:
+            upper=count if cfg['mode']=='Full range scan' else min(count,cfg['initial']+cfg['test_count']+cfg['adaptive'])
+            text+=f'Fresh search screening upper bound: ≤{upper:,} designs; this is not new or completed work. '
+        if cfg.get('resume_file'):text+='A compatible checkpoint may continue its existing plan/history; this is not a count of fresh simulations. '
+        text+='Invalid geometry, reuse and new-design budgets can reduce new/completed work. Planned capacity is not measured results.'
+        if self.bounds.has_unsaved_changes():text+=' Unsaved range edits: click Save range to include them.'
+        return text
+
+    def preview_collection(self):
+        self._preview('collect')
+
     def preview(self):
+        self._preview('search')
+
+    def _preview(self,operation):
         try:
-            _,job=prepare_job('ai_search',self.store.portable_project(),self.options('search'),self.store.library);cfg=job['search']
-            plan=cfg['design_count'] if cfg['mode']=='Full range scan' else min(cfg['design_count'],cfg['initial']+cfg['test_count']+cfg['adaptive'])
+            _,job=prepare_job('ai_search',self.store.portable_project(),self.options(operation),self.store.library);cfg=job['search']
+            adaptive=cfg['adaptive'] if operation=='search' else 0
+            verification=cfg['finalists'] if operation=='search' else 0
+            plan=cfg['design_count'] if cfg['mode']=='Full range scan' else min(cfg['design_count'],cfg['initial']+cfg['test_count']+adaptive)
             estimate='Time estimate available after completed designs.'
             if self.campaign:
                 summary=self.campaign.get('summary',{});n=summary.get('new_simulations',0)
-                if n:estimate=f"Estimated maximum time: {summary['elapsed_seconds']/n*(min(cfg['new_budget'],plan+cfg['finalists']) if cfg['new_budget'] else plan+cfg['finalists'])/60:.1f} min, based on this campaign; accuracy and hardware affect it."
-            limit=f"New S4 designs capped at {cfg['new_budget']:,}." if cfg['new_budget'] else 'No simulation limit; all planned designs can run.'
-            self.plan_label.setText(f"Range grid: {cfg['design_count']:,} combinations. Planned unique screening designs: ≤{plan:,}; verification: ≤{cfg['finalists']}. {limit} Reuse can reduce work. {estimate}")
+                if n:estimate=f"Provisional elapsed estimate: {summary['elapsed_seconds']/n*(min(cfg['new_budget'],plan+verification) if cfg['new_budget'] else plan+verification)/60:.1f} min, based on this campaign; accuracy and hardware affect it."
+            limit=f"New S4 designs capped at {cfg['new_budget']:,}." if cfg['new_budget'] else 'No simulation limit from the new-design budget (0); requested counts are not guaranteed completions.'
+            self.plan_label.setText(f"Range grid: {cfg['design_count']:,} combinations. Planned unique screening designs: ≤{plan:,}; verification: ≤{verification}. {limit} Reuse can reduce work. {estimate}\n"+self.plan_feedback(cfg))
         except Exception as exc:self.plan_label.setText(str(exc))
 
     def run(self,operation):
@@ -273,6 +325,7 @@ class AISearchPage(_RunPage):
         path=self.directory/'campaign.json';self.resume.setText(str(path));self.load_campaign(load_campaign_checkpoint(path));self.save();self.status.setText(f"{event['summary']['status']}. Saved to {self.directory}")
 
     def load_campaign(self,saved):
+        self.invalidate_preview()
         self.campaign=saved;self.records=saved['records'];s=saved['summary'];self.summary.setText(f"{s['completed']} completed · {s['training']} training · {s['tests']} tests · {s['new_simulations']} new S4 designs · {s['reused']} reused · {s['failures']} failed")
         self.refresh_designs();report=s.get('validation',{});self.validation_plot.draw_figure(validation_figure(report));fill_table(self.validation_table,[{k:v for k,v in r.items() if k in ('name','mae','rmse','interval_95_coverage')} for r in report.get('measurements',[])])
         if self.directory and (self.directory/'design_results.csv').exists():fill_table(self.results,pd.read_csv(self.directory/'design_results.csv'))

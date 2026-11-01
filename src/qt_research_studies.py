@@ -5,7 +5,7 @@ from copy import deepcopy
 import json
 import uuid
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QSignalBlocker, pyqtSignal
 from PyQt6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFileDialog,
     QFormLayout, QHBoxLayout, QHeaderView, QLineEdit, QStackedWidget, QTreeWidget,
     QTreeWidgetItem, QStyledItemDelegate, QVBoxLayout, QWidget)
@@ -596,27 +596,42 @@ class StructuredStudyWorkspace(ResearchWorkspaceBase):
 
     def _add_device_model_controls(self):
         _, layout = self.add_section('Device assignments')
-        device = getattr(self.store, 'device', None) or {}
         layout.addWidget(label('This model uses the current finite device and its mesh. '
             'Material/contact identifiers below are stable assignments from that device; editing this list does not change the geometry.'))
         layout.addWidget(button('Edit this simulation’s device and contacts', lambda: self.diagnosticRequested.emit(dict(
             workspace='structure', section='device', field='device', message='Edit the device used for this transport study.'))))
-        descriptions = ['Contacts: '+', '.join(row.get('name', row['id'])+' ['+row['id']+']' for row in device.get('contacts', []) if row.get('enabled', True))]
-        descriptions.append('Materials: '+', '.join(row.get('name', row['id'])+' ['+row['id']+']' for row in getattr(self.store, 'electrical_materials', [])))
-        layout.addWidget(label('\n'.join(descriptions)))
+        self.device_assignment_description=label('')
+        self.device_assignment_description.setAccessibleName('Current device contact and material identifiers')
+        layout.addWidget(self.device_assignment_description)
         self.device_contact_picker = QComboBox()
         self.device_contact_picker.setAccessibleName('Device contact for carrier-resistance inputs')
-        self.device_contact_picker.addItem('Choose a contact…', '')
-        for row in device.get('contacts', []):
-            if row.get('enabled', True):
-                self.device_contact_picker.addItem(row.get('name', row['id']), row['id'])
         layout.addWidget(self.device_contact_picker)
+        self.store.changed.connect(self.refresh_device_assignments)
+        self.refresh_device_assignments()
         layout.addWidget(button('Use as swept contact', lambda: self.fields['swept_contact_id'].setText(self.device_contact_picker.currentData() or '')))
         layout.addWidget(button('Add explicit contact-resistance fields', self.add_contact_fields))
         layout.addWidget(label('Empty optional sections are off. Adding contact-resistance fields requires explicit values and a source; '
             'zero is the ideal-interface limit. Semiconductor recombination, conductor selection and electrochemical heating '
             'use the explicitly supplied properties in their respective sections.'))
         layout.addStretch()
+
+    def refresh_device_assignments(self, reason=None):
+        if reason not in (None,'','project','study','device','structure','undo','electrical_materials','load','reset','all'):
+            return
+        if not self._is_active_document() or not hasattr(self,'device_contact_picker'):
+            return
+        device=getattr(self.store,'device',None) or {}
+        contacts=[row for row in device.get('contacts',[]) if row.get('enabled',True)]
+        descriptions=['Contacts: '+(', '.join(row.get('name',row['id'])+' ['+row['id']+']' for row in contacts) or 'No enabled device contacts.')]
+        descriptions.append('Materials: '+', '.join(row.get('name',row['id'])+' ['+row['id']+']' for row in getattr(self.store,'electrical_materials',[])))
+        self.device_assignment_description.setText('\n'.join(descriptions))
+        selected=self.device_contact_picker.currentData()
+        with QSignalBlocker(self.device_contact_picker):
+            self.device_contact_picker.clear()
+            self.device_contact_picker.addItem('Choose a contact…','')
+            for row in contacts:self.device_contact_picker.addItem(row.get('name',row['id']),row['id'])
+            self.device_contact_picker.setCurrentIndex(max(0,self.device_contact_picker.findData(selected or '')))
+        # This read-only refresh never overwrites the independent swept-contact draft.
 
     def add_contact_fields(self):
         identity = self.device_contact_picker.currentData()

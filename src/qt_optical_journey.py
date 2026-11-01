@@ -219,6 +219,36 @@ def _checks(page,store,route,host):
         for title,key in [('Collect and train','collect'),('Fit saved data','fit'),('Search','search'),('Verify leaders','verify')]: operation.addItem(title,key)
         operation.setCurrentIndex(2); page.journey_check_operation=operation
         layout.addWidget(QLabel('Validate the selected existing campaign operation')); layout.addWidget(operation)
+    if route=='tools.sweep':
+        range_summary=QLabel(); range_summary.setWordWrap(True)
+        range_summary.setAccessibleName('Saved sweep ranges and draft status')
+        page.journey_range_summary=range_summary; layout.addWidget(range_summary)
+        def update_range_summary(*_):
+            count=len(page.bounds.records()); shared=page.shared_hole.options().get('enabled',False)
+            if not count and not shared:
+                text='No saved ranges: current design only (1 design).'
+            else:
+                text=f'{count} saved table range(s); shared radius controls '+('enabled.' if shared else 'disabled.')
+            if page.bounds.has_unsaved_changes():
+                text+='\nUnsaved range edits: click Save range to include them.'
+            text+=f"\nMaximum designs: {page.search_controls['design_budget'].value()}. Check current inputs for the exact combined count."
+            range_summary.setText(text)
+        page.bounds.changed.connect(update_range_summary)
+        page.bounds.draftChanged.connect(update_range_summary)
+        page.shared_hole.changed.connect(update_range_summary)
+        page.search_controls['design_budget'].valueChanged.connect(update_range_summary)
+        update_range_summary()
+    if route=='tools.ai':
+        ai_summary=QLabel(); ai_summary.setWordWrap(True)
+        page.journey_ai_range_summary=ai_summary; layout.addWidget(ai_summary)
+        def update_ai_summary(*_):
+            text=page.bounds.range_feedback()
+            if not page.bounds.records():text+=' No saved ranges: current design only (1 grid candidate before validation).'
+            ai_summary.setText(text+' Check current inputs for operation-specific capacity; draft range edits are excluded.')
+        page.bounds.changed.connect(update_ai_summary)
+        page.bounds.draftChanged.connect(update_ai_summary)
+        store.changed.connect(update_ai_summary)
+        update_ai_summary()
     issues=DiagnosticPanel(body); layout.addWidget(issues); page.journey_diagnostics=issues
     controls=dict(getattr(page,'controls',{})); controls.update(getattr(page,'search_controls',{}))
     controls.update({k:getattr(page,k) for k in ('wavelength','grid','depth','layer','material','layers','bounds','resume') if hasattr(page,k)})
@@ -230,16 +260,29 @@ def _checks(page,store,route,host):
     def check():
         try:
             kind,project,options=_request(page,store,route)
+            sweep_note=''
             if kind=='fdtd':
                 from fdtd_model import build_job
                 build_job(project,store.library.files_for(project),options)
             else:
                 from qt_core import prepare_job
                 if getattr(store,'optical_geometry_source','device')=='original_tables': options=dict(options,optical_geometry_source='original_tables')
-                prepare_job(kind,project,options,store.library)
+                _,prepared=prepare_job(kind,project,options,store.library)
+                if route=='tools.ai':sweep_note='\n'+page.plan_feedback(prepared['search'])
+                if route=='tools.sweep':
+                    search=prepared['search']; count=search['design_count']; points=len(prepared['model']['points'])
+                    recipe=('No saved ranges: current design only.' if not search['dimensions'] else
+                            'Saved/active ranges determine the designs; equal limits give fixed values.')
+                    sweep_note=(f"\n{recipe} Prepared sweep: {count} design(s) × {points} optical sample(s) = {count*points} planned points. "
+                        f"Design budget: {search['design_budget']}; point budget: {search['point_budget']}. No execution has started.")
+                    if count*points>search['point_budget']:
+                        sweep_note+=' Planned points exceed the point budget.'
+                    if page.bounds.has_unsaved_changes():
+                        sweep_note+='\nUnsaved range edits: click Save range to include them.'
             issues.set_diagnostics([])
             operation_note=(page.journey_check_operation.currentText()+': ') if route=='tools.ai' else ''
-            state.setText(operation_note+'Input preparation passed for this draft. Runtime availability and convergence are not established.')
+            readiness=('Input preparation passed for the saved/applied inputs.' if route=='tools.sweep' else 'Input preparation passed for this draft.')
+            state.setText(operation_note+readiness+' Runtime availability and convergence are not established.'+sweep_note)
         except Exception as exc:
             field=str(getattr(exc,'field','') or getattr(exc,'key','')); message=str(exc)
             if field not in controls: field=next((k for k in controls if k.lower() in message.lower()),'')
@@ -268,6 +311,11 @@ def _checks(page,store,route,host):
         for name in ('valueChanged','textChanged','currentIndexChanged','toggled','itemChanged'):
             signal=getattr(widget,name,None)
             if signal is not None: signal.connect(invalidate); break
+    if route in ('tools.sweep','tools.ai'):
+        page.bounds.changed.connect(invalidate)
+        page.bounds.draftChanged.connect(invalidate)
+    if route=='tools.sweep':
+        page.shared_hole.changed.connect(invalidate)
     store.changed.connect(invalidate)
     return body
 

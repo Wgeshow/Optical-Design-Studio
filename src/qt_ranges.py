@@ -63,11 +63,14 @@ def _form(parent=None):
 class BoundsEditor(QWidget):
     """Editable optimization bounds; targets always come from the current project."""
     changed = pyqtSignal()
+    draftChanged = pyqtSignal()
 
     def __init__(self, store, allowed=None, parent=None):
         super().__init__(parent)
         self.store = store
         self.allowed = allowed
+        self._draft_baseline = None
+        self._updating_draft = False
         self._rows = []
         self._patterns = rows(store.patterns, PAT_COLS)
         layout = QVBoxLayout(self)
@@ -113,6 +116,40 @@ class BoundsEditor(QWidget):
         self.overview.itemSelectionChanged.connect(self.load_selected)
         store.changed.connect(self.refresh)
         self._refresh_controls()
+        for control in (self.minimum, self.maximum, self.step):
+            control.valueChanged.connect(self._draft_edited)
+            control.lineEdit().textEdited.connect(self._draft_edited)
+        self.parameter.currentIndexChanged.connect(self._draft_edited)
+        self.target.currentIndexChanged.connect(self._draft_edited)
+        self.materials.itemChanged.connect(self._draft_edited)
+        self._mark_draft_clean()
+
+    def _draft_signature(self):
+        parameter = self.parameter.currentData()
+        values = tuple(self.selected_materials()) if parameter in CATEGORICAL else tuple(
+            control.text() for control in (self.minimum, self.maximum, self.step))
+        return parameter, self.target.currentData(), values
+
+    def has_unsaved_changes(self):
+        return self._draft_baseline is not None and self._draft_signature() != self._draft_baseline
+
+    def range_feedback(self):
+        message = (f'{len(self._rows)} saved range(s) in this table.' if self._rows else
+                   'No saved ranges in this table.')
+        if self.has_unsaved_changes():
+            message += '\nUnsaved range edits: click Save range to include them.'
+        return message
+
+    def _draft_edited(self, *_):
+        if self._updating_draft:
+            return
+        self.status.setText(self.range_feedback())
+        self.draftChanged.emit()
+
+    def _mark_draft_clean(self, prefix=''):
+        self._draft_baseline = self._draft_signature()
+        self.status.setText((prefix+' ' if prefix else '')+self.range_feedback())
+        self.draftChanged.emit()
 
     def records(self):
         return copy.deepcopy(self._rows)
@@ -130,6 +167,7 @@ class BoundsEditor(QWidget):
     def set_records(self, value):
         self._rows = self.validated_records(value)
         self._draw()
+        self._mark_draft_clean()
         self.changed.emit()
 
     def _selected_key(self):
@@ -159,6 +197,7 @@ class BoundsEditor(QWidget):
         self.materials.setVisible(categorical)
         self.materials_label.setVisible(categorical)
         selected = self.selected_materials()
+        blocker = QSignalBlocker(self.materials)
         self.materials.clear()
         for name in names(self.store.materials):
             item = QListWidgetItem(name)
@@ -185,7 +224,7 @@ class BoundsEditor(QWidget):
             return False
         key = range_key({'Parameter': self.parameter.currentData(), 'Target': self.target.currentData()})
         self._draw(key)
-        self.status.setText('Range saved. The next search uses these limits.')
+        self._mark_draft_clean('Range saved.')
         self.changed.emit()
         return True
 
@@ -195,17 +234,22 @@ class BoundsEditor(QWidget):
         row = next((r for r in self._rows if range_key(r) == key), None)
         if row is None:
             return
-        self.parameter.setCurrentIndex(self.parameter.findData(row['Parameter']))
-        self._refresh_controls()
-        self.target.setCurrentIndex(self.target.findData(str(row.get('Target') or '')))
-        if row['Parameter'] in CATEGORICAL:
-            chosen = str(row['Choices']).split(';')
-            for i in range(self.materials.count()):
-                item = self.materials.item(i)
-                item.setCheckState(Qt.CheckState.Checked if item.text() in chosen else Qt.CheckState.Unchecked)
-        else:
-            for widget, key in ((self.minimum, 'Min'), (self.maximum, 'Max'), (self.step, 'Step')):
-                widget.setValue(float(row[key]))
+        self._updating_draft = True
+        try:
+            self.parameter.setCurrentIndex(self.parameter.findData(row['Parameter']))
+            self._refresh_controls()
+            self.target.setCurrentIndex(self.target.findData(str(row.get('Target') or '')))
+            if row['Parameter'] in CATEGORICAL:
+                chosen = str(row['Choices']).split(';')
+                for i in range(self.materials.count()):
+                    item = self.materials.item(i)
+                    item.setCheckState(Qt.CheckState.Checked if item.text() in chosen else Qt.CheckState.Unchecked)
+            else:
+                for widget, key in ((self.minimum, 'Min'), (self.maximum, 'Max'), (self.step, 'Step')):
+                    widget.setValue(float(row[key]))
+        finally:
+            self._updating_draft = False
+        self._mark_draft_clean()
 
     def remove_range(self):
         key = self._selected_key()
@@ -213,11 +257,13 @@ class BoundsEditor(QWidget):
             return
         self._rows = [r for r in self._rows if range_key(r) != key]
         self._draw()
-        self.status.setText('Range removed.')
+        self.status.setText('Range removed. '+self.range_feedback())
+        self.draftChanged.emit()
         self.changed.emit()
 
     def refresh(self, reason=None):
         if reason not in (None,'project','study','structure','undo'):return
+        was_dirty = self.has_unsaved_changes()
         patterns = rows(self.store.patterns, PAT_COLS)
         data, removed = prune_bounds(self._rows, self.store.materials, self.store.layers,
             self.store.patterns, patterns_changed=patterns != self._patterns)
@@ -225,6 +271,10 @@ class BoundsEditor(QWidget):
         self._rows = data.to_dict('records')
         self._refresh_controls()
         self._draw()
+        if not was_dirty:
+            self._mark_draft_clean()
+        else:
+            self._draft_edited()
         if removed:
             self.status.setText(f'{removed} range(s) removed after a Structure edit. Select the current layer or region to set its limits.')
             if reason not in ('project','study'):
