@@ -1,11 +1,11 @@
 {
-  "version": "1.4.0-alpha.14",
-  "build_date": "2026-11-01",
+  "version": "1.4.0",
+  "build_date": "2026-11-02",
   "signed": false,
   "source_tests_run": 247,
   "source_tests_skipped": 0,
   "source_tests_passed": 247,
-  "source_tree_sha256": "883ea917d5d34e360a96906b4c89cacc736d80c7356643fd3225e5912bcaaa13",
+  "source_tree_sha256": "fea24e5798daaf63e264ce911bbaf19cacfcdfa6360442ecd3a4076b2422b917",
   "frozen_verification": "partial",
   "native_startup_verification": "passed",
   "packaged_checks": {
@@ -29,8 +29,8 @@
   "public_payload": "Application, dependency runtime, public Silicon tutorial, guides, licenses and corresponding source. Empty user library.",
   "archive_integrity": "pending",
   "published": false,
-  "release_channel": "highly_experimental",
-  "validation_scope": "247 targeted staged-source tests and 34 packaging/privacy/license tests, zero failures/errors/skips; exact code match for 201 modules in each executable plus standalone Meep and research workers; critical frozen profile and actual Windows startup passed; fresh Terra disabled-object checks and restart restoration, readable Beam guidance, completed compatible saved-source Beam reuse and physical-change rejection passed with explicit scope-to-process attribution and observed normal exit for every inspected process. Full installer matrix not rerun. See release notes for the dated aggregate scientific results; execution, numerical convergence and paper agreement remain distinct.",
+  "release_channel": "stable",
+  "validation_scope": "Fresh final 1.4.0 source 247, package 34, updater 53, compiled-source equality 201 modules per executable, eight critical frozen checks, seven real Windows startup checks and fresh manual smoke passed. Complete installer matrix and operational Stop were not rerun. No new scientific convergence or paper agreement is claimed.",
   "packaged_self_tests_passed": false,
   "compiled_validation_profile": "critical_release",
   "critical_packaged_checks_passed": true,
@@ -97,24 +97,46 @@
     "test_pcsel_research.PCSELResearchTests.test_bad_layer_targets_exact_property_and_poles_respect_bounds"
   ],
   "source_test_scope": "Selected campaign regressions and release gates; offscreen/unit checks are not native scientific acceptance.",
-  "executable_sha256": "d36748a043c26dbf56b710de1ea6fc31f16e30abb02a13489e44a91ed6257859",
-  "backend_executable_sha256": "a5eb2c3445c66e6b6f7d3a69a3ced27503001b3583919159bb63734e2634e5ac",
+  "executable_sha256": "c832a724fb24fbd3af8b153b0916facc583e353184da8b1eb64e802f2ab57fa3",
+  "backend_executable_sha256": "61a1e8ea0b2985409fbb88fc83713f31ea5f37c1d1441769b22ed91fa08e43aa",
   "frozen_module_inventory": {
     "Optical Design Studio.exe": {
-      "sha256": "d36748a043c26dbf56b710de1ea6fc31f16e30abb02a13489e44a91ed6257859",
+      "sha256": "c832a724fb24fbd3af8b153b0916facc583e353184da8b1eb64e802f2ab57fa3",
       "required_modules": 117,
       "numpy_version": "1.26.4"
     },
     "OpticalDesignBackend.exe": {
-      "sha256": "a5eb2c3445c66e6b6f7d3a69a3ced27503001b3583919159bb63734e2634e5ac",
+      "sha256": "61a1e8ea0b2985409fbb88fc83713f31ea5f37c1d1441769b22ed91fa08e43aa",
       "required_modules": 117,
       "numpy_version": "1.26.4"
     }
   },
   "dependency_license_files": 14,
-  "documentation_amendments": [],
+  "documentation_amendments": [
+    {
+      "kind": "extraction_instructions_only",
+      "added": [],
+      "changed": [
+        "RELEASE_NOTES.md",
+        "START_HERE.md"
+      ],
+      "gui_rerun": false,
+      "prior_gui_and_native_results_reused": true,
+      "scope": "Two documentation files clarify LZMA ZIP extraction through the unchanged updater or7-Zip. Original eight frozen checks and seven Windows startup checks belong to the unchanged final executables; no rerun is claimed."
+    }
+  ],
+  "full_packaged_matrix_rerun": false,
+  "manual_packaged_ui_checks": {
+    "passed": true,
+    "version": "1.4.0",
+    "executable_sha256": "c832a724fb24fbd3af8b153b0916facc583e353184da8b1eb64e802f2ab57fa3",
+    "source_tree_sha256": "fea24e5798daaf63e264ce911bbaf19cacfcdfa6360442ecd3a4076b2422b917",
+    "close_exit_code": 0,
+    "scope": "Manual UI smoke only. No scientific solver run, installer, active cancellation, convergence or paper agreement tested."
+  },
+  "updater_regression_tests": 53,
   "limitations": [
-    "Highly Experimental prerelease.",
+    "Release channel is stable; compiled acceptance is limited to the explicitly listed critical profile.",
     "Completed calculations do not establish convergence or agreement for arbitrary edited devices.",
     "Finite-area PCSEL remains unconverged in the existing reference audit."
   ]

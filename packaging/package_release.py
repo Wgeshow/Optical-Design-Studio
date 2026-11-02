@@ -14,8 +14,8 @@ BUILD = Path(__file__).resolve().parent
 ROOT = BUILD.parent
 SRC = BUILD/'source'
 APP = BUILD/'dist'/'Optical Design Studio'
-OUT = ROOT/'GitHub-Release-1.4.0-alpha.14'
-VERSION = '1.4.0-alpha.14'
+OUT = ROOT/'GitHub-Release-1.4.0'
+VERSION = '1.4.0'
 REQUIRED_FROZEN_MODULES = ('field_volume', 'qt_field_volume', 'qt_native_field_volume',
     'qt_native_figure', 'qt_native_plot', 'qt_structure_3d', 'qt_lattice_diagram',
     'qt_windows_glass', 'qt_help', 'qt_materials', 'qt_core', 'data_library',
@@ -287,7 +287,9 @@ def main():
     entries = [(APP/name, name) for name in files]
     entries.append((APP/'PAYLOAD-MANIFEST.json', 'PAYLOAD-MANIFEST.json'))
     print('Creating verified portable ZIP', flush=True)
-    create_zip(portable, entries, 'Optical Design Studio/', 1)
+    create_zip(portable, entries, 'Optical Design Studio/', 9)
+    if portable.stat().st_size >= 2 * 1024**3:
+        raise ValueError('Updater-compatible portable ZIP exceeds GitHub per-asset limit.')
     source = OUT/f'OpticalDesignStudio-Source-{VERSION}.zip'
     readable = APP/'_internal'/'source'
     source_entries = [(readable/name, ('native/'+name if name.startswith('S4-source/') else 'src/'+name))
@@ -301,7 +303,7 @@ def main():
          'stage_release.py', 'build_release.py', 'test_release_source.py', 'verify_release.py',
          'package_release.py', 'test_release_package_gates.py', 'test_packaging.py', 'test_native_setup_packaging.py',
          'verify_release_source_smoke.py', 'audit_source_recipe.py', 'audit_release_archives.py',
-         'package_experimental_candidate.py', 'test_thermal_packaging.py', 'seed_library.zip',
+         'package_experimental_candidate.py', 'package_final_release.py', 'test_thermal_packaging.py', 'seed_library.zip',
          'stage-manifest.json', 'source-stage-manifest.json',
          'START_HERE.md', 'RELEASE_NOTES.md', 'THIRD_PARTY_NOTICES.md', 'SOURCE_README.md', 'BUILDING.md')]
     source_entries += [(BUILD/name, name) for name in ('START_HERE.md', 'RELEASE_NOTES.md', 'THIRD_PARTY_NOTICES.md')]
@@ -323,3 +325,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

@@ -1,6 +1,6 @@
-# Build Optical Design Studio 1.4.0-alpha.6 â€” Highly Experimental
+# Build Optical Design Studio 1.4.0 — build and verification
 
-Build with Windows x64 CPython 3.12 and PyInstaller 6.16.0. The application version is 1.4.0-alpha.6, the build date is 2026-11-01, and Windows version metadata is 1.4.0.6 with the prerelease flag. Build and audit in a fresh directory; preserve existing releases.
+Build with Windows x64 CPython 3.12 and PyInstaller 6.16.0. The application version is 1.4.0, the build date is 2026-11-02, and Windows version metadata is 1.4.0.0 without the prerelease flag. Build and audit in a fresh directory; preserve existing releases.
 
 ## Native and optional dependency inputs
 
@@ -36,16 +36,12 @@ Source test reports must name the exact staged source hash and list the checks a
 
 ## Experimental shipment
 
-`package_release.py` retains the complete-verification gate. A Highly Experimental release may instead use `package_experimental_candidate.py` with fresh source/build reports, a passing critical frozen profile and real Windows startup, and explicit limits on the unrun full matrix. It must not describe unrun checks as passed. Create a portable `.7z`, a corresponding source `.zip`, SHA-256 checksums and an archive audit; verify exact inventories and integrity before publishing. The portable payload includes source and third-party licenses, but no user runs, preferences, projects or solver installation receipts.
+`package_release.py` retains its complete-verification gate. The actual 1.4.0 release uses a separately identified critical profile and the supplied `package_final_release.py` helper. It records the narrower scope, requires the exact eight frozen critical checks, seven real Windows startup checks, fresh process-attributed manual acceptance, source/package/updater tests, compiled-source equality, dependency licenses and matching native source. The complete theme/field/installer matrix is not implied by this profile.
 
-For the bounded experimental profile, prepare the payload as above, run the verifier with `--critical`, finish the release notes, and audit the corresponding source recipe before creating archives:
+After payload preparation, run `verify_release.py` with `--critical`, finish fresh manual acceptance, and audit the source recipe. Preserve all receipts. The final helper requires the reviewed build receipts in the adjacent release-audit directory and refuses existing output assets:
 
 ```powershell
-python .\verify_release.py ".\dist\Optical Design Studio\Optical Design Studio.exe" --critical --output .\verification
-python .\audit_source_recipe.py
-python .\package_experimental_candidate.py --seven-zip "C:\Program Files\7-Zip\7z.exe" --allow-partial --validation-scope "Targeted source checks, critical frozen profile, and real Windows startup; full theme and field matrix not rerun."
+python .\package_final_release.py --allow-critical-profile --validation-scope "Targeted source and updater tests, critical frozen profile, real Windows startup and fresh manual checks; full packaged matrix not rerun."
 ```
 
-The critical profile checks all 29 chooser routes, independent setups and transfer, absence of stray panels, exact grid output, environment resources, bundled dependencies, and a native CPU spectrum. Real Windows startup and restore/maximize checks remain mandatory. It does not claim the full theme and scientific field matrix passed. The experimental helper verifies both executable module inventories and records the actual omitted checks, final archive integrity, and exact corresponding-source hashes.
-
-These recipes build local artifacts only; they do not publish, sign or install the application.
+It creates an LZMA-compressed ZIP compatible with the existing updater (manual extraction uses 7-Zip), a corresponding source ZIP, checksums and aggregate validation. Exact inventories, per-file SHA-256 comparisons and CRC checks precede publication. `packaged_self_tests_passed=false` truthfully records that the full profile was not run; the separately named critical/startup/manual gates record their actual results. The public payload excludes user runs, preferences, projects and solver-installation receipts. A rebuilder must supply fresh receipts for their own source and executable rather than reuse this release's hashes.

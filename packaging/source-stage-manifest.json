@@ -1,7 +1,7 @@
 {
-  "version": "1.4.0-alpha.14",
-  "build_date": "2026-11-01",
-  "tree_sha256": "883ea917d5d34e360a96906b4c89cacc736d80c7356643fd3225e5912bcaaa13",
+  "version": "1.4.0",
+  "build_date": "2026-11-02",
+  "tree_sha256": "fea24e5798daaf63e264ce911bbaf19cacfcdfa6360442ecd3a4076b2422b917",
   "files": {
     "addon_runtime.py": {
       "size": 22124,
@@ -44,8 +44,8 @@
       "sha256": "fc2c73cc97431c3da12d78191c24ec71e47d72cc035969c7fed56c15a2663b2c"
     },
     "app_version.py": {
-      "size": 1757,
-      "sha256": "d3b3eb7ed72fbbce0e60c1f576543bd67ed81f21f1798eec9d56d70e0848957c"
+      "size": 1748,
+      "sha256": "65f36d190458579426e5132bc9ff77dfc52e53ec51449b293d3bab86d8d1d8b8"
     },
     "application_restart.py": {
       "size": 7182,
